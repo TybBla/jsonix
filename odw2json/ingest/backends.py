@@ -26,6 +26,11 @@ def _pdfplumber(path: Path) -> list[str]:
         return [(p.extract_text() or "") for p in pdf.pages]
 
 
+def _fix_pdfium_text(text: str) -> str:
+    """Końce wierszy do ``\\n``; usuwa U+FFFE (znacznik miękkiego łącznika), więc wyraz się skleja."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("￾", "")
+
+
 def _pypdfium2(path: Path) -> list[str]:
     import pypdfium2 as pdfium
 
@@ -40,7 +45,7 @@ def _pypdfium2(path: Path) -> list[str]:
             finally:
                 textpage.close()
                 page.close()
-            pages.append(text.replace("\r\n", "\n").replace("\r", "\n"))
+            pages.append(_fix_pdfium_text(text))
         return pages
     finally:
         pdf.close()
