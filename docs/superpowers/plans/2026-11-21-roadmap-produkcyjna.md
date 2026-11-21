@@ -53,7 +53,7 @@ Cel: zdążyć z pełną pętlą do v1.0. Zostaje wszystko, co wymagają kryteri
 - GUI w React, edytor konfiguracji typów w GUI, podświetlanie po współrzędnych (bbox), testy e2e (Playwright), audyt dostępności.
 - Komenda `odw2json new-doctype` (generator szkieletu typu).
 - API: limity, OpenAPI w repo, pełna obsługa błędów.
-- pdfplumber: stopka przed ``; `mypy`; porządki w logach.
+- pdfplumber: stopka przed `\f`; `mypy`; porządki w logach.
 
 ---
 
