@@ -2,6 +2,22 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v0.2.1 — E2b: skany (2026-11-21)
+
+- 30 syntetycznych skanów UZP (bez warstwy tekstowej, z GT) w `data/train/skany/`; podział dev/holdout 23/7.
+- OCR obowiązkowy (`rapidocr` + `onnxruntime` w `requirements.txt`) i ~4× szybszy: **2,99 s/str.** (`docs/decyzje/E2b-ocr-wydajnosc.md`).
+- Ewaluacja świadoma skanów: GT `X.pdf → X.json`, typ z kluczy GT, metryki `tekst`/`skan`, `eval.gate --source`.
+- Trace z `ocr_used`, `backend`, `warnings`; czyszczenie artefaktów OCR tylko na stronach z OCR.
+- CI bramkuje dokumenty z tekstem (`--source tekst`); testy z prawdziwym OCR oznaczone `ocr_live`.
+- Dokumentacja zespołu: `AGENTS.md`, `CLAUDE.md`, `docs/kryteria-uzp.md`, zakres v1.0, plan E8+E9.
+
+| Bramka | wynik |
+|---|---|
+| Skany wczytane z OCR | 30/30 |
+| Pokrycie GT na skanach | cyfrowe 100%, dosłowne 91,0%, razem 94,4% |
+| Pokrycie GT na dokumentach z tekstem | 1460/1460 |
+| Skany: negatywy / błędy klasyfikacji | 3/3 / 0 |
+
 ## v0.2.0 — E2: ingest produkcyjny (2026-11-21)
 
 - Wymienne backendy PDF (pypdf, pdfplumber, pypdfium2) z fallbackiem; wybrany **pypdfium2** (benchmark: `docs/decyzje/E2-backend-pdf.md`).
