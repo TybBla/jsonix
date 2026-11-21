@@ -1,9 +1,12 @@
 """Sektor A: rozpoznanie typu dokumentu na podstawie ``classify:`` z config/doctypes/*.yaml.
 
 Punktacja typu (szczegóły: ``features.evaluate``): frazy ``strong``/``weak``/``negative`` (obecność),
-``title`` (fraza w nagłówku, rozstrzelone litery zwinięte), ``patterns`` (regex z wagą). Typ z
-niespełnionym ``required_any`` odpada. Wygrywa typ o najwyższym wyniku, o ile wynik >= ``min_score``
-tego typu i przewaga nad drugim typem >= ``min_margin``; inaczej dokument jest nieznany (``None``).
+``title`` (fraza w nagłówku - gdziekolwiek albo jako osobna linia wg ``title_mode``; rozstrzelone litery
+zwinięte), ``patterns`` (regex z wagą), a dla wszystkich typów naraz kara ``foreign_titles`` z
+``config/classify.yaml`` (linia nagłówka zaczynająca się od „wyrok”, „faktura” itp.). Typ z
+niespełnionym ``required_any`` (frazy, regexy, grupy ``all_of``) odpada. Wygrywa typ o najwyższym
+wyniku, o ile wynik >= ``min_score`` tego typu i przewaga nad drugim typem >= ``min_margin``; inaczej
+dokument jest nieznany (``None``).
 
 ``confidence`` (0 dla dokumentu nieznanego, w przeciwnym razie w [0, 1]) = ``margines * nasycenie``:
 ``margines = (best - max(second, 0)) / best``, ``nasycenie = min(1, best / (2 * min_score))``
@@ -13,18 +16,29 @@ odrzucenia i cechy najlepszego kandydata). Typ wyłącznie z treści - nazwa pli
 
 from __future__ import annotations
 
+from functools import cache
+
 from odw2json.classify import features
-from odw2json.config_loader import DocTypeConfig
+from odw2json.config_loader import ClassifySettings, DocTypeConfig, load_classify_settings
 from odw2json.contracts import Classification, Document
 
 METHOD = "keywords"
 
 
-def classify(doc: Document, registry: dict[str, DocTypeConfig]) -> Classification:
+@cache
+def _global_settings() -> ClassifySettings:
+    return load_classify_settings()
+
+
+def classify(
+    doc: Document, registry: dict[str, DocTypeConfig], settings: ClassifySettings | None = None
+) -> Classification:
+    """Rozpoznaje typ; ``settings`` (domyślnie ``config/classify.yaml``) = globalne kary za nagłówki obce."""
+    settings = settings if settings is not None else _global_settings()
     prepared = features.Prepared(doc.text)
     if not prepared.full:
         return Classification(doc_type=None, confidence=0.0, method="empty")
-    results = {k: features.evaluate(prepared, cfg.classify) for k, cfg in registry.items()}
+    results = {k: features.evaluate(prepared, cfg.classify, settings) for k, cfg in registry.items()}
     scores = {k: r.score for k, r in results.items()}
     candidates = [k for k, r in results.items() if r.excluded is None]
     if not candidates:

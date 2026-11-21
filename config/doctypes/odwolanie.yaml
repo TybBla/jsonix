@@ -5,6 +5,7 @@ classify:
   # Frazy i regexy dzialaja na tekscie znormalizowanym (male litery, bez polskich znakow).
   # Tytul "ODWOLANIE" stoi po blokach adresowych stron - stad dluzszy naglowek.
   title: ["odwolanie"]
+  title_mode: line
   header_chars: 1500
   strong: ["odwolanie", "odwolujacy", "zarzut", "krajowej izby odwolawczej"]
   weak: ["zamawiajacy", "prawo zamowien publicznych", "wnosze o"]
@@ -12,6 +13,9 @@ classify:
   patterns:
     - {regex: 'odwolujacy:', weight: 3}
     - {regex: 'zarzut nr \d+', weight: 3}
+  # Odwolanie ma tytul jako osobna linie albo strukture "Odwolujacy:" / "Zarzut nr N" - same slowa domenowe
+  # (pismo do zamawiajacego, wyrok KIO) nie wystarcza.
+  required_any: ["@title", "odwolujacy:", 're:zarzut nr \d+']
   min_score: 8.0   # pojedyncze slowa domenowe (np. w wyroku KIO) nie wystarcza
   min_margin: 2.0
 # Sektor B: opis pol (metoda, normalizacja, zrodla). Format wolny do czasu ustalenia przez B.
