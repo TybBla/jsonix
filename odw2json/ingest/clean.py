@@ -7,6 +7,7 @@ Znak ``\\f`` jest twarda granica stron i nie jest usuwany przez zaden krok.
 
 from __future__ import annotations
 
+import functools
 import re
 import unicodedata
 from collections.abc import Callable
@@ -65,6 +66,16 @@ def dashes(text: str) -> str:
     return text.translate(_DASHES)
 
 
+def _per_page(fn: Callable[[str], str]) -> Callable[[str], str]:
+    """Krok liniowy stosowany osobno do kazdej strony: ``\\f`` jest twarda granica wiersza i strony."""
+
+    @functools.wraps(fn)
+    def wrapper(text: str) -> str:
+        return "\f".join(fn(page) for page in text.split("\f"))
+
+    return wrapper
+
+
 def dehyphenate(text: str) -> str:
     """``wyra-\\nzu`` -> ``wyrazu``: litera, myslnik na koncu wiersza, mala litera."""
     return _DEHYPHEN_RE.sub("", text)
@@ -91,6 +102,7 @@ def _should_join(prev: str, nxt: str) -> bool:
     return not (_LIST_MARKER_RE.match(n) or _LOWER_LABEL_RE.match(n))
 
 
+@_per_page
 def join_wrapped_lines(text: str) -> str:
     """Skleja lamane wiersze akapitu; konserwatywnie (lepiej niedokleic).
 
@@ -105,6 +117,7 @@ def join_wrapped_lines(text: str) -> str:
     return "\n".join(out)
 
 
+@_per_page
 def collapse_spaces(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" +$", "", text, flags=re.M)
@@ -128,17 +141,21 @@ def _strip_repeated_footers(text: str) -> str:
         repeated = {k for k, c in counts.items() if c >= 2}
         if not repeated:
             return "\f".join(pages)
+        seen: set[str] = set()
         new_pages = []
         for lines, idx in zip(split, last_idx, strict=True):
             if idx is not None and lines[idx].strip() in repeated:
-                del lines[idx]
+                key = lines[idx].strip()
+                if key in seen:  # pierwsze wystapienie (strona 1) zostaje, powtorzenia znikaja
+                    del lines[idx]
+                seen.add(key)
             new_pages.append("\n".join(lines))
         pages = new_pages
 
 
 def strip_page_artifacts(text: str) -> str:
-    """Usuwa ``Strona X z Y`` oraz identyczne stopki powtorzone na >= 2 stronach (wymaga ``\\f``)."""
-    text = _PAGE_FOOTER_RE.sub("", text)
+    """Usuwa ``Strona X z Y`` oraz powtorzenia identycznej stopki (zostaje pierwsze; wymaga ``\\f``)."""
+    text = "\f".join(_PAGE_FOOTER_RE.sub("", page) for page in text.split("\f"))
     if "\f" in text:
         text = _strip_repeated_footers(text)
     return text

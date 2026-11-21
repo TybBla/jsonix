@@ -34,9 +34,9 @@ class RunReport:
 
 
 def process_file(
-    pdf: Path, registry: dict[str, DocTypeConfig]
+    pdf: Path, registry: dict[str, DocTypeConfig], ingest_cfg: dict | None = None
 ) -> tuple[Classification, ExtractionResult | None]:
-    doc = ingest.load(pdf)
+    doc = ingest.load(pdf, cfg=ingest_cfg)
     cls = classify.classify(doc, registry)
     if cls.doc_type is None:
         return cls, None
@@ -94,6 +94,9 @@ def run(
     """Przetwarza wszystkie PDF-y z input_dir (case'y w podfolderach lub luzem)."""
     app_cfg = app_cfg if app_cfg is not None else load_app_config()
     registry = registry or load_registry()
+    ingest_cfg = app_cfg.get("ingest")
+    effective = ingest_cfg if ingest_cfg is not None else load_app_config().get("ingest") or {}
+    ingest.validate_ingest_cfg(effective)  # błąd konfiguracji przerywa run
     run_id = run_id or new_run_id()
     report = RunReport(run_id=run_id)
     started = datetime.now(UTC)
@@ -103,7 +106,7 @@ def run(
         t0 = time.perf_counter()
         rel = str(pdf.relative_to(input_dir))
         try:
-            cls, res = process_file(pdf, registry)
+            cls, res = process_file(pdf, registry, ingest_cfg)
             write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg, run_id)
             report.processed += 1
             key = cls.doc_type or "nieznany"
