@@ -1,4 +1,5 @@
 """Wspólne funkcje normalizacji tekstu."""
+
 from __future__ import annotations
 
 import re

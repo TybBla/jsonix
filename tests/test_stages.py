@@ -10,8 +10,11 @@ def test_ingest_reads_text(train_dir):
 
 def test_classify_positive_examples(train_dir):
     reg = load_registry()
-    expected = {"odwolanie.pdf": "odwolanie", "pelnomocnictwo.pdf": "pelnomocnictwo",
-                "potwierdzenie_przelewu.pdf": "przelew"}
+    expected = {
+        "odwolanie.pdf": "odwolanie",
+        "pelnomocnictwo.pdf": "pelnomocnictwo",
+        "potwierdzenie_przelewu.pdf": "przelew",
+    }
     for name, typ in expected.items():
         c = classify.classify(ingest.load(train_dir / "przyklad_01" / name), reg)
         assert c.doc_type == typ, (name, c)
@@ -32,12 +35,15 @@ def test_extract_baseline_returns_template_with_derived():
 
 def ingest_stub():
     from pathlib import Path
+
     from odw2json.contracts import Document
+
     return Document(path=Path("x.pdf"), text="", pages=[""])
 
 
 def test_derived_lookup_fills_opis():
     from odw2json.extract import apply_derived
+
     cfg = load_registry()["odwolanie"]
     data = cfg.template()
     data["OdwolanieKIO"]["czynnosc_powod_id"] = 9

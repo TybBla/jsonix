@@ -3,6 +3,7 @@
 Wersja bazowa: zwraca szablon z nullami + pola 'derived' (lookupy).
 TODO(B): reguły regex, LLM dla pól semantycznych, merge, normalizacja, walidacja.
 """
+
 from __future__ import annotations
 
 from typing import Any

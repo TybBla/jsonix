@@ -1,4 +1,5 @@
 """Sklejenie etapów: ingest -> classify -> extract -> zapis JSON (+ trace)."""
+
 from __future__ import annotations
 
 import json
@@ -27,7 +28,9 @@ class RunReport:
     errors: list[FileError] = field(default_factory=list)
 
 
-def process_file(pdf: Path, registry: dict[str, DocTypeConfig]) -> tuple[Classification, ExtractionResult | None]:
+def process_file(
+    pdf: Path, registry: dict[str, DocTypeConfig]
+) -> tuple[Classification, ExtractionResult | None]:
     doc = ingest.load(pdf)
     cls = classify.classify(doc, registry)
     if cls.doc_type is None:
@@ -39,8 +42,14 @@ def _dump(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
 
 
-def write_outputs(pdf: Path, input_dir: Path, output_dir: Path, cls: Classification,
-                  res: ExtractionResult | None, app_cfg: dict) -> Path | None:
+def write_outputs(
+    pdf: Path,
+    input_dir: Path,
+    output_dir: Path,
+    cls: Classification,
+    res: ExtractionResult | None,
+    app_cfg: dict,
+) -> Path | None:
     rel = pdf.relative_to(input_dir).with_suffix(".json")
     target = output_dir / rel
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -55,15 +64,25 @@ def write_outputs(pdf: Path, input_dir: Path, output_dir: Path, cls: Classificat
     if app_cfg.get("write_trace", True):
         tr = output_dir / ".trace" / rel.with_suffix(".trace.json")
         tr.parent.mkdir(parents=True, exist_ok=True)
-        tr.write_text(_dump({
-            "source": str(pdf), "classification": asdict(cls),
-            "trace": [asdict(f) for f in res.trace] if res else [],
-        }), encoding="utf-8")
+        tr.write_text(
+            _dump(
+                {
+                    "source": str(pdf),
+                    "classification": asdict(cls),
+                    "trace": [asdict(f) for f in res.trace] if res else [],
+                }
+            ),
+            encoding="utf-8",
+        )
     return target
 
 
-def run(input_dir: Path, output_dir: Path, app_cfg: dict | None = None,
-        registry: dict[str, DocTypeConfig] | None = None) -> RunReport:
+def run(
+    input_dir: Path,
+    output_dir: Path,
+    app_cfg: dict | None = None,
+    registry: dict[str, DocTypeConfig] | None = None,
+) -> RunReport:
     """Przetwarza wszystkie PDF-y z input_dir (case'y w podfolderach lub luzem)."""
     app_cfg = app_cfg if app_cfg is not None else load_app_config()
     registry = registry or load_registry()
