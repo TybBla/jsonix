@@ -22,7 +22,7 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 ## 3. Ocena
 - **Etap 1 (preselekcja): 100% F1** na ukrytym zbiorze (≥ 10 spraw).
 - **Etap 2 (finał, max 3 zespoły): 50% F1 + 50% elastyczność**, w tym:
-  - 1–20 pkt za **moc modelu LLM** (mniejszy = więcej punktów; **bez LLM = maksimum**, UZP Discord 13:52),
+  - 1–20 pkt za **moc modelu LLM** wg **średniej liczby parametrów wszystkich użytych modeli** (przy MoE liczą się parametry ogółem, nie aktywne): **≤ 8B = 20**, >8–14B = 18, >14–32B = 12, >32–70B = 8, >70–150B = 4, >150B = 0. Bez LLM = maksimum (UZP Discord 13:52). Przykład UZP: modele 3B i 32B → średnia 17,5B → 12 pkt. **Wniosek: każdy model ≤ 8B nie kosztuje punktów; nie mieszamy z większymi.**
   - 1–20 pkt za **łatwość dodawania nowych typów dokumentów i pól bez przebudowy** (konfiguracja zamiast kodu),
   - 1–10 pkt za **inne funkcje** (np. GUI).
 - GUI nie jest wymagane, ale punktowane; idealnie: wgranie PDF, uruchomienie analizy, **podgląd dokumentu obok wyodrębnionych danych**.
