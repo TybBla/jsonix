@@ -2,13 +2,16 @@
 
 **jsonix** zamienia dokumenty PDF spraw odwoławczych KIO (odwołanie, pełnomocnictwo, potwierdzenie przelewu) na dane JSON zgodne ze schematami UZP: rozpoznaje typ dokumentu z treści i wyodrębnia pola, pokazując, skąd pochodzi każda wartość. Dokumenty spoza tych typów są rozpoznawane jako **nieznane**.
 
-## Szybki start (Windows, Python 3.13+)
+## Szybki start (Windows)
 
 ```powershell
-pip install -r requirements.txt
-copy .env.example .env    # opcjonalnie: tylko z LLM (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY)
-start.bat                 # = python -m odw2json run input output
+start.bat                 # wsad: input\ -> output\ (python -m odw2json run input output)
+start-gui.bat             # GUI w przeglądarce: http://127.0.0.1:8000
 ```
+
+Przy pierwszym uruchomieniu `start.bat` (i `start-gui.bat`) sam przygotowuje środowisko (`scripts/setup-env.bat`): użyje Pythona z `PATH`, jeśli ma już zależności, a w przeciwnym razie utworzy `.venv` na **Pythonie 3.13 lub 3.14** (launcher `py`) i zainstaluje `requirements.txt` (jednorazowo, kilka minut, potrzebny internet). Plik `.env` jest opcjonalny — tylko z LLM (`copy .env.example .env`, uzupełnij `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
+
+**Wersja Pythona.** Zalecany **Python 3.13 lub 3.14**. Na nowszym (3.15+) aplikacja się instaluje i działa, ale **OCR skanów jest niedostępny** (paczki `onnxruntime`/`pyclipper` nie mają jeszcze wersji dla 3.15): dokumenty z warstwą tekstową są przetwarzane normalnie, a skan bez tekstu dostaje ostrzeżenie. Ręcznie: `py -3.13 -m venv .venv`, `.venv\Scripts\pip install -r requirements.txt`, `.venv\Scripts\python -m odw2json run input output`. Linux/macOS: `pip install -r requirements.txt`, `sh start.sh` (wybiera Pythona 3.13+).
 
 - Wejście: `input/<sprawa>/<plik>.pdf` (lub PDF-y luzem w `input/`).
 - Wyjście: `output/<sprawa>/<plik>.json` — nazwa jak plik wejściowy.
@@ -22,7 +25,7 @@ python -m odw2json serve         # API + GUI na http://127.0.0.1:8000
 docker compose up --build        # to samo w Dockerze (sekcja „Docker” niżej)
 ```
 
-**OCR.** Skany bez warstwy tekstowej czyta OCR (rapidocr + onnxruntime, w `requirements.txt`, modele w paczce, bez sieci w czasie działania). Paczki OCR są dostępne dla Pythona 3.13; ten sam OCR jest w obrazie Dockera.
+**OCR.** Skany bez warstwy tekstowej czyta OCR (rapidocr + onnxruntime, w `requirements.txt`, modele w paczce, bez sieci w czasie działania). Paczki OCR są dostępne dla Pythona 3.13 i 3.14 (na 3.15+ OCR jest pomijany, patrz wyżej); ten sam OCR jest w obrazie Dockera.
 
 ## Docker
 
