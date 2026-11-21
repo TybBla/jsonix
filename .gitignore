@@ -12,3 +12,5 @@ input/*
 web/node_modules/
 fundament/
 *.log
+bench_out/
+.claude/worktrees/
