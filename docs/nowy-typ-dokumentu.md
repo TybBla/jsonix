@@ -163,6 +163,7 @@ liter (chyba że `case: true`); grupa nazwana `v` = wartość.
 | `section_line` | `section_line: nagłówek` | `n` (1; 0 = linia nagłówka), `line_start` | `n`-ta niepusta linia po linii nagłówka |
 | `near` | `near: [frazy]` | `direction` (after/before/both), `max_chars` (200), `value`, `case` | wartość typu pola najbliżej frazy |
 | `const` | `const: 7` | — | stała |
+| `if_match` | `if_match: [frazy]` | `then` | stała `then`, gdy w zakresie jest któraś fraza (np. `{phrases: [ceidg], then: osoba_fizyczna}`, a dalej `const: osoba_prawna`) |
 | `derived` | (klucz pola) | `lookup`, `from` | wartość z innego pola przez słownik `config/lookups/<lookup>.yaml` (bez `lookup` — kopia) |
 
 `scope`: `after` (brak frazy = pole `null`), `before`, `max_chars`. Normalizatory (`normalize`, łańcuch po
@@ -173,6 +174,13 @@ kolei; `None` = odrzut): `ws`, `date` (→ ISO), `amount` (→ liczba), `iban` (
 `lists`: blok listy od frazy `start` do `end` (brak `start` = jeden pusty element z szablonu), elementy
 zaczynają się od `item_sep` (brak — cały blok to jeden element), `max_items`. Lista niezadeklarowana w `lists`
 = jeden element szukany w całym zakresie nadrzędnym. Pola elementu szukane są tylko w jego fragmencie tekstu.
+Dodatkowo (przykład: `config/doctypes/pelnomocnictwo.yaml`):
+- `split.item_regex` — zamiast `item_sep`: elementy zaczynają się od trafień regexu na **oryginale** z rozróżnianiem
+  wielkości liter (np. „Imię Nazwisko” po tytule `adw.`), czego nie da się wyrazić na tekście złożonym;
+- `groups` (lista zagnieżdżona) — podział **całego dokumentu** jak `split`; `i`-ty element rodzica szuka swojej
+  listy w `i`-tym bloku (np. podpisy „W imieniu X:” konsorcjum leżą daleko od danych mocodawców). Brak bloków =
+  zwykły fragment rodzica;
+- `unique: true` — pomija elementy puste i duplikaty (ta sama osoba w treści i pod podpisem); trace ma kolejne indeksy.
 
 Nowy ekstraktor/normalizator/walidator w Pythonie (gdy konfiguracja nie wystarcza): dekoratory
 `register_extractor(name, primary=..., options=(...))`, `register_normalizer(name)`, `register_validator(name)`

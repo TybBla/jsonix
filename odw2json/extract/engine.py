@@ -391,6 +391,20 @@ def ex_const(ctx: Ctx, opts: dict) -> Iterator[Hit]:
     yield Hit(opts.get("value"))
 
 
+@register_extractor("if_match", primary="phrases", options=("then",))
+def ex_if_match(ctx: Ctx, opts: dict) -> Iterator[Hit]:
+    """Stała ``then``, gdy w zakresie występuje któraś z fraz (``re:`` = regex na tekście złożonym);
+    pozycja trafienia trafia do trace.
+
+    Np. typ osoby: ``{if_match: {phrases: [ceidg], then: osoba_fizyczna}}``.
+    """
+    for ph in _as_list(opts.get("phrases")):
+        m = phrase_pattern(ph).search(ctx.folded, ctx.start, ctx.end)
+        if m:
+            yield Hit(opts.get("then"), m.start(), m.end())
+            return
+
+
 # ============================================================== normalizatory lokalne
 # Minimalne wersje za interfejsem ``fn(value: str) -> Any | None``; jeśli istnieje moduł
 # ``odw2json.extract.normalize`` (T2) / ``odw2json.extract.names`` (T3), ich funkcje je nadpisują.
@@ -665,40 +679,67 @@ def extract_field(ctx: Ctx, path: str, spec: FieldSpec) -> FieldResult | None:
     return None
 
 
-def _split_items(ctx: Ctx, region: tuple[int, int], spec: Any) -> list[tuple[int, int]]:
-    if spec is None or spec.split is None:
-        items = [region]
+def _split_region(ctx: Ctx, region: tuple[int, int], sp: Any) -> list[tuple[int, int]]:
+    """Blok ``start``..``end`` w ``region`` podzielony na elementy (``item_sep`` / ``item_regex``)."""
+    s, e = region
+    if sp.start:
+        m = phrase_pattern(sp.start).search(ctx.folded, s, e)
+        if not m:
+            return []
+        s = m.start()
+        search_from = m.end()
     else:
-        s, e = region
-        sp = spec.split
-        if sp.start:
-            m = phrase_pattern(sp.start).search(ctx.folded, s, e)
-            if not m:
-                return []
-            s = m.start()
-            search_from = m.end()
-        else:
-            search_from = s
-        if sp.end:
-            m = phrase_pattern(sp.end).search(ctx.folded, search_from, e)
-            if m:
-                e = m.start()
-        if sp.item_sep:
-            starts = [m.start() for m in phrase_pattern(sp.item_sep).finditer(ctx.folded, s, e)]
-            items = [(a, b) for a, b in zip(starts, starts[1:] + [e], strict=True)] if starts else [(s, e)]
-        else:
-            items = [(s, e)]
+        search_from = s
+    if sp.end:
+        m = phrase_pattern(sp.end).search(ctx.folded, search_from, e)
+        if m:
+            e = m.start()
+    if sp.item_sep:
+        starts = [m.start() for m in phrase_pattern(sp.item_sep).finditer(ctx.folded, s, e)]
+    elif getattr(sp, "item_regex", None):
+        starts = [m.start() for m in value_pattern(sp.item_regex, True).finditer(ctx.text, s, e)]
+    else:
+        return [(s, e)]
+    return [(a, b) for a, b in zip(starts, starts[1:] + [e], strict=True)] if starts else [(s, e)]
+
+
+def _split_items(ctx: Ctx, region: tuple[int, int], spec: Any) -> list[tuple[int, int]]:
+    items = [region] if spec is None or spec.split is None else _split_region(ctx, region, spec.split)
     if spec is not None and spec.max_items:
         items = items[: spec.max_items]
     return items
 
 
+def _group_region(ctx: Ctx, spec: Any, index: int | None) -> tuple[int, int] | None:
+    """``groups``: ``index``-ty blok całego dokumentu (``None`` = brak bloków, zostaje fragment rodzica)."""
+    if spec is None or getattr(spec, "groups", None) is None or index is None:
+        return None
+    groups = _split_region(ctx, (0, len(ctx.text)), spec.groups)
+    return groups[index] if index < len(groups) else None
+
+
+def _is_empty(v: Any) -> bool:
+    if isinstance(v, dict):
+        return all(_is_empty(x) for x in v.values())
+    if isinstance(v, list):
+        return all(_is_empty(x) for x in v)
+    return v is None
+
+
 def _fill(
-    obj: dict, prefix: str, concrete: str, region: tuple[int, int], ctx: Ctx, cfg: DocTypeConfig, trace: list
+    obj: dict,
+    prefix: str,
+    concrete: str,
+    region: tuple[int, int],
+    ctx: Ctx,
+    cfg: DocTypeConfig,
+    trace: list,
+    index: int | None = None,
 ) -> None:
     """Wypełnia ``obj`` polami o prefiksie ``prefix`` (DSL) w zakresie ``region``; listy rekurencyjnie.
 
-    ``concrete`` - ten sam prefiks z konkretnymi indeksami (``Odwolujacy[0].``) do trace.
+    ``concrete`` - ten sam prefiks z konkretnymi indeksami (``Odwolujacy[0].``) do trace;
+    ``index`` - indeks ``obj`` w liście nadrzędnej (dla ``groups``).
     """
     local = Ctx(ctx.doc, ctx.text, ctx.folded, region[0], region[1])
     lists: list[str] = []
@@ -722,11 +763,19 @@ def _fill(
     for name in lists:
         proto_list = get_path(obj, name)
         proto = proto_list[0] if isinstance(proto_list, list) and proto_list else {}
-        items = []
-        for i, r in enumerate(_split_items(local, region, cfg.lists.get(prefix + name))):
+        lspec = cfg.lists.get(prefix + name)
+        lregion = _group_region(ctx, lspec, index) or region
+        unique = bool(lspec is not None and lspec.unique)
+        items: list = []
+        for r in _split_items(local, lregion, lspec):
+            i = len(items)
             item = copy.deepcopy(proto)
-            _fill(item, f"{prefix}{name}{LIST_MARK}.", f"{concrete}{name}[{i}].", r, ctx, cfg, trace)
+            item_trace: list = []
+            _fill(item, f"{prefix}{name}{LIST_MARK}.", f"{concrete}{name}[{i}].", r, ctx, cfg, item_trace, i)
+            if unique and (_is_empty(item) or item in items):
+                continue
             items.append(item)
+            trace.extend(item_trace)
         set_path(obj, name, items or [copy.deepcopy(proto)])
     for rest, spec in derived:
         trace.append(_apply_derived_one(obj, rest, concrete + rest, spec, cfg, prefix, trace))

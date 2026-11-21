@@ -232,11 +232,23 @@ class SplitSpec(BaseModel):
     start: str | None = None
     end: str | None = None
     item_sep: str | None = None
+    # elementy od trafień regexu na ORYGINALE (wielkość liter ma znaczenie), np. imię i nazwisko
+    item_regex: str | None = None
 
     @field_validator("start", "end", "item_sep")
     @classmethod
     def _valid_phrases(cls, v: str | None) -> str | None:
         return _check_phrases(v)
+
+    @field_validator("item_regex")
+    @classmethod
+    def _valid_regex(cls, v: str | None) -> str | None:
+        if v is not None:
+            try:
+                re.compile(v)
+            except re.error as e:
+                raise ValueError(f"item_regex: niepoprawny regex {v!r}: {e}") from e
+        return v
 
 
 class ListSpec(BaseModel):
@@ -244,6 +256,11 @@ class ListSpec(BaseModel):
 
     split: SplitSpec | None = None
     max_items: int | None = Field(None, gt=0)
+    # lista zagnieżdżona: i-ty element rodzica szukany w i-tym bloku CAŁEGO dokumentu
+    # (brak bloków = fragment rodzica)
+    groups: SplitSpec | None = None
+    # bez duplikatów i pustych elementów (gdy nic nie znaleziono - jeden pusty element z szablonu)
+    unique: bool = False
 
 
 class DocTypeConfig(BaseModel):
