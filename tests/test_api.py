@@ -336,3 +336,10 @@ def test_zip_not_ready_or_empty_is_409_or_404(client, store):
     bad = _submit(client, [("notatka.txt", b"tekst", "text/plain")])
     _wait(client, bad)
     assert client.get(f"/api/jobs/{bad}/zip").status_code == 404
+
+
+def test_ascii_fallback_transliterates_polish_letters():
+    from odw2json.api.files import content_disposition
+
+    cd = content_disposition("Pełnomocnictwo Łódź żółć.json")
+    assert 'filename="Pelnomocnictwo Lodz zolc.json"' in cd

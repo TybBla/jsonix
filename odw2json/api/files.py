@@ -11,6 +11,7 @@ HEADER_WINDOW = 1024
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _UNSAFE = re.compile(r"[^\w.\- ]", re.UNICODE)
+_NON_DECOMPOSABLE = str.maketrans({"ł": "l", "Ł": "L"})
 _RESERVED = {"con", "prn", "aux", "nul"} | {f"{p}{i}" for p in ("com", "lpt") for i in range(10)}
 
 
@@ -53,6 +54,7 @@ def json_name(display: str) -> str:
 
 def content_disposition(filename: str) -> str:
     """Nagłówek `attachment` z nazwą ASCII (fallback) i pełną nazwą UTF-8 (RFC 6266/5987)."""
-    ascii_name = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode()
+    ascii_name = filename.translate(_NON_DECOMPOSABLE)
+    ascii_name = unicodedata.normalize("NFKD", ascii_name).encode("ascii", "ignore").decode()
     ascii_name = re.sub(r'["\\\r\n]', "_", ascii_name) or "plik"
     return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
