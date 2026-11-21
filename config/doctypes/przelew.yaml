@@ -1,0 +1,11 @@
+id: przelew
+title: Potwierdzenie przelewu
+output_template: schemas/przelew.json
+classify:
+  strong: ["przelew", "kwota", "tytulem", "beneficjent", "nadawca", "rachunek"]
+  weak: ["pln", "numer transakcji", "data transakcji"]
+  negative: ["zarzut nr", "ogloszenie o zamowieniu"]
+  min_score: 3.0
+fields: {}
+llm:
+  prompt: prompts/przelew.md

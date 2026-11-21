@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./config:/app/config
+  # Batch bez GUI: docker compose run --rm app python -m odw2json run

@@ -1,0 +1,38 @@
+{
+  "OdwolanieKIO": {
+    "data": null,
+    "czynnosc_dzien": null,
+    "czynnosc_powod_id": null,
+    "czynnosc_opis": null,
+    "miejscowosc": null
+  },
+  "Odwolujacy": [
+    {
+      "krs": null,
+      "nazwa": null,
+      "nip": null,
+      "regon": null,
+      "przez-pelnomocnika": null,
+      "pelnomocnik": {
+        "imie_nazwisko": null,
+        "nazwa": null,
+        "mail": null
+      }
+    }
+  ],
+  "Zamawiajacy": [
+    {
+      "krs": null,
+      "nazwa": null,
+      "nip": null,
+      "regon": null,
+      "prowadzacy_postepowanie": null
+    }
+  ],
+  "ZamowieniePubliczne": {
+    "numer_bzp": null,
+    "numer_postepowania": null,
+    "numer_ted": null,
+    "tytul": null
+  }
+}

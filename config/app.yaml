@@ -1,0 +1,6 @@
+# Co zrobic z dokumentem, ktorego typu nie rozpoznano:
+#   none       - nie tworzymy pliku JSON (odpowiedz UZP na Discordzie)
+#   empty_file - tworzymy pusty plik .json (README organizatora)
+unknown_output: none
+write_trace: true          # output/.trace/<case>/<plik>.trace.json
+llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
