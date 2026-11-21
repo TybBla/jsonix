@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ["3.13"]
+        python: ["3.13", "3.14"]
     defaults:
       run:
         shell: bash
@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ["3.13"]
+        python: ["3.13", "3.14"]
     env:
       LLM_MODE: replay
     steps:
