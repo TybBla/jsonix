@@ -10,6 +10,7 @@ Gałąź `etap/E12-demo` → `main`. Wyłącznie dokumentacja i zrzuty ekranu.
   - plan 10 slajdów;
   - przygotowane odpowiedzi na pytania jury.
 - **`docs/prezentacja.html`**: gotowa prezentacja, 10 slajdów według planu. Działa offline z repo (fonty i zrzuty lokalne). Sterowanie: ← → slajdy, F pełny ekran, Ctrl+P zapis do PDF (jeden slajd na stronę). Miejsca do uzupełnienia (liczby F1, demo E10, skład zespołu) są na czerwono.
+- **`docs/img/demo-gui.gif`** (610 KB): plan B na finał, 7 kroków GUI z podpisami po polsku, w pętli.
 - **Zrzuty** w `docs/img/`: `gui-dodaj-pliki.jpg` (lista 4 plików) i `gui-zaznaczenie-podpis.jpg` (zaznaczone imię i nazwisko podpisującego w pełnomocnictwie, z podświetleniem w PDF).
 
 ### Do uzupełnienia przez zespół

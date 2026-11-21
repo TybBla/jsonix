@@ -41,6 +41,7 @@ Zrzuty ekranu do slajdów są w `docs/img/`: `gui-dodaj-pliki.jpg`, `gui-dlaczeg
 ![Zaznaczenie podpisu w pełnomocnictwie](img/gui-zaznaczenie-podpis.jpg)
 
 ### Plan B
+- **Nagranie zamiast pokazu na żywo:** [img/demo-gui.gif](img/demo-gui.gif) — 7 kroków z podpisami (wgranie, „Dlaczego ten typ?”, podświetlenie źródła w obie strony, zaznaczenie, ręczna poprawka, wysoki kontrast), ok. 20 s w pętli; działa offline w każdej przeglądarce i w PowerPoincie.
 - **Docker nie startuje:** `start-gui.bat` (lokalny Python 3.13).
 - **GUI nie działa:** sam CLI (`start.bat`) i pliki z `output/`, w tym `.trace/`.
 - **Sieć niedostępna:** nic nie trzeba zmieniać. Aplikacja działa offline: PDF.js, fonty i modele OCR są lokalne, LLM domyślnie wyłączony.
