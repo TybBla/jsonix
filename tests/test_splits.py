@@ -32,12 +32,12 @@ def test_holdout_size_in_range():
 
 
 def test_script_is_deterministic(tmp_path: Path):
-    before = SPLITS_FILE.read_bytes()
-    for _ in range(2):
-        subprocess.run([sys.executable, str(SCRIPT)], check=True, cwd=ROOT)
-    after_first = SPLITS_FILE.read_bytes()
-    subprocess.run([sys.executable, str(SCRIPT)], check=True, cwd=ROOT)
-    assert SPLITS_FILE.read_bytes() == after_first == before
+    outs = []
+    for i in range(2):
+        out = tmp_path / f"splits{i}.yaml"
+        subprocess.run([sys.executable, str(SCRIPT), "--out", str(out)], check=True, cwd=ROOT)
+        outs.append(out.read_bytes())
+    assert outs[0] == outs[1] == SPLITS_FILE.read_bytes()
 
 
 def test_assignment_stable_when_new_case_added():

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from odw2json.llm import CassetteMissing, LLMClient, cassette_key
+from odw2json.llm import CassetteCorrupt, CassetteMissing, LLMClient, cassette_key
 
 
 class FakeClient:
@@ -126,3 +126,30 @@ def test_env_mode_wins_over_config(tmp_path, monkeypatch):
     _patch(monkeypatch, {"model": "m", "mode": "live", "cassette_dir": str(tmp_path)})
     monkeypatch.setenv("LLM_MODE", "replay")
     assert LLMClient.from_config().mode == "replay"
+
+
+def test_key_int_and_float_temperature_equal():
+    assert cassette_key("m", "s", "u", 0) == cassette_key("m", "s", "u", 0.0)
+
+
+def test_from_config_default_model_from_yaml(monkeypatch):
+    for k in ("LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY", "LLM_MODE"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr("odw2json.llm.load_dotenv", lambda *a, **k: None)
+    assert LLMClient.from_config().model == "ministral-8b-latest"
+
+
+def test_corrupt_cassette_raises_named_error(tmp_path):
+    path = tmp_path / f"{cassette_key('m', 's', 'u', 0)}.json"
+    path.write_text("{nie json", encoding="utf-8")
+    c, fake = make(tmp_path, "replay")
+    with pytest.raises(CassetteCorrupt) as e:
+        c.complete_json("s", "u")
+    assert path.name in str(e.value) and isinstance(e.value, RuntimeError) and fake.calls == 0
+
+
+def test_cassette_written_atomically(tmp_path):
+    c, _ = make(tmp_path, "record")
+    c.complete_json("s", "u")
+    assert list(tmp_path.glob("*.tmp")) == []
+    assert len(list(tmp_path.glob("*.json"))) == 1

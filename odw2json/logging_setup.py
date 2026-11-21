@@ -30,6 +30,7 @@ class JsonLinesFormatter(logging.Formatter):
         }
         for k in _FIELDS:
             data[k] = getattr(record, k, None)
+        data["exc"] = self.formatException(record.exc_info) if record.exc_info else None
         return json.dumps(data, ensure_ascii=False, default=str)
 
 
@@ -56,3 +57,12 @@ def setup_logging(verbose: bool = False, log_file: Path | None = None, run_id: s
         fh._odw2json = True  # type: ignore[attr-defined]
         logger.addHandler(fh)
     return run_id
+
+
+def reset_logging() -> None:
+    """Usuwa i zamyka wszystkie handlery loggera 'odw2json' oraz zeruje jego poziom."""
+    logger = logging.getLogger(LOGGER_NAME)
+    for h in list(logger.handlers):
+        logger.removeHandler(h)
+        h.close()
+    logger.setLevel(logging.NOTSET)

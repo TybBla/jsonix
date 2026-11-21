@@ -28,8 +28,12 @@ class CassetteMissing(RuntimeError):
     """Tryb replay: brak kasety dla danego zapytania."""
 
 
+class CassetteCorrupt(RuntimeError):
+    """Kaseta istnieje, ale nie jest poprawnym JSON-em."""
+
+
 def cassette_key(model: str, system: str, user: str, temperature: float) -> str:
-    raw = json.dumps([model, system, user, temperature], ensure_ascii=False)
+    raw = json.dumps([model, system, user, float(temperature)], ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -122,7 +126,12 @@ class LLMClient:
         path = self._cassette_path(key)
         if self.mode in ("replay", "auto") and path.exists():
             self.usage["cached_calls"] += 1
-            return json.loads(path.read_text(encoding="utf-8"))["response"]
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))["response"]
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                raise CassetteCorrupt(
+                    f"Uszkodzona kaseta {path}: {e}. Usun ja i nagraj ponownie (LLM_MODE=record)."
+                ) from e
         if self.mode == "replay":
             raise CassetteMissing(
                 f"Brak kasety {key} w {self.cassette_dir}. Nagraj ją: LLM_MODE=record (wymaga kluczy w .env)."
@@ -155,5 +164,7 @@ class LLMClient:
                 "usage": {"prompt_tokens": pt, "completion_tokens": ct},
                 "created": datetime.now(UTC).isoformat(timespec="seconds"),
             }
-            path.write_text(json.dumps(cassette, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(json.dumps(cassette, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(tmp, path)
         return out
