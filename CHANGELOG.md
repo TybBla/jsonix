@@ -2,6 +2,22 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v0.2.0 — E2: ingest produkcyjny (2026-11-21)
+
+- Wymienne backendy PDF (pypdf, pdfplumber, pypdfium2) z fallbackiem; wybrany **pypdfium2** (benchmark: `docs/decyzje/E2-backend-pdf.md`).
+- Czyszczenie tekstu jako konfigurowalna lista kroków na całym dokumencie (stopki usuwane z zachowaniem pierwszego wystąpienia; bez `dashes`, bo GT zachowuje „–”).
+- `Document.page_offsets` / `page_of`, `backend`, `warnings`; `IngestError` z polskimi komunikatami; walidacja konfiguracji fail-fast.
+- Opcjonalny OCR (rapidocr, polskie znaki, modele w paczce) dla stron bez tekstu, cache `output/.cache/ocr` (`docs/decyzje/E2-ocr.md`).
+- Miara pokrycia wartości GT w tekście (`python -m eval.ingest_coverage`), fixture'y uszkodzonych PDF i testy odporności.
+- Ustalenie UZP: LLM wyłącznie u firmy z polityką prywatności (zakres i miejsce przetwarzania danych).
+
+| Bramka | wynik |
+|---|---|
+| PDF-y wczytane bez wyjątku | 196/196 |
+| Pokrycie wartości GT w tekście | 1460/1460 (100%) |
+| F1 dev / holdout (ekstrakcja = zaślepki) | 0.000 / 0.000 |
+| Negatywy odrzucone dev / holdout | 12/15 / 11/13 |
+
 ## v0.1.0 — E1: harness jakości (2026-11-21)
 
 - Ruff, `pyproject.toml`, pre-commit (szybkie testy w hooku), pin `ruff==0.17.6`.
