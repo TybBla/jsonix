@@ -8,7 +8,7 @@ import sys
 
 from odw2json import pipeline
 from odw2json.config_loader import ROOT_DIR
-from odw2json.logging_setup import setup_logging
+from odw2json.logging_setup import reset_logging, setup_logging
 
 
 def _inp(tmp_path, train_dir):
@@ -59,6 +59,7 @@ def test_cli_polish_filename_cp1250(tmp_path, train_dir):
     inp.mkdir()
     shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "zażółć gęślą.pdf")
     env = {k: v for k, v in os.environ.items() if k != "PYTHONIOENCODING"}
+    env["PYTHONIOENCODING"] = "ascii"  # CLI musi to nadpisac wlasnym reconfigure(utf-8)
     p = subprocess.run(
         [sys.executable, "-m", "odw2json", "run", str(inp), str(out)],
         cwd=ROOT_DIR,
@@ -67,3 +68,30 @@ def test_cli_polish_filename_cp1250(tmp_path, train_dir):
     )
     assert p.returncode == 0, p.stderr
     assert (out / "zażółć gęślą.json").exists()
+    assert "Przebieg" in p.stdout.decode("utf-8")
+
+
+def test_reset_logging_closes_handlers(tmp_path):
+    log = tmp_path / "l.jsonl"
+    setup_logging(False, log)
+    logging.getLogger("odw2json").info("x")
+    reset_logging()
+    lg = logging.getLogger("odw2json")
+    assert lg.handlers == [] and lg.level == logging.NOTSET
+    log.unlink()
+    assert not log.exists()
+
+
+def test_jsonl_exc_field(tmp_path):
+    log = tmp_path / "l.jsonl"
+    setup_logging(False, log)
+    lg = logging.getLogger("odw2json")
+    lg.info("ok")
+    try:
+        raise ZeroDivisionError("x")
+    except ZeroDivisionError:
+        lg.exception("boom")
+    reset_logging()
+    recs = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
+    assert recs[0]["exc"] is None
+    assert "ZeroDivisionError" in recs[1]["exc"] and "Traceback" in recs[1]["exc"]

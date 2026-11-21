@@ -6,6 +6,7 @@ Plik jest deterministyczny: ponowne uruchomienie daje identyczne bajty.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -27,7 +28,10 @@ HEADER = (
 )
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", type=Path, default=OUT, help="plik wyjsciowy (domyslnie data/splits.yaml)")
+    out = ap.parse_args(argv).out
     cases = sorted(p.name for p in TRAIN.iterdir() if p.is_dir() and p.name.startswith("przyklad_"))
     dev = [c for c in cases if assign_split(c) == "dev"]
     holdout = [c for c in cases if assign_split(c) == "holdout"]
@@ -37,8 +41,8 @@ def main() -> None:
         sort_keys=False,
         default_flow_style=False,
     )
-    OUT.write_text(HEADER + body, encoding="utf-8", newline="\n")
-    print(f"dev={len(dev)} holdout={len(holdout)} -> {OUT}")
+    out.write_text(HEADER + body, encoding="utf-8", newline="\n")
+    print(f"dev={len(dev)} holdout={len(holdout)} -> {out}")
 
 
 if __name__ == "__main__":

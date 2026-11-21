@@ -138,3 +138,46 @@ def test_samples_infer_leaf_types():
     schema = build_json_schema({"a": None, "b": None}, samples=[{"a": "x", "b": 1}, {"a": None, "b": 2}])
     assert set(schema["properties"]["a"]["type"]) == {"string", "null"}
     assert set(schema["properties"]["b"]["type"]) == {"integer", "null"}
+
+
+def _check(schema: dict, data, path: str = "$") -> list[str]:
+    """Minimalny walidator JSON Schema: type / required / additionalProperties / items."""
+    errs: list[str] = []
+    t = schema.get("type")
+    types = t if isinstance(t, list) else [t]
+    py = {
+        "object": lambda v: isinstance(v, dict),
+        "array": lambda v: isinstance(v, list),
+        "string": lambda v: isinstance(v, str),
+        "boolean": lambda v: isinstance(v, bool),
+        "null": lambda v: v is None,
+        "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    }
+    if not any(py[x](data) for x in types):
+        return [f"{path}: {type(data).__name__} not in {types}"]
+    if isinstance(data, dict) and "object" in types:
+        for k in schema.get("required", []):
+            if k not in data:
+                errs.append(f"{path}: missing {k}")
+        props = schema.get("properties", {})
+        for k, v in data.items():
+            if k in props:
+                errs += _check(props[k], v, f"{path}.{k}")
+            elif schema.get("additionalProperties") is False:
+                errs.append(f"{path}: unexpected {k}")
+    if isinstance(data, list) and "items" in schema:
+        for i, item in enumerate(data):
+            errs += _check(schema["items"], item, f"{path}[{i}]")
+    return errs
+
+
+@pytest.mark.parametrize("type_id", sorted(STEM_TO_TYPE.values()))
+def test_gt_conforms_to_built_json_schema(type_id):
+    gts = [json.loads(p.read_text(encoding="utf-8")) for p in GT_FILES if STEM_TO_TYPE[p.stem] == type_id]
+    assert gts
+    schema = build_json_schema(REG[type_id].template(), samples=gts)
+    for gt in gts:
+        assert _check(schema, gt) == []
+    bad = dict(gts[0], dodatkowy_klucz=1)
+    assert _check(schema, bad) != []
