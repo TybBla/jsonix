@@ -55,3 +55,32 @@ def test_start_sh_picks_python_313_or_newer():
 def test_ci_runs_on_python_313_and_314():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert '"3.13", "3.14"' in ci
+
+
+def _lock() -> dict[str, str]:
+    pins = {}
+    for line in (ROOT / "requirements-lock.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            name, _, version = line.partition("==")
+            assert version, f"wpis bez przypiętej wersji: {line}"
+            pins[name.lower().replace("_", "-")] = version
+    return pins
+
+
+def test_every_requirement_has_pinned_version_in_lock():
+    pins = _lock()
+    for name in _requirements():
+        assert name.replace("_", "-") in pins, f"{name}: brak wersji w requirements-lock.txt"
+
+
+def test_lock_is_used_wherever_dependencies_are_installed():
+    files = {
+        "Dockerfile": ROOT / "Dockerfile",
+        "setup-env.bat": ROOT / "scripts" / "setup-env.bat",
+        "smoke.ps1": ROOT / "scripts" / "smoke.ps1",
+        "smoke.sh": ROOT / "scripts" / "smoke.sh",
+        "ci.yml": ROOT / ".github" / "workflows" / "ci.yml",
+    }
+    for label, path in files.items():
+        assert "-c" in (text := path.read_text(encoding="utf-8")) and "requirements-lock.txt" in text, label

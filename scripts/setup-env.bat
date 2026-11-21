@@ -35,7 +35,7 @@ if not defined JSONIX_BASE (
 )
 echo [jsonix] Tworze srodowisko w "%JSONIX_VENV%" (jednorazowo, kilka minut)...
 %JSONIX_BASE% -m venv "%JSONIX_VENV%" || (echo [jsonix] Nie udalo sie utworzyc srodowiska .venv. & exit /b 1)
-"%JSONIX_VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r "%JSONIX_ROOT%\requirements.txt"
+"%JSONIX_VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r "%JSONIX_ROOT%\requirements.txt" -c "%JSONIX_ROOT%\requirements-lock.txt"
 if errorlevel 1 (
   echo [jsonix] Instalacja zaleznosci nie powiodla sie. Sprawdz polaczenie z internetem i uruchom ponownie.
   exit /b 1
