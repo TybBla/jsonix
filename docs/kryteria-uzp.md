@@ -13,7 +13,7 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 ## 2. Wymagania techniczne i formalne
 - **Python 3.13+**, `requirements.txt`, uruchomienie z **CLI** / wrappera (`start.bat`).
 - Foldery **`input/`** i **`output/`** w katalogu głównym; wynik `output/<sprawa>/<nazwa_jak_pdf>.json`.
-- Wyłącznie komponenty **open source**; laptop testowy: i7, 16 GB RAM, **bez GPU**, z internetem, bez limitu czasu.
+- Wyłącznie komponenty **open source**; laptop testowy: i7, 16 GB RAM, **bez GPU**, z internetem; **czas na rozwiązanie ograniczony** (pkt 5a).
 - LLM (opcjonalny): **open source**, przez API **firmy z serwerami w UE/EOG**, która ma **Politykę Prywatności określającą zakres i miejsce przetwarzania danych**; dostarczamy klucz API. **Hosting przez osobę prywatną (własny komputer/serwer) wykluczony.**
 - Zgłoszenie: tytuł projektu + link do GitHub z działającym prototypem (wgranie dokumentów i odczyt wyników). Dodatkowo: dokumentacja techniczna (w tym opis użytego LLM), wyniki testów jakości.
 - Warunek wypłaty nagrody (regulamin §3.5): kod źródłowy, instrukcja uruchomienia, **Docker Compose**, dokumentacja: **opis architektury, konfiguracja ekstrakcji danej klasy dokumentów, dodawanie nowej klasy dokumentów**.
@@ -38,7 +38,18 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 - `czynnosc_powod_id` 1–12, słownik `data/oczekiwane-json/czynnosc_powod_id_dict.md`; 12 = „Projektowane postanowienia umowy”; 6 = „Odpowiedzi/wyjaśnienia do SWZ” (**ze skośnikiem**). `czynnosc_opis` ustalany wyłącznie z **pierwszego zarzutu**.
 - Sumy kontrolne NIP/REGON/PESEL w danych demo są celowo błędne — **nie walidujemy sum**, tylko format.
 - **Imiona i nazwiska w mianowniku** (np. „Mateusz Szymański”, nie „Mateusza Szymańskiego”).
-- Maszyna oceniająca ma internet; brak limitu czasu.
+- Maszyna oceniająca ma internet. ~~Brak limitu czasu~~ — nieaktualne, patrz 5a: każde rozwiązanie ma ograniczony czas.
+
+### 5a. Ustalenia z Discorda, wieczór 21.11.2026 (UZP, MateuszSz)
+- **Limit czasu na rozwiązanie (21:13):** rate limit i liczba zapytań do API **nie wpływają na ocenę**, ale **każde rozwiązanie dostaje ograniczony czas** (wartość nieznana) i program, który nie skończy, może nie zostać w pełni oceniony. Wcześniejsze „bez limitu czasu” jest nieaktualne. Wnioski: liczy się czas na sprawę na CPU (szczególnie OCR skanów); ponawianie zapytań przy limicie API wolno stosować, ale zjada ten sam budżet czasu.
+- **Numer rachunku w potwierdzeniu przelewu (21:17):** wpisujemy numer **tak, jak jest w dokumencie** — z prefiksem „PL”, jeśli dokument go ma. Brak „PL” w części wzorcowych JSON-ów to **błąd danych treningowych**, którego **nie będzie w zbiorze oceniającym**. Spacje: odpowiedź UZP ich nie rozstrzyga wprost (pytanie dotyczyło „PL i spacji”); dane wzorcowe nigdy nie mają spacji, więc zostajemy przy zapisie bez spacji (do potwierdzenia na Discordzie).
+- **Nazwa firmy w pełnomocnictwie (21:17):** wpisujemy **tak, jak w analizowanym dokumencie**, nawet jeśli różni się od CEIDG (np. przy jednoosobowej działalności: pełna firma z imieniem i nazwiskiem, jeśli tak jest w dokumencie).
+
+**Wpływ na projekt (stan 21.11, wieczór):**
+- `data/train`: w 138 ze 140 numerów rachunków w GT brak „PL”, a w 95 ze 119 przypadków, w których numer da się znaleźć w warstwie tekstu PDF, dokument ma „PL” przed numerem (w 71 numer jest zapisany ze spacjami). Bramka F1 liczona na obecnym GT będzie więc **karać poprawny wynik z „PL”** — GT trzeba poprawić albo porównywać IBAN po normalizacji (decyzja etapu E4/eval).
+- Ekstrakcja (gałąź E4, `odw2json/extract/normalize.py: iban`) **usuwa prefiks „PL”** — zgodnie z obecnym GT, ale niezgodnie z ustaleniem UZP: do zmiany na „PL” zachowane, gdy jest w dokumencie.
+- Nazwa firmy (`company`) bierze tekst z dokumentu (np. „pod firmą …”) bez rozwijania skrótów — zgodnie z ustaleniem.
+- Czas: raport jakości ma podawać czas na sprawę (CPU, z OCR i bez); aplikacja nie powinna wykonywać zbędnej pracy (cache OCR, LLM domyślnie wyłączony).
 
 ## 6. Gdzie to jest w projekcie
 - Architektura i decyzje: `docs/superpowers/specs/2026-11-21-odwolania2json-design.md`, `docs/decyzje/`.
