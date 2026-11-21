@@ -48,6 +48,29 @@ dev:
 - przyklad_57
 - przyklad_58
 - przyklad_60
+- skany/odwolania/0001
+- skany/odwolania/0002
+- skany/odwolania/0003
+- skany/odwolania/0004
+- skany/odwolania/0006
+- skany/odwolania/0007
+- skany/odwolania/0008
+- skany/odwolania/0009
+- skany/odwolania/0010
+- skany/pelnomocnictwa/0001
+- skany/pelnomocnictwa/0002
+- skany/pelnomocnictwa/0003
+- skany/pelnomocnictwa/0005
+- skany/pelnomocnictwa/0008
+- skany/pelnomocnictwa/0009
+- skany/pelnomocnictwa/0010
+- skany/potwierdzenia/0001
+- skany/potwierdzenia/0002
+- skany/potwierdzenia/0005
+- skany/potwierdzenia/0007
+- skany/potwierdzenia/0008
+- skany/potwierdzenia/0009
+- skany/potwierdzenia/0010
 holdout:
 - przyklad_06
 - przyklad_10
@@ -63,5 +86,12 @@ holdout:
 - przyklad_41
 - przyklad_51
 - przyklad_59
+- skany/odwolania/0005
+- skany/pelnomocnictwa/0004
+- skany/pelnomocnictwa/0006
+- skany/pelnomocnictwa/0007
+- skany/potwierdzenia/0003
+- skany/potwierdzenia/0004
+- skany/potwierdzenia/0006
 negatives:
 - negatywne
