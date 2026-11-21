@@ -1,12 +1,13 @@
-"""Poprawka danych wzorcowych: numer rachunku w potwierdzeniu przelewu z prefiksem „PL”, jeśli ma go dokument.
+"""Poprawka danych wzorcowych: numer rachunku w potwierdzeniu przelewu z „PL”, jeśli ma go dokument.
 
-Ustalenie UZP (Discord 21.11.2026, 21:17, `docs/kryteria-uzp.md` pkt 5a): numer rachunku wpisujemy tak, jak jest
-w dokumencie; brak „PL” w części wzorcowych JSON-ów to błąd, którego nie będzie w zbiorze oceniającym.
+Ustalenie UZP (Discord 21.11.2026, 21:17, `docs/kryteria-uzp.md` pkt 5a): numer rachunku wpisujemy tak,
+jak jest w dokumencie; brak „PL” w części wzorcowych JSON-ów to błąd, którego nie będzie w zbiorze
+oceniającym.
 
-Dla każdego PDF-a z `data/train`, którego GT ma `przelew_bankowy`, sprawdza w tekście dokumentu (warstwa tekstu
-albo OCR, przez `odw2json.ingest`), czy bezpośrednio przed cyframi numeru stoi „PL”. Jeśli tak, a GT nie ma
-prefiksu — dopisuje „PL” (bez spacji, jak reszta GT). Numerów, których nie da się znaleźć w tekście, nie zmienia
-(lista „bez zmian — nie znaleziono” w wyniku).
+Dla każdego PDF-a z `data/train`, którego GT ma `przelew_bankowy`, sprawdza w tekście dokumentu
+(warstwa tekstu albo OCR, przez `odw2json.ingest`), czy bezpośrednio przed cyframi numeru stoi „PL”.
+Jeśli tak, a GT nie ma prefiksu — dopisuje „PL” (bez spacji, jak reszta GT). Numerów, których nie da się
+znaleźć w tekście, nie zmienia (lista „bez zmian — nie znaleziono” w wyniku).
 
 Użycie:
     python scripts/fix_gold_iban.py            # podgląd zmian (nic nie zapisuje)
@@ -55,7 +56,9 @@ def plan(train_dir: Path) -> tuple[list[tuple[Path, str, str, str]], list[tuple[
         pb = data.get("przelew_bankowy") if isinstance(data, dict) else None
         if not pb:
             continue
-        todo = [f for f in FIELDS if isinstance(pb.get(f), str) and pb[f] and not pb[f].upper().startswith("PL")]
+        todo = [
+            f for f in FIELDS if isinstance(pb.get(f), str) and pb[f] and not pb[f].upper().startswith("PL")
+        ]
         if not todo:
             continue
         text = ingest.load(pdf, cfg=cfg).text
@@ -89,7 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{gt.relative_to(REPO).as_posix()}: {f} {old} -> {new}")
     for gt, f in missing:
         print(f"bez zmian - nie znaleziono w tekście: {gt.relative_to(REPO).as_posix()}: {f}")
-    print(f"zmian: {len(changes)}, nie znaleziono: {len(missing)}{'' if a.apply else ' (podgląd, --apply zapisuje)'}")
+    mode = "" if a.apply else " (podgląd, --apply zapisuje)"
+    print(f"zmian: {len(changes)}, nie znaleziono: {len(missing)}{mode}")
     if a.apply:
         apply(changes)
     return 0

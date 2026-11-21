@@ -35,7 +35,6 @@ def test_plan_and_apply_on_copy(tmp_path):
     fx.apply(changes)
     data = json.loads((case / "przelew.json").read_text(encoding="utf-8"))
     assert data["przelew_bankowy"]["na_rachunek"] == "PL" + NUM
-    assert list(data["przelew_bankowy"]) == list(json.loads((src / "przelew.json").read_text(encoding="utf-8"))[
-        "przelew_bankowy"
-    ]), "kolejność kluczy bez zmian"
+    original = json.loads((src / "przelew.json").read_text(encoding="utf-8"))["przelew_bankowy"]
+    assert list(data["przelew_bankowy"]) == list(original), "kolejność kluczy bez zmian"
     assert fx.plan(tmp_path) == ([], []), "drugi przebieg niczego nie zmienia"
