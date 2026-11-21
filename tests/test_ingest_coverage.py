@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from eval.ingest_coverage import Coverage, coverage_for_doc
 from odw2json.config_loader import ROOT_DIR
 
@@ -141,6 +143,7 @@ def test_przyklad_01_with_current_loader():
     assert total.rate_with_fuzzy > 0.9
 
 
+@pytest.mark.slow
 def test_cli_json_dump(tmp_path: Path):
     out = tmp_path / "cov.json"
     proc = subprocess.run(

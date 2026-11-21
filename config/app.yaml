@@ -10,7 +10,18 @@ llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
 ingest:
   backend: pypdf                                # pypdf | pdfplumber | pypdfium2
   fallback_backends: [pypdfium2, pdfplumber]    # kolejno, gdy backend rzuci wyjatek lub zwroci pusty tekst
-  clean: []                                     # kroki czyszczenia (odw2json/ingest/clean.py), w podanej kolejnosci
+  # Kroki czyszczenia (odw2json/ingest/clean.py), uruchamiane w tej kolejnosci na calym dokumencie.
+  # Lista = clean.DEFAULT_ORDER wypisana jawnie; usuniecie/zmiana kolejnosci nie wymaga zmian kodu.
+  clean:
+    - unicode_nfc
+    - nbsp_to_space
+    - ligatures
+    - quotes
+    - dashes
+    - strip_page_artifacts
+    - dehyphenate
+    - join_wrapped_lines
+    - collapse_spaces
   ocr:                                          # OCR dla stron bez tekstu (opcjonalny; wlaczany w T5)
     enabled: true
     engine: rapidocr

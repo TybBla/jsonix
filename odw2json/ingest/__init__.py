@@ -13,12 +13,35 @@ from pathlib import Path
 
 from odw2json.config_loader import load_app_config
 from odw2json.contracts import Document, IngestError
-from odw2json.ingest import backends
+from odw2json.ingest import backends, clean
 
 PAGE_SEPARATOR = "\n\f\n"
 DEFAULT_BACKEND = "pypdf"
 _HEADER_SCAN_BYTES = 1024
-_BOM = b"\xef\xbb\xbf"
+
+
+def validate_ingest_cfg(cfg: dict) -> None:
+    """Fail fast: błędna konfiguracja ingestu (``ValueError`` po polsku) przerywa uruchomienie."""
+    cfg = cfg or {}
+    available = sorted(backends.BACKENDS)
+    primary = cfg.get("backend")
+    if primary is not None and primary not in backends.BACKENDS:
+        raise ValueError(
+            f"Błąd konfiguracji ingest: nieznany backend '{primary}' (ingest.backend). "
+            f"Dostępne: {', '.join(available)}"
+        )
+    for name in cfg.get("fallback_backends") or []:
+        if name not in backends.BACKENDS:
+            raise ValueError(
+                f"Błąd konfiguracji ingest: nieznany backend zapasowy '{name}' "
+                f"(ingest.fallback_backends). Dostępne: {', '.join(available)}"
+            )
+    unknown = [s for s in cfg.get("clean") or [] if s not in clean.CLEAN_STEPS]
+    if unknown:
+        raise ValueError(
+            f"Błąd konfiguracji ingest: nieznane kroki czyszczenia (ingest.clean): {', '.join(unknown)}. "
+            f"Dostępne: {', '.join(sorted(clean.CLEAN_STEPS))}"
+        )
 
 
 def _check_file(path: Path) -> None:
@@ -30,9 +53,8 @@ def _check_file(path: Path) -> None:
         raise IngestError(f"Nie można odczytać pliku: {e}") from e
     if not head:
         raise IngestError("Plik jest pusty (0 B)")
-    start = head.removeprefix(_BOM).lstrip()
-    if not start.startswith(b"%PDF-"):
-        raise IngestError("Plik nie jest PDF-em (brak nagłówka %PDF-)")
+    if b"%PDF-" not in head:  # śmieci lub BOM przed nagłówkiem są dozwolone (jak w czytnikach PDF)
+        raise IngestError("Plik nie jest PDF-em (brak nagłówka %PDF- w pierwszym kilobajcie)")
     _check_pypdf_structure(path)
 
 
@@ -100,17 +122,17 @@ def _extract(path: Path, primary: str, fallbacks: list[str], warnings: list[str]
     raise IngestError("Nie udało się wczytać PDF żadnym backendem: " + "; ".join(errors))
 
 
-def _clean_pages(pages: list[str], steps: list[str], warnings: list[str]) -> list[str]:
+def _clean_pages(pages: list[str], steps: list[str]) -> list[str]:
+    """Czyszczenie na całym dokumencie (strony złączone ``\\f``), żeby kroki widziały powtórzenia stron."""
     if not steps:
         return pages
-    try:
-        from odw2json.ingest.clean import clean_text
-    except ImportError:
-        warnings.append(
-            "Ingest: moduł czyszczenia niedostępny, pominięto kroki czyszczenia: " + ", ".join(steps)
+    cleaned = clean.clean_text("\f".join(pages), steps).split("\f")
+    if len(cleaned) != len(pages):
+        raise RuntimeError(
+            f"Czyszczenie zmieniło liczbę stron ({len(pages)} -> {len(cleaned)}); "
+            "żaden krok nie może usuwać znaku końca strony"
         )
-        return pages
-    return [clean_text(p, steps) for p in pages]
+    return cleaned
 
 
 def _join(pages: list[str]) -> tuple[str, list[int]]:
@@ -126,11 +148,12 @@ def load(path: Path, backend: str | None = None, cfg: dict | None = None) -> Doc
     path = Path(path)
     if cfg is None:
         cfg = load_app_config().get("ingest", {}) or {}
+    validate_ingest_cfg(cfg)
     primary = backend or cfg.get("backend") or DEFAULT_BACKEND
     _check_file(path)
     warnings: list[str] = []
     used, pages = _extract(path, primary, list(cfg.get("fallback_backends") or []), warnings)
-    pages = _clean_pages(pages, list(cfg.get("clean") or []), warnings)
+    pages = _clean_pages(pages, list(cfg.get("clean") or []))
     text, offsets = _join(pages)
     return Document(
         path=path,

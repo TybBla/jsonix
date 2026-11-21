@@ -133,16 +133,39 @@ def test_strip_page_artifacts_footer_numbers():
     assert f("Zobacz Strona 1 z 2 w tekście") == "Zobacz Strona 1 z 2 w tekście"
 
 
-def test_strip_page_artifacts_repeated_footer():
+def test_strip_page_artifacts_repeated_footer_keeps_first():
     f = CLEAN_STEPS["strip_page_artifacts"]
     text = "a1\nKancelaria X, tel. 000\n\f\na2\nKancelaria X, tel. 000\n\f\na3\nunikat"
-    assert f(text) == "a1\n\f\na2\n\f\na3\nunikat"
+    assert f(text) == "a1\nKancelaria X, tel. 000\n\f\na2\n\f\na3\nunikat"
+    assert f(f(text)) == f(text)
+    # stopka na 3 stronach: zostaje tylko pierwsze wystapienie
+    three = "a\nFOOT\n\fb\nFOOT\n\fc\nFOOT"
+    assert f(three) == "a\nFOOT\n\fb\n\fc"
+    assert f(f(three)) == f(three)
     # bez \f nic sie nie usuwa
     plain = "a1\nKancelaria X\n\na2\nKancelaria X"
     assert f(plain) == plain
     # pojedyncza stopka nie jest powtorzona
     single = "a1\nKancelaria X\n\f\na2"
     assert f(single) == single
+
+
+def test_page_boundaries_without_newlines_are_line_boundaries():
+    # dokument sklejony samym "\f" (bez "\n" wokol): kroki liniowe widza granice strony
+    assert CLEAN_STEPS["strip_page_artifacts"]("a\nStrona 1 z 2\fb") == "a\n\fb"
+    assert CLEAN_STEPS["collapse_spaces"]("a  \fb") == "a\fb"
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED))
+def test_steps_never_remove_page_breaks(name, samples):
+    for s in samples:
+        assert CLEAN_STEPS[name](s).count("\f") == s.count("\f")
+
+
+def test_default_order_keeps_page_count_on_joined_pages():
+    pages = ["a-\nb  x\nStopka", "c\nStopka", "d\nStopka", ""]
+    out = clean_text("\f".join(pages), DEFAULT_ORDER)
+    assert out.count("\f") == 3
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))
