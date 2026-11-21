@@ -61,8 +61,9 @@ def test_backend_from_config_and_argument_override(odwolanie):
     assert doc.backend == "pypdfium2"
 
 
-def test_default_config_backend_is_pypdf(odwolanie):
-    assert ingest.load(odwolanie).backend == "pypdf"
+def test_default_config_backend_is_pypdfium2(odwolanie):
+    # Decyzja orkiestratora: docs/decyzje/E2-backend-pdf.md
+    assert ingest.load(odwolanie).backend == "pypdfium2"
 
 
 def test_unknown_backend_raises_ingest_error(odwolanie):

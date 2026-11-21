@@ -46,7 +46,9 @@ def samples() -> list[str]:
 
 def test_registry_names():
     assert set(CLEAN_STEPS) == EXPECTED
-    assert set(DEFAULT_ORDER) == EXPECTED
+    # DEFAULT_ORDER bez "dashes" (decyzja orkiestratora, docs/decyzje/E2-backend-pdf.md)
+    assert set(DEFAULT_ORDER) == EXPECTED - {"dashes"}
+    assert len(DEFAULT_ORDER) == len(set(DEFAULT_ORDER))
 
 
 def test_unknown_step():

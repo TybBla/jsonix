@@ -178,7 +178,7 @@ DEFAULT_ORDER: list[str] = [
     "nbsp_to_space",
     "ligatures",
     "quotes",
-    "dashes",
+    # "dashes" pominiete: UZP GT zachowuje "–" w tytulach; krok dostepny dla innych typow dokumentow.
     "strip_page_artifacts",
     "dehyphenate",
     "join_wrapped_lines",
