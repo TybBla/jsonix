@@ -19,6 +19,13 @@ Wymóg UZP to „Python 3.13+”, a aktualny Python to 3.15. Dla 3.15 paczki `on
 - **`requirements-lock.txt`** (punkt 5 z listy luk): przypięte wersje jako plik ograniczeń pip (`-c`), żeby nowe wydanie biblioteki w dniu oceny niczego nie zepsuło. `requirements.txt` dalej mówi, *co* instalujemy, a lock, *które wersje*. Lock wygenerowałem z działającego obrazu (3.13). Używają go `Dockerfile`, `setup-env.bat`, CI i oba smoke. Sprawdzone na 3.13 (obraz, `smoke_docker` OK), 3.14 (kontener) i 3.15 (Windows).
 - **`tests/test_install.py`** sprawdza znaczniki OCR, skrypty startowe, CRLF w `.bat`, `start.sh` i macierz CI oraz to, że każda zależność ma wersję w locku i lock jest używany wszędzie, gdzie instalujemy.
 
+### Test jury (`docs/test-jury.md`)
+Świeży klon do folderu ze spacją i polskimi znakami, tylko Python 3.15, bez `.venv` i `.env`. Przeszło `.\start.bat` (67 s z instalacją), `.\start-gui.bat` i Docker Compose. Poprawki z testu:
+- README pokazywał `start.bat` w bloku PowerShella, a PowerShell wymaga `.\start.bat`;
+- dodane wymagania i kroki 1–2–3 (gdzie PDF-y, co uruchomić, gdzie wyniki);
+- pełna ścieżka `.venv` w komunikacie;
+- `ping` zamiast `timeout` w `start-gui.bat`, bo `timeout` nie działa bez interaktywnej konsoli.
+
 ### Sprawdzone
 - **Windows, tylko Python 3.15, świeże `.venv`** (`start.bat` z `JSONIX_VENV` w katalogu tymczasowym): instalacja OK (70 s), 3 PDF z tekstem przetworzone, skan → `{}` z ostrzeżeniem.
 - **Ponowne uruchomienie:** używa istniejącego `.venv`, bez instalacji (2 s).
