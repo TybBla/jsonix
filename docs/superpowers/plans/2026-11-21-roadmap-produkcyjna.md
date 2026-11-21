@@ -25,6 +25,36 @@ Każda zmiana przechodzi przez te same automatyczne sprawdzenia, lokalnie i w CI
 
 Zasada nadrzędna: **zmiana, która obniża F1 na bramce albo łamie kontrakt, nie wchodzi na `main`.**
 
+
+## ⚠ Aktualizacja zakresu: pierwsze pełne wydanie v1.0 (2026-11-21, decyzja użytkownika)
+
+Cel: zdążyć z pełną pętlą do v1.0. Zostaje wszystko, co wymagają kryteria UZP lub co daje punkty; resztę przenosimy do **backlogu po v1.0** (sekcja niżej). Ta sekcja ma pierwszeństwo przed opisami etapów E3–E12 poniżej.
+
+### Zakres v1.0 (etapy po E2)
+| Etap | Zakres v1.0 | Dlaczego zostaje |
+|---|---|---|
+| **E2b Skany** (w toku) | T1 import ✅, T2 ewaluacja z podziałem tekst/skan i filtrem `--source`, T3 OCR obowiązkowy i szybszy. **Bez kaset OCR**: CI bramkuje tylko dokumenty z tekstem, skany lokalnie z cache. | Skany są w danych UZP → wpływ na F1 |
+| **E3 Klasyfikacja** | Naprawa 5 znanych błędów, poprawna klasyfikacja 30 skanów, 100% na dev/holdout. **Bez LLM fallback.** | Błędny typ = zero punktów za dokument |
+| **E4+E5 Ekstrakcja (scalone)** | Silnik pól sterowany YAML (regex, sekcje, listy, derived/lookup, normalizatory), reguły dla wszystkich pól 3 typów, imiona w mianowniku (reguły + słownik końcówek), trace pól (strona + fragment). Zostają uwagi z E2: `\s+` między etykietą a wartością, cudzysłowy ASCII, offsety w tekście po czyszczeniu. | Rdzeń F1 i punkty za konfigurowalność |
+| **E6 LLM** | **Domyślnie bez LLM** (UZP: maksimum punktów za moc modelu). Krótki pomiar wyłącznie dla pól, gdzie reguły zostawiają dużą lukę (np. mianownik imion, tytuł); LLM wchodzi tylko, jeśli zysk F1 wyraźnie przewyższa utratę punktów, i tylko u firmy z polityką prywatności (UE). | Decyzja wpływa na 20 pkt |
+| **E7 Jakość** | Jedna, ograniczona czasowo pętla poprawek na najgorszych polach (dev), holdout sprawdzony raz na końcu. | F1 = 50–100% oceny |
+| **E8+E9 Aplikacja (scalone)** — realizuje drugi członek zespołu, plan: `docs/superpowers/plans/2026-11-21-E8E9-aplikacja.md` | FastAPI + **lekki GUI bez kroku budowania** (statyczny HTML/JS serwowany przez FastAPI, PDF.js): upload, typ i pewność, PDF obok JSON, kliknięcie pola → strona i podświetlony fragment, pobranie JSON. React przeniesiony do backlogu. | GUI: 1–10 pkt; „PDF obok pól z podświetleniem” to wymóg must-have |
+| **E10 Rozszerzalność** | 4. typ dokumentu dodany wyłącznie konfiguracją + przewodnik krok po kroku; test „0 linii kodu”. | 20 pkt |
+| **E11+E12 Wydanie (scalone)** | requirements, `start.bat`, Docker Compose, smoke na czystym Windows, README, architektura, opis konfiguracji klasy i dodawania nowej klasy (wymóg nagrody), raport jakości F1, zgłoszenie, tag `v1.0.0`. | Wymagania formalne |
+
+### Uproszczenia procesu
+- Review: jedno review etapu (Sonnet high, świeży kontekst) zamiast review fali + review etapu. **Opus** tylko dla E4+E5 i finalnego wydania.
+- Poprawki po review w jednym zadaniu; drobne nity → backlog.
+- CI, bramka F1 i TDD zostają bez zmian (to nasz harness, nie koszt do cięcia).
+
+### Backlog po v1.0
+- Kasety OCR i bramka skanów w CI; dalsza optymalizacja OCR.
+- LLM: pełny benchmark modeli, kasety LLM w przepływie ekstrakcji, `llm: LLMClient` wstrzykiwany przez pipeline, licznik kosztów w raporcie.
+- GUI w React, edytor konfiguracji typów w GUI, podświetlanie po współrzędnych (bbox), testy e2e (Playwright), audyt dostępności.
+- Komenda `odw2json new-doctype` (generator szkieletu typu).
+- API: limity, OpenAPI w repo, pełna obsługa błędów.
+- pdfplumber: stopka przed `\f`; `mypy`; porządki w logach.
+
 ---
 
 ## E0 — Fundament ✅ (zrobione)

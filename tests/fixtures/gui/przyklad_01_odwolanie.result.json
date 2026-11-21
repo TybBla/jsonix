@@ -1,0 +1,183 @@
+{
+  "file": "odwolanie.pdf",
+  "classification": {
+    "doc_type": "odwolanie",
+    "confidence": 1.0,
+    "method": "keywords"
+  },
+  "data": {
+    "OdwolanieKIO": {
+      "data": null,
+      "czynnosc_dzien": "2026-03-20",
+      "czynnosc_powod_id": 9,
+      "czynnosc_opis": "Decyzja o unieważnieniu postępowania",
+      "miejscowosc": null
+    },
+    "Odwolujacy": [
+      {
+        "krs": "9999405188",
+        "nazwa": "Belmoria Rozwiązania S.A.",
+        "nip": "9999284065",
+        "regon": "999642785",
+        "przez-pelnomocnika": 1,
+        "pelnomocnik": {
+          "imie_nazwisko": "Aleksandra Marciniak",
+          "nazwa": "Kancelaria Adwokacka Spółka z ograniczoną odpowiedzialnością",
+          "mail": "biuro@poczta.example"
+        }
+      }
+    ],
+    "Zamawiajacy": [
+      {
+        "krs": "9999716254",
+        "nazwa": "Aurelink Automatyka S.A.",
+        "nip": "9997518659",
+        "regon": "999184816",
+        "prowadzacy_postepowanie": null
+      }
+    ],
+    "ZamowieniePubliczne": {
+      "numer_bzp": "2026/BZP00999778",
+      "numer_postepowania": "ZS.791.2026",
+      "numer_ted": "999137-2026",
+      "tytul": "Zakup i dostawa sprzętu komputerowego wraz z oprogramowaniem oraz usługą wdrożenia"
+    }
+  },
+  "trace": [
+    {
+      "path": "OdwolanieKIO.czynnosc_dzien",
+      "value": "2026-03-20",
+      "method": "derived",
+      "source_snippet": null,
+      "page": null
+    },
+    {
+      "path": "OdwolanieKIO.czynnosc_powod_id",
+      "value": 9,
+      "method": "regex",
+      "source_snippet": "ul. Zaczarowana 78, 90-803 Łódź",
+      "page": 0
+    },
+    {
+      "path": "OdwolanieKIO.czynnosc_opis",
+      "value": "Decyzja o unieważnieniu postępowania",
+      "method": "derived",
+      "source_snippet": null,
+      "page": null
+    },
+    {
+      "path": "Odwolujacy[0].krs",
+      "value": "9999405188",
+      "method": "regex",
+      "source_snippet": "KRS: 9999405188, NIP: 9999284065, REGON: 999642785",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].nazwa",
+      "value": "Belmoria Rozwiązania S.A.",
+      "method": "regex",
+      "source_snippet": "Belmoria Rozwiązania S.A.",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].nip",
+      "value": "9999284065",
+      "method": "regex",
+      "source_snippet": "KRS: 9999405188, NIP: 9999284065, REGON: 999642785",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].regon",
+      "value": "999642785",
+      "method": "regex",
+      "source_snippet": "KRS: 9999405188, NIP: 9999284065, REGON: 999642785",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].przez-pelnomocnika",
+      "value": 1,
+      "method": "regex",
+      "source_snippet": "ul. Postępu 17A",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].pelnomocnik.imie_nazwisko",
+      "value": "Aleksandra Marciniak",
+      "method": "regex",
+      "source_snippet": "reprezentowana przez: r. pr. Aleksandra Marciniak, r. pr. Jolanta Zajkowski",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].pelnomocnik.nazwa",
+      "value": "Kancelaria Adwokacka Spółka z ograniczoną odpowiedzialnością",
+      "method": "regex",
+      "source_snippet": "adres do korespondencji: Kancelaria Adwokacka Spółka z ograniczoną odpowiedzialnością, ul. Jasionowa 19, 80-994 Gdańsk",
+      "page": 0
+    },
+    {
+      "path": "Odwolujacy[0].pelnomocnik.mail",
+      "value": "biuro@poczta.example",
+      "method": "regex",
+      "source_snippet": "tel. 000 000 000, biuro@poczta.example",
+      "page": 0
+    },
+    {
+      "path": "Zamawiajacy[0].krs",
+      "value": "9999716254",
+      "method": "regex",
+      "source_snippet": "KRS: 9999716254, NIP: 9997518659, REGON: 999184816",
+      "page": 0
+    },
+    {
+      "path": "Zamawiajacy[0].nazwa",
+      "value": "Aurelink Automatyka S.A.",
+      "method": "regex",
+      "source_snippet": "Aurelink Automatyka S.A.",
+      "page": 0
+    },
+    {
+      "path": "Zamawiajacy[0].nip",
+      "value": "9997518659",
+      "method": "regex",
+      "source_snippet": "KRS: 9999716254, NIP: 9997518659, REGON: 999184816",
+      "page": 0
+    },
+    {
+      "path": "Zamawiajacy[0].regon",
+      "value": "999184816",
+      "method": "regex",
+      "source_snippet": "KRS: 9999716254, NIP: 9997518659, REGON: 999184816",
+      "page": 0
+    },
+    {
+      "path": "ZamowieniePubliczne.numer_bzp",
+      "value": "2026/BZP00999778",
+      "method": "regex",
+      "source_snippet": "2026/BZP00999778, numer ogłoszenia TED: 999137-2026",
+      "page": 0
+    },
+    {
+      "path": "ZamowieniePubliczne.numer_postepowania",
+      "value": "ZS.791.2026",
+      "method": "regex",
+      "source_snippet": "\"Zakup i dostawa sprzętu komputerowego wraz z oprogramowaniem oraz usługą wdrożenia\" nr referencyjny sprawy: ZS.791.2026, ogłoszenie o zamówieniu nr",
+      "page": 0
+    },
+    {
+      "path": "ZamowieniePubliczne.numer_ted",
+      "value": "999137-2026",
+      "method": "regex",
+      "source_snippet": "2026/BZP00999778, numer ogłoszenia TED: 999137-2026",
+      "page": 0
+    },
+    {
+      "path": "ZamowieniePubliczne.tytul",
+      "value": "Zakup i dostawa sprzętu komputerowego wraz z oprogramowaniem oraz usługą wdrożenia",
+      "method": "regex",
+      "source_snippet": "\"Zakup i dostawa sprzętu komputerowego wraz z oprogramowaniem oraz usługą wdrożenia\" nr referencyjny sprawy: ZS.791.2026, ogłoszenie o zamówieniu nr",
+      "page": 0
+    }
+  ],
+  "warnings": [],
+  "pages": 2
+}
