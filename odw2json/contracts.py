@@ -20,7 +20,7 @@ class Document:
     pages: list[str]  # tekst stron po czyszczeniu
     ocr_used: bool = False
     page_offsets: list[int] = field(default_factory=list)  # offset początku strony i w `text`
-    backend: str = ""  # np. "pypdf", "pypdfium2", "ocr:rapidocr"
+    backend: str = ""  # np. "pypdfium2", "pypdf", "pypdfium2+ocr:rapidocr"
     warnings: list[str] = field(default_factory=list)
 
     def page_of(self, offset: int) -> int | None:

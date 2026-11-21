@@ -17,7 +17,8 @@ from odw2json.contracts import Document, IngestError
 from odw2json.ingest import backends, clean, ocr
 
 PAGE_SEPARATOR = "\n\f\n"
-DEFAULT_BACKEND = "pypdf"
+_NO_TEXT_WARNING = "Ingest: żaden backend nie wyciągnął tekstu (skan bez warstwy tekstowej?)"
+DEFAULT_BACKEND = "pypdfium2"  # decyzja: docs/decyzje/E2-backend-pdf.md
 _HEADER_SCAN_BYTES = 1024
 
 
@@ -42,6 +43,31 @@ def validate_ingest_cfg(cfg: dict) -> None:
         raise ValueError(
             f"Błąd konfiguracji ingest: nieznane kroki czyszczenia (ingest.clean): {', '.join(unknown)}. "
             f"Dostępne: {', '.join(sorted(clean.CLEAN_STEPS))}"
+        )
+    _validate_ocr_cfg(cfg.get("ocr"))
+
+
+def _validate_ocr_cfg(ocr_cfg: object) -> None:
+    if ocr_cfg is None:
+        return
+    if not isinstance(ocr_cfg, dict):
+        raise ValueError("Błąd konfiguracji ingest: sekcja ingest.ocr musi być słownikiem")
+    engine = ocr_cfg.get("engine")
+    if engine is not None and engine not in ocr.OCR_ENGINES:
+        raise ValueError(
+            f"Błąd konfiguracji ingest: nieznany silnik OCR '{engine}' (ingest.ocr.engine). "
+            f"Dostępne: {', '.join(sorted(ocr.OCR_ENGINES))}"
+        )
+    for key in ("min_chars_per_page", "dpi"):
+        val = ocr_cfg.get(key)
+        if val is not None and (isinstance(val, bool) or not isinstance(val, int) or val <= 0):
+            raise ValueError(
+                f"Błąd konfiguracji ingest: ocr.{key} musi być dodatnią liczbą całkowitą (jest {val!r})"
+            )
+    enabled = ocr_cfg.get("enabled")
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ValueError(
+            f"Błąd konfiguracji ingest: ingest.ocr.enabled musi być true lub false (jest: {enabled!r})"
         )
 
 
@@ -116,7 +142,7 @@ def _extract(path: Path, primary: str, fallbacks: list[str], warnings: list[str]
             continue
         return name, pages
     if empty is not None:
-        warnings.append("Ingest: żaden backend nie wyciągnął tekstu (skan bez warstwy tekstowej?)")
+        warnings.append(_NO_TEXT_WARNING)
         return empty
     if errors and all("brak stron" in e for e in errors):
         raise IngestError("PDF bez stron")
@@ -182,14 +208,17 @@ def _join(pages: list[str]) -> tuple[str, list[int]]:
 
 def load(path: Path, backend: str | None = None, cfg: dict | None = None) -> Document:
     path = Path(path)
-    if cfg is None:
-        cfg = load_app_config().get("ingest", {}) or {}
+    file_cfg = load_app_config().get("ingest", {}) or {}
+    cfg = file_cfg if cfg is None else {**file_cfg, **cfg}  # brakujące klucze z config/app.yaml
     validate_ingest_cfg(cfg)
     primary = backend or cfg.get("backend") or DEFAULT_BACKEND
     _check_file(path)
     warnings: list[str] = []
     used, pages = _extract(path, primary, list(cfg.get("fallback_backends") or []), warnings)
     pages, ocr_engine = _apply_ocr(path, pages, cfg.get("ocr") or {}, warnings)
+    if ocr_engine and all(p.strip() for p in pages) and _NO_TEXT_WARNING in warnings:
+        warnings.remove(_NO_TEXT_WARNING)  # OCR odzyskał tekst wszystkich stron: ostrzeżenie nieaktualne
+    pages = [p.replace("\f", "\n") for p in pages]  # \f jest zarezerwowany jako separator stron
     pages = _clean_pages(pages, list(cfg.get("clean") or []))
     text, offsets = _join(pages)
     return Document(

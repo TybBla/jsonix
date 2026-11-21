@@ -66,6 +66,7 @@ Stan: testy 29/29, klasyfikacja 191/196, F1 = 0 (zaślepki ekstrakcji).
 - Walidacja konfiguracji z czytelnymi błędami (`odw2json validate-config`).
 - Typ referencyjny: **przelew** w całości na regułach.
 - Wstrzykiwanie LLM (z review E1): opcjonalny `llm: LLMClient | None` przekazywany przez `pipeline.run/process_file → classify/extract`; `usage_report()` trafia do `RunReport` i do `.logs/*.summary.json`.
+- Uwagi z E2: regexy muszą dopuszczać `\s+` (także nową linię) między etykietą a wartością (np. `REGON\n999642785`); czyszczony tekst ma cudzysłowy ASCII `"`; offsety wskazują tekst po czyszczeniu (podświetlanie bbox wymaga nowego opcjonalnego pola).
 **Bramka:** przelew F1 ≥ 0.98 na dev i holdout bez LLM; testy jednostkowe każdego normalizatora; błędny YAML daje zrozumiały komunikat.
 
 ## E5 — Reguły dla pełnomocnictwa i odwołania

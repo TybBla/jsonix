@@ -22,6 +22,8 @@ python -m odw2json serve         # API + GUI na http://127.0.0.1:8000
 docker compose up --build        # to samo w Dockerze
 ```
 
+**OCR (opcjonalny).** Skany bez warstwy tekstowej czyta OCR po `pip install -r requirements-ocr.txt` (~107 MB, modele w paczce, bez sieci w czasie działania). Obraz Dockera domyślnie go nie zawiera: skan dostaje wtedy ostrzeżenie, a pusty tekst jest traktowany jako dokument nieznany.
+
 ## Architektura
 
 ```

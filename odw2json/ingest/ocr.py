@@ -11,15 +11,22 @@ dołączonego do paczki (bez pobierania modeli w czasie działania), który obs�
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import importlib.util
+import os
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from odw2json import config_loader
+
 DEFAULT_ENGINE = "rapidocr"
 DEFAULT_DPI = 200
+OCR_CACHE_VERSION = "1"  # podbić przy zmianie renderowania/składania wierszy, żeby unieważnić stary cache
+MEMO_MAX = 256
 
 
 @dataclass(frozen=True)
@@ -126,35 +133,99 @@ def render_page(path: Path, page_index: int, dpi: int = DEFAULT_DPI):
         pdf.close()
 
 
-_MEMO: dict[tuple, str] = {}  # wyniki w obrębie procesu: ta sama treść pliku = jeden OCR strony
+_MEMO: OrderedDict[tuple, str] = OrderedDict()  # LRU w obrębie procesu (max ``MEMO_MAX`` stron)
+
+
+def _memo_get(key: tuple) -> str | None:
+    if key in _MEMO:
+        _MEMO.move_to_end(key)
+        return _MEMO[key]
+    return None
+
+
+def _memo_put(key: tuple, text: str) -> None:
+    _MEMO[key] = text
+    _MEMO.move_to_end(key)
+    while len(_MEMO) > MEMO_MAX:
+        _MEMO.popitem(last=False)
+
+
+def _hash_file(path: str) -> str:
+    return hashlib.sha1(Path(path).read_bytes()).hexdigest()
+
+
+@lru_cache(maxsize=64)
+def _digest_cached(path: str, mtime_ns: int, size: int) -> str:
+    return _hash_file(path)
+
+
+def _file_digest(path: Path) -> str:
+    """Hash zawartości pliku, liczony raz na (ścieżka, mtime, rozmiar), nie przy każdej stronie."""
+    st = Path(path).stat()
+    return _digest_cached(str(path), st.st_mtime_ns, st.st_size)
+
+
+_file_digest.cache_clear = _digest_cached.cache_clear  # type: ignore[attr-defined]
+
+
+@lru_cache(maxsize=1)
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("rapidocr")
+    except Exception:
+        return "na"
+
+
+def resolve_cache_dir(cache_dir: str | os.PathLike) -> Path:
+    """Względny ``cache_dir`` liczony od korzenia repozytorium (nie od cwd); bezwzględny bez zmian."""
+    p = Path(cache_dir)
+    return p if p.is_absolute() else config_loader.ROOT_DIR / p
+
+
+def _read_cache(path: Path) -> str | None:
+    """Zawartość pliku cache albo ``None`` (brak, uszkodzony lub pusty = miss)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    return text if text.strip() else None
+
+
+def _write_cache(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def ocr_page(path: Path, page_index: int, cfg: dict | None = None) -> str:
     """Tekst strony ``page_index`` (0-based) pliku ``path`` rozpoznany OCR-em.
 
     ``cfg`` = sekcja ``ingest.ocr`` (``engine``, opcjonalnie ``dpi`` i ``cache_dir``: katalog z
-    wynikami OCR kluczowanymi hashem pliku, żeby kolejne uruchomienia nie liczyły strony drugi raz).
-    Wynik jest też pamiętany w procesie (klucz: hash zawartości pliku, więc kopie pliku też trafiają).
-    Rzuca wyjątek, gdy silnik jest nieznany lub niezainstalowany; wołający powinien wcześniej
-    sprawdzić ``ocr_available``.
+    wynikami OCR kluczowanymi hashem pliku, wersją cache i wersją pakietu OCR; względny ``cache_dir``
+    liczony od korzenia repozytorium). Wynik jest też pamiętany w procesie (LRU; klucz: hash
+    zawartości pliku, więc kopie pliku też trafiają). Rzuca wyjątek, gdy silnik jest nieznany lub
+    niezainstalowany; wołający powinien wcześniej sprawdzić ``ocr_available``.
     """
     cfg = cfg or {}
     name = cfg.get("engine") or DEFAULT_ENGINE
     engine = _engine(name)
     dpi = int(cfg.get("dpi") or DEFAULT_DPI)
-    digest = hashlib.sha1(Path(path).read_bytes()).hexdigest()
+    digest = _file_digest(Path(path))
     key = (digest, page_index, name, dpi)
-    if key in _MEMO:
-        return _MEMO[key]
+    hit = _memo_get(key)
+    if hit is not None:
+        return hit
     cache = None
     if cfg.get("cache_dir"):
-        cache = Path(cfg["cache_dir"]) / f"{digest}.{page_index}.{name}.{dpi}.txt"
-        if cache.is_file():
-            _MEMO[key] = cache.read_text(encoding="utf-8")
-            return _MEMO[key]
+        tag = f"v{OCR_CACHE_VERSION}.{_package_version()}"
+        cache = resolve_cache_dir(cfg["cache_dir"]) / f"{digest}.{page_index}.{name}.{dpi}.{tag}.txt"
+        cached = _read_cache(cache)
+        if cached is not None:
+            _memo_put(key, cached)
+            return cached
     text = engine.run(render_page(Path(path), page_index, dpi), cfg)
-    _MEMO[key] = text
+    _memo_put(key, text)
     if cache is not None:
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(text, encoding="utf-8")
+        _write_cache(cache, text)
     return text
