@@ -1,0 +1,23 @@
+FAKTURA PROFORMA nr PF/112/2026
+
+Data wystawienia: 2026-09-01
+Termin płatności: 2026-09-15
+
+Sprzedawca:
+Kancelaria Radców Prawnych Lis i Wspólnicy sp.p.
+ul. Półwiejska 9, 61-888 Poznań, NIP 7780000007
+
+Nabywca:
+Elektrobud Wielkopolska sp. z o.o.
+ul. Dąbrowskiego 77, 60-529 Poznań, NIP 7770000003
+
+Lp. | Nazwa usługi | Ilość | Cena netto | VAT | Wartość brutto
+1 | Przygotowanie odwołania do KIO | 1 | 4 000,00 | 23% | 4 920,00
+2 | Reprezentacja na rozprawie przed KIO | 1 | 3 000,00 | 23% | 3 690,00
+
+Razem do zapłaty: 8 610,00 PLN
+
+Płatność przelewem na rachunek: 77 1090 1362 0000 0001 2345 6789
+Tytuł przelewu: PF/112/2026
+
+Dokument nie jest fakturą VAT. Faktura zostanie wystawiona po otrzymaniu płatności.

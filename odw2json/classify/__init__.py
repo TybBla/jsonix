@@ -1,34 +1,68 @@
-"""Sektor A: rozpoznanie typu dokumentu na podstawie config/doctypes/*.yaml.
+"""Sektor A: rozpoznanie typu dokumentu na podstawie ``classify:`` z config/doctypes/*.yaml.
 
-Wersja bazowa: punktacja słów kluczowych (strong=+2, weak=+1, negative=-3, liczona obecność).
-TODO(A): wagi pozycji (nagłówek), LLM fallback przy niskiej pewności, kalibracja na negatywach.
+Punktacja typu (szczegóły: ``features.evaluate``): frazy ``strong``/``weak``/``negative`` (obecność),
+``title`` (fraza w nagłówku - gdziekolwiek albo jako osobna linia wg ``title_mode``; rozstrzelone litery
+zwinięte), ``patterns`` (regex z wagą) oraz kara ``foreign_titles`` z ``classify.yaml`` (linia nagłówka
+zaczynająca się od „wyrok”, „faktura” itp.; liczona per typ - typ nie jest karany za frazę pokrywającą
+się z własnym ``title`` ani za frazy z ``ignore_foreign``). Typ z
+niespełnionym ``required_any`` (frazy, regexy, grupy ``all_of``) odpada. Wygrywa typ o najwyższym
+wyniku, o ile wynik >= ``min_score`` tego typu i przewaga nad drugim typem >= ``min_margin``; inaczej
+dokument jest nieznany (``None``).
+
+``confidence`` (0 dla dokumentu nieznanego, w przeciwnym razie w [0, 1]) = ``margines * nasycenie``:
+``margines = (best - max(second, 0)) / best``, ``nasycenie = min(1, best / (2 * min_score))``
+(``features.confidence``). ``evidence`` = opisy trafionych cech zwycięzcy (przy odrzuceniu: powód
+odrzucenia i cechy najlepszego kandydata). Typ wyłącznie z treści - nazwa pliku nie jest używana.
 """
 
 from __future__ import annotations
 
-from odw2json.config_loader import DocTypeConfig
+from functools import cache
+from pathlib import Path
+
+from odw2json.classify import features
+from odw2json.config_loader import CONFIG_DIR, ClassifySettings, DocTypeConfig, load_classify_settings
 from odw2json.contracts import Classification, Document
-from odw2json.textnorm import fold
 
-W_STRONG, W_WEAK, W_NEG = 2.0, 1.0, -3.0
-
-
-def score(text_folded: str, cfg: DocTypeConfig) -> float:
-    c = cfg.classify
-    s = sum(W_STRONG for k in c.strong if fold(k) in text_folded)
-    s += sum(W_WEAK for k in c.weak if fold(k) in text_folded)
-    s += sum(W_NEG for k in c.negative if fold(k) in text_folded)
-    return s
+METHOD = "keywords"
 
 
-def classify(doc: Document, registry: dict[str, DocTypeConfig]) -> Classification:
-    t = fold(doc.text)
-    if not t:
+@cache
+def _global_settings(config_dir: Path = CONFIG_DIR) -> ClassifySettings:
+    """``classify.yaml`` z katalogu konfiguracji (cache per katalog)."""
+    return load_classify_settings(config_dir)
+
+
+def _registry_config_dir(registry: dict[str, DocTypeConfig]) -> Path:
+    """Katalog konfiguracji rejestru (typy z ``load_registry(dir)`` niosą ``config_dir``)."""
+    return next(iter(registry.values())).config_dir if registry else CONFIG_DIR
+
+
+def classify(
+    doc: Document, registry: dict[str, DocTypeConfig], settings: ClassifySettings | None = None
+) -> Classification:
+    """Rozpoznaje typ; ``settings`` (domyślnie ``classify.yaml`` z katalogu konfiguracji rejestru) =
+    globalne kary za nagłówki obce."""
+    settings = settings if settings is not None else _global_settings(_registry_config_dir(registry))
+    prepared = features.Prepared(doc.text)
+    if not prepared.full:
         return Classification(doc_type=None, confidence=0.0, method="empty")
-    scores = {k: score(t, cfg) for k, cfg in registry.items()}
-    best = max(scores, key=scores.get)
-    ok = scores[best] >= registry[best].classify.min_score
-    top = sorted(scores.values(), reverse=True)
-    margin = top[0] - (top[1] if len(top) > 1 else 0.0)
-    conf = 0.0 if not ok else min(1.0, margin / max(top[0], 1e-9))
-    return Classification(doc_type=best if ok else None, confidence=conf, method="keywords", scores=scores)
+    results = {k: features.evaluate(prepared, cfg.classify, settings) for k, cfg in registry.items()}
+    scores = {k: r.score for k, r in results.items()}
+    candidates = [k for k, r in results.items() if r.excluded is None]
+    if not candidates:
+        reasons = [f"{k}: {r.excluded}" for k, r in results.items()]
+        return Classification(None, 0.0, METHOD, scores, ["odrzucono: " + "; ".join(reasons)])
+    best = max(candidates, key=lambda k: scores[k])
+    second = max((scores[k] for k in candidates if k != best), default=0.0)
+    best_cfg = registry[best].classify
+    margin = scores[best] - max(second, 0.0)
+    evidence = list(results[best].evidence)
+    if scores[best] < best_cfg.min_score:
+        why = f"odrzucono: wynik {scores[best]:g} < min_score {best_cfg.min_score:g} (najlepszy: {best})"
+        return Classification(None, 0.0, METHOD, scores, [why, *evidence])
+    if margin < best_cfg.min_margin:
+        why = f"odrzucono: margines {margin:g} < min_margin {best_cfg.min_margin:g} (najlepszy: {best})"
+        return Classification(None, 0.0, METHOD, scores, [why, *evidence])
+    conf = features.confidence(scores[best], second, best_cfg.min_score)
+    return Classification(best, conf, METHOD, scores, evidence)

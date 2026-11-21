@@ -1,0 +1,17 @@
+Bank Spółdzielczy Nadodrze - bankowość internetowa
+
+Potwierdzenie wykonania operacji
+
+Rachunek nadawcy: 33 8765 4321 0000 0000 1111 2222
+Nadawca: Drogbud Wrocław S.A., ul. Fabryczna 30, 53-609 Wrocław
+Rachunek odbiorcy: 44 1010 1010 0002 3344 5566 7788
+Nazwa odbiorcy: Urząd Zamówień Publicznych
+Data operacji: 12.10.2026 09:41
+Typ operacji: przelew zewnętrzny
+Kwota operacji: 15000,00 PLN
+Waluta: PLN
+Tytuł operacji: wpis odwoławczy KIO - Kłodzko ZP.271.14.2026
+Identyfikator transakcji: TRX-88123-2026
+Saldo po operacji: nie dotyczy
+
+Operacja została przyjęta do realizacji i zaksięgowana.

@@ -42,6 +42,8 @@ class Classification:
     confidence: float
     method: str  # "keywords" | "llm" | ...
     scores: dict[str, float] = field(default_factory=dict)
+    # trafione cechy (dlaczego ten typ / dlaczego odrzucono)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
