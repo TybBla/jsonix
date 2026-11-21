@@ -9,7 +9,7 @@ rem OCR skanow (rapidocr + onnxruntime) ma paczki dla Pythona 3.13 i 3.14. Na no
 rem ale skany bez warstwy tekstowej nie zostana odczytane (ostrzezenie ponizej i w wynikach).
 
 set "JSONIX_PY="
-set "JSONIX_ROOT=%~dp0.."
+for %%I in ("%~dp0..") do set "JSONIX_ROOT=%%~fI"
 if not defined JSONIX_VENV set "JSONIX_VENV=%JSONIX_ROOT%\.venv"
 set "JSONIX_DEPS=import fastapi, pypdfium2, yaml, rapidfuzz, uvicorn"
 

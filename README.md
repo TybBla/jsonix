@@ -4,10 +4,17 @@
 
 ## Szybki start (Windows)
 
+**Wymagania:** Windows 10/11 i **Python 3.13 lub 3.14** ([python.org](https://www.python.org/downloads/), przy instalacji zaznacz „Add python.exe to PATH”), internet przy pierwszym uruchomieniu (instalacja zależności). Albo zamiast Pythona: Docker Desktop (sekcja „Docker”).
+
+1. Umieść dokumenty w `input\` — jeden podfolder na sprawę: `input\<sprawa>\<plik>.pdf` (PDF-y luzem w `input\` też działają).
+2. Uruchom w terminalu (PowerShell albo cmd) w katalogu repozytorium:
+
 ```powershell
-start.bat                 # wsad: input\ -> output\ (python -m odw2json run input output)
-start-gui.bat             # GUI w przeglądarce: http://127.0.0.1:8000
+.\start.bat              # wsad: input\ -> output\ (python -m odw2json run input output)
+.\start-gui.bat          # GUI w przeglądarce: http://127.0.0.1:8000
 ```
+
+3. Wyniki: `output\<sprawa>\<plik>.json` (nazwa jak PDF). W `cmd.exe` wpisz `start.bat` bez `.\`; PowerShell wymaga `.\` przed nazwą pliku z bieżącego katalogu.
 
 Przy pierwszym uruchomieniu `start.bat` (i `start-gui.bat`) sam przygotowuje środowisko (`scripts/setup-env.bat`): użyje Pythona z `PATH`, jeśli ma już zależności, a w przeciwnym razie utworzy `.venv` na **Pythonie 3.13 lub 3.14** (launcher `py`) i zainstaluje `requirements.txt` (jednorazowo, kilka minut, potrzebny internet). Plik `.env` jest opcjonalny — tylko z LLM (`copy .env.example .env`, uzupełnij `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
 
@@ -44,7 +51,7 @@ python scripts/smoke_docker.py                         # test: build, healthchec
 ## GUI
 
 ```powershell
-start-gui.bat                    # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
+.\start-gui.bat                  # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
 python scripts/smoke_gui.py      # test dymny API + GUI (kod wyjścia 0/1)
 ```
 
