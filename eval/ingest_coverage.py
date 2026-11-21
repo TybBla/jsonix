@@ -178,6 +178,7 @@ class Report:
     by_type: dict[str, Coverage] = field(default_factory=dict)
     docs: int = 0
     load_errors: list[tuple[str, str]] = field(default_factory=list)
+    foreign_backend: list[tuple[str, str]] = field(default_factory=list)  # (doc, backend inny niz zadany)
 
     @property
     def by_field(self) -> dict[str, Coverage]:
@@ -191,21 +192,21 @@ class Report:
             "missing": [{"field": p, "value": v} for p, v in self.total.missing],
             "docs": self.docs,
             "load_errors": [{"doc": d, "error": e} for d, e in self.load_errors],
+            "foreign_backend": [{"doc": d, "backend": b} for d, b in self.foreign_backend],
         }
 
 
 def _make_loader(backend: str | None):
+    """Loader; przy jawnym backendzie bez fallbackow, zeby pokrycie liczylo sie tylko jemu."""
+    from odw2json.config_loader import load_app_config
     from odw2json.ingest import load
 
     if backend is None:
         return load
+    cfg = {**(load_app_config().get("ingest", {}) or {}), "fallback_backends": []}
 
     def _load(path: Path):
-        try:
-            return load(path, backend=backend)
-        except TypeError:
-            print("UWAGA: ingest.load nie przyjmuje `backend=`; uzywam load(path).", file=sys.stderr)
-            return load(path)
+        return load(path, backend=backend, cfg=cfg)
 
     return _load
 
@@ -229,7 +230,10 @@ def run_coverage(split: str = "all", backend: str | None = None, train_dir: Path
             gt = json.loads(gt_path.read_text(encoding="utf-8-sig"))
             rel = f"{case}/{pdf.name}"
             try:
-                text = loader(pdf).text
+                doc = loader(pdf)
+                text = doc.text
+                if backend is not None and doc.backend != backend:
+                    rep.foreign_backend.append((rel, doc.backend))
             except Exception as e:  # noqa: BLE001 - narzedzie pomiarowe, jedziemy dalej
                 rep.load_errors.append((rel, f"{type(e).__name__}: {e}"))
                 text = ""

@@ -157,3 +157,30 @@ def test_cli_json_dump(tmp_path: Path):
     assert {"global", "by_type", "by_field"} <= set(data)
     assert data["global"]["total"] > 0
     assert "odwolanie" in data["by_type"]
+
+
+def test_explicit_backend_has_no_fallback(monkeypatch):
+    """Przy --backend padniecie backendu = blad wczytania, a nie ciche obsluzenie przez fallback."""
+    import eval.ingest_coverage as ic
+    from odw2json.ingest import backends
+
+    def boom(path):
+        raise RuntimeError("backend padl")
+
+    monkeypatch.setitem(backends.BACKENDS, "pypdf", boom)
+    monkeypatch.setattr(ic, "_cases", lambda split: ["przyklad_01"])
+    rep = ic.run_coverage("dev", backend="pypdf")
+    assert rep.docs > 0
+    assert len(rep.load_errors) == rep.docs
+    assert rep.total.found == 0
+    assert rep.foreign_backend == []
+
+
+def test_explicit_backend_serves_itself(monkeypatch):
+    import eval.ingest_coverage as ic
+
+    monkeypatch.setattr(ic, "_cases", lambda split: ["przyklad_01"])
+    rep = ic.run_coverage("dev", backend="pypdfium2")
+    assert rep.load_errors == []
+    assert rep.foreign_backend == []
+    assert rep.total.found > 0
