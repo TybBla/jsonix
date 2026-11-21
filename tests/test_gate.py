@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,9 +14,10 @@ from eval import gate
 from odw2json import classify as classify_mod
 from odw2json import extract as extract_mod
 from odw2json import pipeline as pipeline_mod
+from odw2json.config_loader import load_registry
 from odw2json.contracts import Classification
-
-pytestmark = pytest.mark.slow
+from odw2json.ingest import backends
+from odw2json.ingest import ocr as ocr_mod
 
 TRAIN = Path(__file__).resolve().parents[1] / "data" / "train"
 CASES = ["przyklad_01", "przyklad_02"]
@@ -50,6 +54,7 @@ def _patch_kwota(monkeypatch, delta: float = 0.0, extra_key: bool = False):
     monkeypatch.setattr(extract_mod, "extract", fake)
 
 
+@pytest.mark.slow
 def test_update_then_run_is_green(run):
     first = run(update=True)
     assert first.exit_code == 0
@@ -61,6 +66,7 @@ def test_update_then_run_is_green(run):
     assert second.regressions == []
 
 
+@pytest.mark.slow
 def test_baseline_file_shape(run, tmp_path):
     run(update=True)
     data = json.loads((tmp_path / "baseline.json").read_text(encoding="utf-8"))
@@ -87,6 +93,7 @@ def test_baseline_file_shape(run, tmp_path):
     assert (tmp_path / "gate" / "dev.json").is_file()
 
 
+@pytest.mark.slow
 def test_field_regression_is_detected(run, monkeypatch):
     _patch_kwota(monkeypatch)  # kwota poprawna
     good = run(update=True)
@@ -98,6 +105,7 @@ def test_field_regression_is_detected(run, monkeypatch):
     assert bad.metrics["f1_by_field"][KWOTA] < 1.0
 
 
+@pytest.mark.slow
 def test_tolerance_absorbs_drop(run, monkeypatch):
     _patch_kwota(monkeypatch)
     run(update=True)
@@ -107,6 +115,7 @@ def test_tolerance_absorbs_drop(run, monkeypatch):
     assert res.regressions == []
 
 
+@pytest.mark.slow
 def test_extra_key_is_schema_error(run, monkeypatch):
     run(update=True)  # dobry baseline
     _patch_kwota(monkeypatch, extra_key=True)
@@ -116,6 +125,7 @@ def test_extra_key_is_schema_error(run, monkeypatch):
     assert any("schema_errors" in r for r in res.regressions)
 
 
+@pytest.mark.slow
 def test_update_refused_on_schema_errors(run, monkeypatch, tmp_path):
     _patch_kwota(monkeypatch, extra_key=True)
     res = run(update=True)
@@ -123,6 +133,7 @@ def test_update_refused_on_schema_errors(run, monkeypatch, tmp_path):
     assert not (tmp_path / "baseline.json").exists()
 
 
+@pytest.mark.slow
 def test_negative_misclassified(run, monkeypatch):
     base = run(update=True)
     assert base.metrics["neg_correct"] == base.metrics["neg_total"] == 1
@@ -135,6 +146,7 @@ def test_negative_misclassified(run, monkeypatch):
     assert res.exit_code == 1
 
 
+@pytest.mark.slow
 def test_pipeline_exception_is_failure(run, monkeypatch):
     run(update=True)
 
@@ -147,12 +159,14 @@ def test_pipeline_exception_is_failure(run, monkeypatch):
     assert res.exit_code == 1
 
 
+@pytest.mark.slow
 def test_missing_baseline_section_is_exit_2(run, tmp_path):
     res = run()
     assert res.exit_code == 2
     assert not (tmp_path / "baseline.json").exists()
 
 
+@pytest.mark.slow
 def test_update_writes_only_selected_section(run, tmp_path):
     path = tmp_path / "baseline.json"
     path.write_text(json.dumps({"holdout": {"f1": 0.5}}), encoding="utf-8")
@@ -164,6 +178,7 @@ def test_update_writes_only_selected_section(run, tmp_path):
     assert list(data) == ["dev", "holdout"] or set(data) == {"dev", "holdout"}
 
 
+@pytest.mark.slow
 def test_unknown_case_is_usage_error(run):
     with pytest.raises(ValueError):
         run(cases=["nie_ma_takiej_sprawy"])
@@ -231,6 +246,7 @@ def _patch_unknown_writer(monkeypatch, content: str | None):
 
 
 @pytest.mark.parametrize("content", ["null{garbage", None, "null", '{"a": 1}'])
+@pytest.mark.slow
 def test_negative_strict_raw_output(run, monkeypatch, content):
     run(update=True)  # dobry baseline
     _patch_unknown_writer(monkeypatch, content)
@@ -241,6 +257,7 @@ def test_negative_strict_raw_output(run, monkeypatch, content):
         assert res.metrics["schema_errors"] >= 1
 
 
+@pytest.mark.slow
 def test_negative_empty_object_still_green(run, monkeypatch):
     run(update=True)
     _patch_unknown_writer(monkeypatch, "{}")
@@ -299,6 +316,7 @@ def test_classification_error_set_regression():
     assert gate.compare_metrics(base2, mixed, 0.0)[1]
 
 
+@pytest.mark.slow
 def test_metrics_store_error_files(run, monkeypatch):
     monkeypatch.setattr(
         classify_mod, "classify", lambda doc, registry: Classification("odwolanie", 1.0, "patched")
@@ -306,3 +324,178 @@ def test_metrics_store_error_files(run, monkeypatch):
     res = run()
     files = res.metrics["classification_error_files"]
     assert files and files == sorted(files)
+
+
+# ------------------------------------- E2b: skany, typ z kluczy GT, podzial wg zrodla
+
+SCAN_CASE = "skany/potwierdzenia/0001"
+SCAN_DIR = TRAIN / "skany" / "potwierdzenia" / "0001"
+SCAN_REL = "skany/potwierdzenia/0001/0001.pdf"
+
+
+@pytest.fixture
+def mini(tmp_path, monkeypatch):
+    """Mini-drzewo: skan 0001 (GT 0001.json), sprawa klasyczna przyklad_01 i negatyw z warstwa tekstu.
+
+    `ocr_page` jest podmieniony (bez silnika): zwraca tekst klasycznego potwierdzenia + wartosci GT skanu.
+    """
+    train = tmp_path / "train"
+    shutil.copytree(SCAN_DIR, train / "skany" / "potwierdzenia" / "0001")
+    classic = train / "przyklad_01"
+    classic.mkdir(parents=True)
+    shutil.copy2(TRAIN / "przyklad_01" / "potwierdzenie_przelewu.pdf", classic)
+    shutil.copy2(TRAIN / "przyklad_01" / "przelew.json", classic)
+    (train / "negatywne").mkdir()
+    shutil.copy2(TRAIN / "negatywne" / NEGATIVES[0], train / "negatywne")
+    gt = json.loads((SCAN_DIR / "0001.json").read_text(encoding="utf-8-sig"))
+    classic_text = "\n".join(backends.BACKENDS["pypdfium2"](classic / "potwierdzenie_przelewu.pdf"))
+
+    def fake_ocr(path, page_index, cfg=None):
+        return classic_text + "\n" + json.dumps(gt, ensure_ascii=False)
+
+    monkeypatch.setattr(ocr_mod, "ocr_page", fake_ocr)
+    return SimpleNamespace(train=train, gt=gt, tmp=tmp_path)
+
+
+def _patch_scan_extract(monkeypatch, gt, drop: str | None = None):
+    """extract: dla skanu (stem 0001) zwraca GT (opcjonalnie bez pola `drop`); reszta bez zmian."""
+    real = extract_mod.extract
+
+    def fake(doc, cfg):
+        res = real(doc, cfg)
+        if doc.path.stem == "0001":
+            data = copy.deepcopy(gt)
+            if drop:
+                data["przelew_bankowy"][drop] = None
+            res.data = data
+        return res
+
+    monkeypatch.setattr(extract_mod, "extract", fake)
+
+
+def _mrun(mini, split="dev", **kw):
+    kw.setdefault("baseline_path", mini.tmp / "baseline.json")
+    kw.setdefault("gate_dir", mini.tmp / "gate")
+    kw.setdefault("cases", ["przyklad_01", SCAN_CASE])
+    kw.setdefault("negatives", NEGATIVES)
+    kw.setdefault("train_dir", mini.train)
+    return gate.run_gate(split, **kw)
+
+
+@pytest.mark.slow
+def test_scan_case_nested_type_from_gt_and_by_source(mini, monkeypatch):
+    _patch_scan_extract(monkeypatch, mini.gt)
+    res = _mrun(mini, update=True)
+    assert res.exit_code == 0
+    m = res.metrics
+    assert (m["schema_errors"], m["classification_errors"], m["pipeline_errors"]) == (0, 0, 0)
+    assert set(m["by_source"]) == {"tekst", "skan"}
+    assert m["by_source"]["skan"]["f1"] == 1.0
+    assert m["by_source"]["skan"]["docs"] == 1 and m["by_source"]["tekst"]["docs"] == 2  # + negatyw
+    assert {"przelew/skan", "przelew/tekst"} <= set(m["f1_by_type_source"])
+    docs = {d["doc"]: d for d in res.details["score"]["docs"]}
+    d = docs[SCAN_REL]  # wynik w <out>/skany/potwierdzenia/0001/0001.json
+    assert d["pred_missing"] is False and d["type"] == "przelew" and d["source"] == "skan"
+    assert d["f1"] == 1.0
+    assert docs["przyklad_01/potwierdzenie_przelewu.pdf"]["source"] == "tekst"
+
+
+@pytest.mark.slow
+def test_scan_regression_is_detected(mini, monkeypatch):
+    _patch_scan_extract(monkeypatch, mini.gt)
+    assert _mrun(mini, update=True).exit_code == 0
+    _patch_scan_extract(monkeypatch, mini.gt, drop="kwota")  # regresja tylko na skanie
+    bad = _mrun(mini)
+    assert bad.exit_code == 1
+    assert bad.metrics["by_source"]["skan"]["f1"] < 1.0
+    assert any("by_source[skan].f1" in r for r in bad.regressions)
+    assert not any("by_source[tekst]" in r for r in bad.regressions)
+    assert any("f1_by_type_source[przelew/skan]" in r for r in bad.regressions)
+
+
+@pytest.mark.slow
+def test_source_option_filters_cases_and_keys_baseline(mini, monkeypatch):
+    _patch_scan_extract(monkeypatch, mini.gt)
+    t = _mrun(mini, source="tekst", update=True)
+    assert t.details["cases"] == ["przyklad_01"]
+    assert set(t.metrics["by_source"]) == {"tekst"}
+    s = _mrun(mini, source="skan", update=True)
+    assert s.details["cases"] == [SCAN_CASE]
+    assert set(s.metrics["by_source"]) == {"skan"}
+    assert s.metrics["neg_total"] == 0  # negatyw z warstwa tekstu nie wchodzi do przebiegu 'skan'
+    data = json.loads((mini.tmp / "baseline.json").read_text(encoding="utf-8"))
+    assert set(data) == {"dev@tekst", "dev@skan"}
+    assert (mini.tmp / "gate" / "dev@skan.json").is_file()
+    assert _mrun(mini, source="tekst").exit_code == 0  # porownanie z wlasna sekcja
+    assert _mrun(mini, source="all").exit_code == 2  # sekcji 'dev' (all) nie ma
+
+
+def test_prepare_source_filter_with_scanned_negative(mini):
+    scan_neg = mini.train / "negatywne" / "skan_negatyw.pdf"
+    shutil.copy2(SCAN_DIR / "0001.pdf", scan_neg)
+    cases = ["przyklad_01", SCAN_CASE]
+
+    def staged(source, negatives=None):
+        work = mini.tmp / f"w_{source}_{negatives is None}"
+        in_dir, _ = gate._prepare(work, mini.train, cases, ["negatywne"], negatives, source)
+        return sorted(p.relative_to(in_dir).as_posix() for p in in_dir.rglob("*.pdf"))
+
+    text_neg, scan_neg_rel = "negatywne/" + NEGATIVES[0], "negatywne/skan_negatyw.pdf"
+    classic = "przyklad_01/potwierdzenie_przelewu.pdf"
+    assert staged("all") == sorted([SCAN_REL, classic, text_neg, scan_neg_rel])
+    assert staged("tekst") == sorted([classic, text_neg])
+    assert staged("skan") == sorted([SCAN_REL, scan_neg_rel])
+    # jawna lista negatywow: nazwa odfiltrowana przez source nie jest bledem "brak negatywow"
+    assert staged("skan", negatives=NEGATIVES) == [SCAN_REL]
+
+
+def test_filter_cases_and_section_key():
+    cases = ["przyklad_01", "skany/odwolania/0001", "przyklad_02"]
+    assert gate.filter_cases(cases, "all") == cases
+    assert gate.filter_cases(cases, "tekst") == ["przyklad_01", "przyklad_02"]
+    assert gate.filter_cases(cases, "skan") == ["skany/odwolania/0001"]
+    assert gate.section_key("dev", "all") == "dev"
+    assert gate.section_key("holdout", "skan") == "holdout@skan"
+    with pytest.raises(ValueError):
+        gate.filter_cases(cases, "nieznane")
+
+
+def test_inspect_expected_type_comes_from_gt_keys(tmp_path):
+    reg = load_registry()
+    gt, out = tmp_path / "gt", tmp_path / "out"
+    rel = Path("skany") / "odwolania" / "0001"
+    (gt / rel).mkdir(parents=True)
+    (out / rel).mkdir(parents=True)
+    (gt / rel / "0001.pdf").write_bytes(b"")
+    gt_doc = reg["odwolanie"].template()
+    gt_doc["OdwolanieKIO"]["data"] = "2026-01-01"
+    (gt / rel / "0001.json").write_text(json.dumps(gt_doc), encoding="utf-8")
+    target = out / rel / "0001.json"
+    # dobry typ -> brak bledow
+    target.write_text(json.dumps(reg["odwolanie"].template()), encoding="utf-8")
+    assert gate._inspect_outputs(out, gt, reg)[:2] == (0, 0)
+    # wynik innego typu -> blad klasyfikacji z oczekiwanym typem odwolanie (nie "0001")
+    target.write_text(json.dumps(reg["przelew"].template()), encoding="utf-8")
+    schema_n, cls_n, _, cls_msgs, cls_files = gate._inspect_outputs(out, gt, reg)
+    assert (schema_n, cls_n) == (0, 1)
+    assert "oczekiwano odwolanie" in cls_msgs[0]
+    assert cls_files == ["skany/odwolania/0001/0001.pdf"]
+
+
+def test_compare_by_source_rows():
+    base = {"f1": 0.9, "by_source": {"tekst": {"f1": 0.9}, "skan": {"f1": 0.8}}}
+    base["f1_by_type_source"] = {"odwolanie/skan": 0.8}
+    cur = copy.deepcopy(base)
+    assert gate.compare_metrics(base, cur, 0.0)[1] == []
+    cur["by_source"]["skan"]["f1"] = 0.7
+    cur["f1_by_type_source"]["odwolanie/skan"] = 0.7
+    reg = gate.compare_metrics(base, cur, 0.0)[1]
+    assert any("by_source[skan].f1" in r for r in reg)
+    assert any("f1_by_type_source[odwolanie/skan]" in r for r in reg)
+    assert gate.compare_metrics(base, cur, 0.2)[1] == []
+    # baseline sprzed E2b (bez by_source) -> "new", nie regresja; zrodlo, ktorego nie ma teraz -> "gone"
+    old = {"f1": 0.9}
+    rows, reg = gate.compare_metrics(old, base, 0.0)
+    assert reg == [] and any(r.name == "by_source[skan].f1" and r.flag == "new" for r in rows)
+    rows, reg = gate.compare_metrics(base, {"f1": 0.9}, 0.0)
+    assert reg == [] and any(r.name == "by_source[skan].f1" and r.flag == "gone" for r in rows)

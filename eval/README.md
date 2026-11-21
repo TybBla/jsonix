@@ -6,9 +6,19 @@ Liczy TP/TN/FP/FN na poziomie pol (zasady organizatora) i F1 = 2TP/(2TP+FP+FN).
 python -m eval.score --pred output --gt data/train [--threshold 0.8] [--json raport.json] [--worst 10]
 ```
 
-Predykcja `output/<case>/<nazwa>.json` jest porownywana z `data/train/<case>/<nazwa>.json`
-(wyjatek: `potwierdzenie_przelewu.pdf` -> GT `przelew.json`; mapowanie w `GT_NAME_FOR_PDF`).
-PDF-y bez GT (np. `negatywne/`) to negatywy: poprawny wynik to brak pliku JSON (pusty plik = brak).
+Predykcja `output/<case>/<nazwa>.json` jest porownywana z GT dla `<nazwa>.pdf` (sprawy moga lezec w
+podkatalogach, np. `skany/odwolania/0001/0001.pdf`; sciezki wzgledne sa zachowane):
+- GT to `<nazwa>.json` w tym samym katalogu, jesli istnieje; w przeciwnym razie mapowanie `GT_NAME_FOR_PDF`
+  (`potwierdzenie_przelewu.pdf` -> `przelew.json`); `gt_path_for_pdf(pdf)` zwraca sciezke albo `None`;
+- **typ dokumentu w raporcie** to typ z rejestru (`config/doctypes`), ktorego szablon ma najwiecej kluczy
+  najwyzszego poziomu wspolnych z GT (`infer_doc_type(gt, registry)`; remis albo brak wspolnych kluczy =
+  `None`, wtedy nazwa pliku GT jak dawniej). Nazwa pliku (np. `0001`) nie decyduje o typie;
+- PDF-y bez GT (np. `negatywne/`) to negatywy: poprawny wynik to brak pliku JSON (pusty plik = brak).
+
+Zrodlo dokumentu (`tekst` / `skan`): `doc_source(pred_root, rel)` czyta `<pred>/.trace/<rel>.trace.json` i
+zwraca `skan`, gdy jest tam `ocr_used: true` (czyli ingest uzyl OCR), inaczej `tekst` (takze przy braku trace).
+`score_dirs(..., sources={rel: zrodlo})` nadpisuje odczyt z trace (uzywa tego bramka). Raport ma
+`by_source`, `by_type_source` (`typ/zrodlo`, bez negatywow) i `docs_by_source`.
 
 Zasady:
 - TP: wartosc jest u nas i zgadza sie z GT; TN: null/brak po obu stronach;
@@ -27,7 +37,7 @@ Testy: `python -m pytest -q tests/test_score.py`
 ## Bramka regresji F1 (`eval.gate`)
 
 ```
-python -m eval.gate [--split dev|holdout|all] [--update-baseline] [--tolerance 0.0] [--json PATH]
+python -m eval.gate [--split dev|holdout|all] [--source tekst|skan|all] [--update-baseline] [--tolerance 0.0] [--json PATH]
 ```
 
 Dla wybranego splitu (`data/splits.yaml`) kopiuje PDF-y spraw + wszystkie negatywy (`data/train/negatywne`)
@@ -36,7 +46,26 @@ sprawdza kazdy wynik (`schema.validate_output` dla pozytywow, `is_unknown_output
 i porownuje z `eval/baseline.json` (osobna sekcja `dev` i `holdout`). `all` = oba splity osobno.
 
 Baseline per split: `f1`, `precision`, `recall`, `f1_by_type`, `f1_by_field`, `neg_correct`/`neg_total`,
-`schema_errors`, `classification_errors`, `pipeline_errors`, `updated`, `commit`.
+`schema_errors`, `classification_errors`, `pipeline_errors`, `updated`, `commit`, a od E2b takze
+`by_source` (`tekst`/`skan`: `f1`, `precision`, `recall`, `tp`, `fp`, `fn`, `tn`, `docs`) i
+`f1_by_type_source` (`odwolanie/skan`, ...). `by_source[<zrodlo>].f1` i `f1_by_type_source[...]` sa bramkowane
+jak `f1_by_type` (spadek > tolerancja = regresja); klucze nieobecne w starym baseline to `new`, nieobecne w
+biezacym wyniku to `gone` (bez bledu).
+
+**Zrodlo dokumentu** to `skan`, gdy ingest faktycznie uzyl OCR (`doc.ocr_used`), inaczej `tekst`. Trace
+pipeline'u nie zapisuje dzis `ocr_used`, wiec bramka zbiera te informacje sama (opakowanie `ingest.load`
+na czas przebiegu) i przekazuje je do `score_dirs`. Skan, ktorego OCR nic nie rozpoznal, wpada wiec do `tekst`
+(widac to jako spadek F1 tekstowych); narzedzie pokrycia lapie taki przypadek heurystyka z warstwa tekstu.
+
+**Filtr `--source`** (domyslnie `all`; `run_gate(..., source=...)`): ogranicza sprawy i negatywy PRZED
+uruchomieniem pipeline'u (OCR nie jest uruchamiany do filtrowania):
+- `tekst` = sprawy spoza `skany/` (np. `przyklad_*`) + negatywy z warstwa tekstu,
+- `skan` = sprawy `skany/...` + negatywy bez warstwy tekstu (surowa ekstrakcja `pypdfium2` < 30 znakow),
+- `all` = wszystko (jak dawniej).
+Dla `--source tekst|skan` sekcja baseline nazywa sie `<split>@<source>` (`dev@tekst`, `dev@skan`,
+`holdout@tekst`...), a wynik trafia do `output/.gate/<split>@<source>.json`; `--source all` uzywa sekcji
+`dev` / `holdout`. Dzieki temu CI moze bramkowac sam tekst (`--split dev --source tekst`) niezaleznie od
+pelnej bramki. Brak sekcji = kod 2 (jak zawsze).
 
 Kody wyjscia:
 - `0` - brak regresji,
@@ -60,7 +89,10 @@ nagraj kasety ponownie (`LLM_MODE=record`).
 (i do `--json PATH`). Baseline aktualizuj swiadomie, razem ze zmiana poprawiajaca wynik.
 
 Python API: `eval.gate.run_gate(split, cases=None, baseline_path=..., update=False, tolerance=0.0,
-train_dir=..., negatives=None, gate_dir=None) -> GateResult` (`.exit_code`, `.metrics`, `.regressions`).
+train_dir=..., negatives=None, gate_dir=None, source="all") -> GateResult` (`.exit_code`, `.metrics`,
+`.regressions`, `.section`). Oczekiwany typ pozytywu przy ocenie bledow klasyfikacji pochodzi z kluczy GT
+(`infer_doc_type`), nie z nazwy pliku; sprawy w podkatalogach (`skany/odwolania/0001`) maja wyniki w
+`<out>/skany/odwolania/0001/0001.json`.
 
 Testy: `python -m pytest -q tests/test_gate.py`
 
@@ -71,8 +103,8 @@ python -m eval.ingest_coverage [--backend NAME] [--split dev|holdout|all] [--sho
 ```
 
 Mierzy, ile wartosci z GT wystepuje w tekscie wyciagnietym z PDF (`odw2json.ingest.load`), niezaleznie od
-reszty pipeline'u. Sprawy z `data/splits.yaml`; PDF -> GT jak w `eval.score` (`potwierdzenie_przelewu` ->
-`przelew`), negatywy pomijane. `--backend` wywoluje `load(path, backend=NAME)` (gdy loader nie zna parametru,
+reszty pipeline'u. Sprawy z `data/splits.yaml` (takze `skany/<typ>/<NNNN>`); PDF -> GT i typ dokumentu jak
+w `eval.score` (`X.json` obok PDF-a, inaczej `GT_NAME_FOR_PDF`; typ z kluczy GT), negatywy pomijane. `--backend` wywoluje `load(path, backend=NAME)` (gdy loader nie zna parametru,
 drukuje uwage i uzywa `load(path)`). Kod wyjscia zawsze 0 (narzedzie pomiarowe).
 
 - Pola doslowne: `nazwa`, `tytul`, `imie_nazwisko`, `mail`, `numer_postepowania`, `numer_transakcji`,
@@ -84,10 +116,14 @@ drukuje uwage i uzywa `load(path)`). Kod wyjscia zawsze 0 (narzedzie pomiarowe).
   token zaczynajacy sie od jego 4 pierwszych liter, krotsze slowa musza byc tokenem identycznym.
 - Pomijane: daty, kwoty, BZP, TED, `czynnosc_*`, `typ`, `przez-pelnomocnika`, `prowadzacy_postepowanie`.
 
-Raport: pokrycie globalne, per typ dokumentu, per pole (sciezki jak w `eval.score`, od najgorszego) i lista
+Podzial wg zrodla (`by_source`, `by_type_source`, `docs_by_source` w JSON): `skan`, gdy `doc.ocr_used`
+albo gdy PDF nie ma warstwy tekstu (< 30 znakow w surowej ekstrakcji; dotyczy tez bledu wczytania i OCR bez
+wyniku), inaczej `tekst`.
+
+Raport: pokrycie globalne, per typ dokumentu, per zrodlo, per pole (sciezki jak w `eval.score`, od najgorszego) i lista
 brakow. `--json` zapisuje `global`, `by_type`, `by_field`, `missing`, `docs`, `load_errors`.
 
 Python API: `coverage_for_doc(text, gt, doc_type) -> Coverage` (`found`, `found_fuzzy`, `total`, `missing`,
-`rate`, `rate_with_fuzzy`, `+`), `run_coverage(split, backend) -> Report`.
+`rate`, `rate_with_fuzzy`, `+`), `run_coverage(split, backend, train_dir, cases=None) -> Report`.
 
 Testy: `python -m pytest -q tests/test_ingest_coverage.py`

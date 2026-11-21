@@ -1,7 +1,22 @@
 import json
 from pathlib import Path
 
-from eval.score import Counts, ScoreConfig, score_dirs, score_pair
+import pytest
+
+from eval.score import (
+    Counts,
+    ScoreConfig,
+    doc_source,
+    gt_path_for_pdf,
+    has_text_layer,
+    infer_doc_type,
+    score_dirs,
+    score_pair,
+)
+from odw2json.config_loader import ROOT_DIR, load_registry
+
+TRAIN = ROOT_DIR / "data" / "train"
+SCAN_PDF = TRAIN / "skany" / "potwierdzenia" / "0001" / "0001.pdf"
 
 
 def test_identical_dicts():
@@ -162,3 +177,132 @@ def test_score_dirs(tmp_path):
     assert rep.total.tp == 2 and rep.total.fn == 1 and rep.total.fp == 1
     assert len(rep.docs) == 8
     json.dumps(rep.to_dict())
+
+
+# ------------------------------------------------ E2b: skany, typ z kluczy GT, zrodlo
+
+
+@pytest.fixture(scope="module")
+def registry():
+    return load_registry()
+
+
+def test_infer_doc_type_from_top_level_keys(registry):
+    assert infer_doc_type({"przelew_bankowy": {"kwota": 1}}, registry) == "przelew"
+    assert infer_doc_type({"mocodawca": [], "pelnomocnicy": []}, registry) == "pelnomocnictwo"
+    odw = {"OdwolanieKIO": {}, "Odwolujacy": [], "Zamawiajacy": [], "ZamowieniePubliczne": {}}
+    assert infer_doc_type(odw, registry) == "odwolanie"
+
+
+def test_infer_doc_type_partial_unknown_and_ambiguous(registry):
+    assert infer_doc_type({"Odwolujacy": [{"nazwa": "x"}]}, registry) == "odwolanie"  # podzbior kluczy
+    assert infer_doc_type({}, registry) is None
+    assert infer_doc_type({"a": "x"}, registry) is None
+    assert infer_doc_type([1, 2], registry) is None
+    assert infer_doc_type({"przelew_bankowy": {}, "mocodawca": []}, registry) is None  # remis
+
+    class _T:
+        def __init__(self, keys):
+            self._k = keys
+
+        def template(self):
+            return dict.fromkeys(self._k)
+
+    assert infer_doc_type({"x": 1}, {"a": _T("xy"), "b": _T("xz")}) is None
+
+
+def test_gt_path_for_pdf_mapping_and_same_name(tmp_path):
+    d = tmp_path / "przyklad_x"
+    for name in ("odwolanie.pdf", "odwolanie.json", "potwierdzenie_przelewu.pdf", "przelew.json", "neg.pdf"):
+        _w(d / name, {})
+    assert gt_path_for_pdf(d / "odwolanie.pdf") == d / "odwolanie.json"
+    assert gt_path_for_pdf(d / "potwierdzenie_przelewu.pdf") == d / "przelew.json"  # stary wyjatek
+    assert gt_path_for_pdf(d / "neg.pdf") is None
+    # X.json obok X.pdf ma pierwszenstwo przed mapowaniem
+    _w(d / "potwierdzenie_przelewu.json", {})
+    assert gt_path_for_pdf(d / "potwierdzenie_przelewu.pdf") == d / "potwierdzenie_przelewu.json"
+
+
+def test_has_text_layer():
+    assert has_text_layer(TRAIN / "przyklad_01" / "odwolanie.pdf") is True
+    assert has_text_layer(SCAN_PDF) is False
+    assert has_text_layer(TRAIN / "przyklad_01" / "nie_ma.pdf") is True  # nieczytelny != skan
+
+
+def _nested_tree(tmp_path):
+    gt, pr = tmp_path / "gt", tmp_path / "pred"
+    rel = Path("skany") / "odwolania" / "0001"
+    gt_doc = {"OdwolanieKIO": {"data": "2026-01-01"}, "Odwolujacy": [{"nazwa": "Alfa"}]}
+    _w(gt / rel / "0001.pdf", {})
+    _w(gt / rel / "0001.json", gt_doc)
+    _w(gt / "przyklad_01" / "odwolanie.pdf", {})
+    _w(gt / "przyklad_01" / "odwolanie.json", gt_doc)
+    _w(pr / rel / "0001.json", gt_doc)
+    _w(pr / "przyklad_01" / "odwolanie.json", gt_doc)
+    return gt, pr, rel
+
+
+def test_score_dirs_nested_case_type_from_gt_keys(tmp_path):
+    gt, pr, _ = _nested_tree(tmp_path)
+    rep = score_dirs(pr, gt)
+    by_doc = {d.rel: d for d in rep.docs}
+    d = by_doc["skany/odwolania/0001/0001.pdf"]
+    assert d.doc_type == "odwolanie"  # typ z kluczy GT, nie z nazwy pliku "0001"
+    assert d.pred_missing is False and d.counts.fp == 0 and d.counts.fn == 0
+    assert set(rep.by_type) == {"odwolanie"}
+    assert d.to_dict()["source"] == "tekst"  # brak trace -> tekst
+
+
+def test_score_dirs_source_from_trace(tmp_path):
+    gt, pr, rel = _nested_tree(tmp_path)
+    _w(pr / ".trace" / rel / "0001.trace.json", {"ocr_used": True, "trace": []})
+    _w(pr / ".trace" / "przyklad_01" / "odwolanie.trace.json", {"ocr_used": False})
+    rep = score_dirs(pr, gt)
+    srcs = {d.rel: d.source for d in rep.docs}
+    assert srcs == {"skany/odwolania/0001/0001.pdf": "skan", "przyklad_01/odwolanie.pdf": "tekst"}
+    assert set(rep.by_source) == {"tekst", "skan"}
+    assert rep.by_source["skan"].tp == rep.by_source["tekst"].tp > 0
+    assert set(rep.by_type_source) == {"odwolanie/tekst", "odwolanie/skan"}
+    assert (rep.by_source["skan"] + rep.by_source["tekst"]).tp == rep.total.tp
+    assert rep.docs_by_source == {"tekst": 1, "skan": 1}
+    out = rep.to_dict()
+    assert out["by_source"]["skan"]["tp"] == rep.by_source["skan"].tp
+    assert "odwolanie/skan" in out["by_type_source"]
+    json.dumps(out)
+
+
+def test_score_dirs_sources_override_beats_trace(tmp_path):
+    gt, pr, rel = _nested_tree(tmp_path)
+    _w(pr / ".trace" / rel / "0001.trace.json", {"ocr_used": False})
+    rep = score_dirs(pr, gt, sources={"skany/odwolania/0001/0001.pdf": "skan"})
+    assert {d.rel: d.source for d in rep.docs}["skany/odwolania/0001/0001.pdf"] == "skan"
+
+
+def test_doc_source_edge_cases(tmp_path):
+    assert doc_source(tmp_path, "a/b.pdf") == "tekst"  # brak trace
+    t = tmp_path / ".trace" / "a" / "b.trace.json"
+    t.parent.mkdir(parents=True)
+    t.write_text("{zepsute", encoding="utf-8")
+    assert doc_source(tmp_path, "a/b.pdf") == "tekst"
+    t.write_text(json.dumps({"ocr_used": True}), encoding="utf-8")
+    assert doc_source(tmp_path, "a/b.pdf") == "skan"
+    # kropka w nazwie: pipeline zapisuje a.b.trace.json
+    t2 = tmp_path / ".trace" / "a.b.trace.json"
+    t2.write_text(json.dumps({"ocr_used": True}), encoding="utf-8")
+    assert doc_source(tmp_path, "a.b.pdf") == "skan"
+
+
+def test_przyklad_only_behaviour_unchanged(tmp_path):
+    """Sprawa klasyczna: typ = nazwa GT (jak dawniej), wszystko 'tekst'."""
+    gt, pr = tmp_path / "gt", tmp_path / "pred"
+    for stem in ("odwolanie", "pelnomocnictwo", "potwierdzenie_przelewu"):
+        _w(gt / "p1" / f"{stem}.pdf", {})
+    _w(gt / "p1" / "odwolanie.json", {"OdwolanieKIO": {"data": "2026-01-01"}})
+    _w(gt / "p1" / "przelew.json", {"przelew_bankowy": {"kwota": 10.0}})
+    _w(gt / "p1" / "pelnomocnictwo.json", {"mocodawca": [], "pelnomocnicy": []})
+    _w(pr / "p1" / "odwolanie.json", {"OdwolanieKIO": {"data": "2026-01-01"}})
+    _w(pr / "p1" / "potwierdzenie_przelewu.json", {"przelew_bankowy": {"kwota": 10}})
+    rep = score_dirs(pr, gt)
+    assert set(rep.by_type) == {"odwolanie", "przelew", "pelnomocnictwo"}
+    assert set(rep.by_source) == {"tekst"}
+    assert rep.by_source["tekst"] == rep.total
