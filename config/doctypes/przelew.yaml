@@ -38,6 +38,57 @@ classify:
         - 're:(na rachunek|beneficjent|odbiorc|kontrahent)'
   min_score: 6.0
   min_margin: 2.0
-fields: {}
+# Ekstrakcja pol (DSL silnika odw2json/extract/engine.py, opis: docs/nowy-typ-dokumentu.md).
+# Etykiety dopasowywane bez polskich znakow i wielkosci liter; kolejnosc ekstraktorow = priorytet.
+fields:
+  przelew_bankowy.data_operacji:
+    type: date
+    extract:
+      - label: [data operacji, data transakcji, data realizacji, data wykonania, data ksiegowania, w dniu]
+        max_chars: 60
+  przelew_bankowy.kwota:
+    type: amount
+    extract:
+      - label: [kwota przelewu, kwota operacji, kwota transakcji, kwota, w kwocie, wartosc]
+        max_chars: 60
+    validate: {min: 0.01}
+  przelew_bankowy.z_rachunku:
+    type: iban
+    extract:
+      # 1) etykieta rachunku nadawcy; 2) pierwszy IBAN po danych nadawcy; 3) pierwszy IBAN w dokumencie
+      - label: [z rachunku, rachunek nadawcy, rachunek zleceniodawcy, rachunek obciazany, rachunek platnika, rachunek obciazony]
+        max_chars: 80
+      - near: {phrases: [dane nadawcy, nadawca, zleceniodawca, platnik], direction: after, max_chars: 250}
+      - regex: {pattern: '(?<![\dA-Za-z])(?:PL\s?)?\d{2}(?:\s?\d{4}){6}(?!\d)', nth: 1}
+  przelew_bankowy.na_rachunek:
+    type: iban
+    extract:
+      - label: [na rachunek, rachunek odbiorcy, rachunek beneficjenta, rachunek uznawany, rachunek adresata]
+        max_chars: 80
+      - near: {phrases: [dane odbiorcy, odbiorca, beneficjent, adresat przelewu, adresat], direction: after, max_chars: 250}
+      - regex: {pattern: '(?<![\dA-Za-z])(?:PL\s?)?\d{2}(?:\s?\d{4}){6}(?!\d)', nth: 2}
+  przelew_bankowy.numer_transakcji:
+    type: str
+    extract:
+      # identyfikator: ciag liter/cyfr (>= 8 znakow, z cyfra) w oknie po etykiecie
+      - label: [numer transakcji, numer referencyjny, nr referencyjny, nr ref., nr ref, identyfikator operacji, identyfikator transakcji, numer operacji, id transakcji]
+        value: '(?<![A-Za-z0-9])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{8,}(?![A-Za-z0-9])'
+        max_chars: 60
+  przelew_bankowy.tytul:
+    type: str
+    extract:
+      # tytul bywa zawiniety: doklejamy kolejne linie do pustej linii albo nastepnej etykiety
+      - label:
+          labels: [tytul przelewu, tytulem, tytul, opis operacji, opis]
+          line_start: true
+          multiline: true
+          max_lines: 6
+          stop: [nr ref, nr klienta, numer, identyfikator, kwota, wartosc, data, status, waluta, kanal, typ operacji,
+                 tryb, oplata, zrealizowano, wykonano, nadawca, odbiorca, platnik, zleceniodawca, adresat, beneficjent,
+                 dane nadawcy, dane odbiorcy, rachunek, z rachunku, na rachunek, z powazaniem, bank, potwierdzenie,
+                 typ, dokument, strona, niniejsze,
+                 're:^-{3,}', 're:^\*{3}']
+    normalize: [ws, trim_quotes]
+    validate: {min_len: 3}
 llm:
   prompt: prompts/przelew.md
