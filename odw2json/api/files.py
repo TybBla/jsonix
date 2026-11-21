@@ -20,11 +20,24 @@ def has_pdf_header(head: bytes) -> bool:
     return PDF_MAGIC in head[:HEADER_WINDOW]
 
 
-def display_name(raw: str | None) -> str:
-    """Nazwa do wyświetlenia: bez ścieżki i znaków sterujących, polskie znaki zachowane."""
+def _basename(raw: str | None) -> str:
     name = unicodedata.normalize("NFC", raw or "")
     name = re.split(r"[\\/]", name)[-1]
-    name = _CONTROL.sub("", name).strip().lstrip(".").strip()
+    return _CONTROL.sub("", name).strip()
+
+
+def valid_name(raw: str | None) -> bool:
+    """Czy nazwa pliku (bez ścieżki) ma treść: nie jest pusta ani złożona z samych kropek (`.`, `..`)."""
+    return bool(_basename(raw).strip(". "))
+
+
+def display_name(raw: str | None) -> str:
+    """Nazwa do wyświetlenia: bez ścieżki i znaków sterujących, polskie znaki zachowane."""
+    raw_name = _basename(raw)
+    name = raw_name.lstrip(".").strip()
+    if raw_name.lower().endswith(".pdf") and not name.lower().endswith(".pdf"):
+        # „.pdf”, „...pdf”: po zdjęciu kropek z początku zostało samo „pdf” — zachowaj rozszerzenie
+        name = f"{name[:-3].strip(' .') or 'dokument'}.pdf"
     return name or "dokument.pdf"
 
 
@@ -36,7 +49,8 @@ def storage_name(display: str, taken: set[str]) -> str:
     if not dot:
         stem, ext = safe, ""
     stem = stem[:120] or "dokument"
-    if stem.casefold() in _RESERVED:
+    # Windows traktuje jako nazwę urządzenia część przed PIERWSZĄ kropką (CON.txt.pdf = CON, „AUX .pdf” = AUX)
+    if stem.split(".", 1)[0].strip().casefold() in _RESERVED:
         stem = f"_{stem}"
     candidate = f"{stem}.{ext}" if ext else stem
     n = 2

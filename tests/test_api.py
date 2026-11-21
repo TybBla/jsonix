@@ -7,6 +7,7 @@ import json
 import os
 import time
 import zipfile
+from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -85,7 +86,7 @@ def test_job_with_three_pdfs_finishes_with_contract(done_job):
     for r in results.values():
         assert set(r) == RESULT_KEYS
         assert r["status"] == "done" and r["error"] is None
-        assert set(r["classification"]) == {"doc_type", "confidence", "method"}
+        assert set(r["classification"]) == {"doc_type", "confidence", "method", "evidence"}
         assert isinstance(r["pages"], int) and r["pages"] >= 1
         assert isinstance(r["warnings"], list)
         for t in r["trace"]:
@@ -294,12 +295,16 @@ def test_cleanup_never_touches_dirs_that_are_not_jobs(tmp_path):
     assert foreign.exists()
 
 
-@pytest.mark.parametrize("reserved", ["NUL.pdf", "con.pdf", "COM1.pdf", "lpt9.PDF", "aux"])
+@pytest.mark.parametrize(
+    "reserved",
+    ["NUL.pdf", "con.pdf", "COM1.pdf", "lpt9.PDF", "aux", "CON.txt.pdf", "nul.tar.pdf", "Aux .pdf"],
+)
 def test_windows_reserved_names_are_not_used_on_disk(reserved):
     from odw2json.api.files import storage_name
 
-    stem = storage_name(reserved, set()).split(".")[0]
-    assert stem.casefold() not in {"nul", "con", "com1", "lpt9", "aux"}
+    # Windows traktuje jako zarezerwowaną część nazwy przed PIERWSZĄ kropką (CON.txt.pdf = CON)
+    first = storage_name(reserved, set()).split(".")[0].strip()
+    assert first.casefold() not in {"nul", "con", "com1", "lpt9", "aux"}
 
 
 def test_failure_message_is_polish_without_internals(store, monkeypatch):
@@ -308,7 +313,7 @@ def test_failure_message_is_polish_without_internals(store, monkeypatch):
     def boom(*_a, **_k):
         raise RuntimeError(r"C:\sciezka\serwera boom")
 
-    monkeypatch.setattr(jobs_mod.ingest, "load", boom)
+    monkeypatch.setattr(jobs_mod.pipeline, "process_file_ex", boom)
     job = store.create([("a.pdf", (P01 / "pelnomocnictwo.pdf").read_bytes())])
     store.process(job.id)
     (f,) = store.snapshot(job)["files"]
@@ -347,3 +352,203 @@ def test_ascii_fallback_transliterates_polish_letters():
 
 def test_openapi_title_is_project_display_name(client):
     assert client.get("/openapi.json").json()["info"]["title"] == "jsonix"
+
+
+# --- poprawki z review PR #4 ---
+
+
+def test_job_uses_pipeline_and_gives_same_data_as_cli(store, monkeypatch):
+    """GUI i CLI muszą dawać identyczne dane: job woła pipeline.process_file_ex."""
+    from odw2json import pipeline
+    from odw2json.api import jobs as jobs_mod
+    from odw2json.config_loader import load_app_config, load_registry
+
+    calls = []
+    real = pipeline.process_file_ex
+
+    def spy(pdf, registry, ingest_cfg=None):
+        calls.append(Path(pdf).name)
+        return real(pdf, registry, ingest_cfg)
+
+    monkeypatch.setattr(jobs_mod.pipeline, "process_file_ex", spy)
+    job = store.create([(n, (P01 / n).read_bytes()) for n in PDFS])
+    store.process(job.id)
+    assert calls == PDFS
+    registry, cfg = load_registry(), load_app_config().get("ingest")
+    for entry, name in zip(store.snapshot(job)["files"], PDFS, strict=True):
+        doc, cls, res = real(P01 / name, registry, cfg)
+        assert entry["classification"]["doc_type"] == cls.doc_type
+        assert entry["data"] == (res.data if res else {})
+        assert entry["trace"] == ([asdict(t) for t in res.trace] if res else [])
+        assert entry["warnings"] == list(doc.warnings) and entry["pages"] == len(doc.pages)
+
+
+def test_classification_evidence_is_passed_to_result(store, monkeypatch):
+    from odw2json.api import jobs as jobs_mod
+    from odw2json.contracts import Classification, Document
+
+    def fake(pdf, registry, ingest_cfg=None):
+        cls = Classification(doc_type=None, confidence=0.1, method="keywords")
+        cls.evidence = ["brak słów kluczowych odwołania", "brak kwoty przelewu"]
+        return Document(path=Path(pdf), text="x", pages=["x"]), cls, None
+
+    monkeypatch.setattr(jobs_mod.pipeline, "process_file_ex", fake)
+    job = store.create([("a.pdf", (P01 / "pelnomocnictwo.pdf").read_bytes())])
+    store.process(job.id)
+    (f,) = store.snapshot(job)["files"]
+    assert f["classification"]["evidence"] == ["brak słów kluczowych odwołania", "brak kwoty przelewu"]
+    assert f["data"] == {}
+
+
+def test_classification_evidence_defaults_to_empty_list(done_job):
+    _, body = done_job
+    for f in body["files"]:
+        assert isinstance(f["classification"]["evidence"], list)
+        assert all(isinstance(e, str) for e in f["classification"]["evidence"])
+
+
+def test_too_many_files_rejected_before_processing(client, store, monkeypatch):
+    monkeypatch.setattr(api, "MAX_FILES", 3)
+    files = [("files", (f"p{i}.pdf", b"%PDF-1.4 x", "application/pdf")) for i in range(4)]
+    for url in ("/api/jobs", "/api/process"):
+        resp = client.post(url, files=files)
+        assert resp.status_code == 400, url
+        assert "najwyżej 3 plik" in resp.json()["detail"]
+    assert not store._jobs
+
+
+def test_default_limit_is_50_files():
+    assert api.MAX_FILES == 50
+    assert api.MAX_TOTAL_BYTES >= api.MAX_FILE_BYTES
+
+
+def test_total_size_limit_rejected_with_413(client, store, monkeypatch):
+    monkeypatch.setattr(api, "MAX_TOTAL_BYTES", 1000)
+    files = [("files", (f"p{i}.pdf", b"%PDF-1.4" + b"x" * 400, "application/pdf")) for i in range(3)]
+    for url in ("/api/jobs", "/api/process"):
+        resp = client.post(url, files=files)
+        assert resp.status_code == 413, url
+        assert "Łączny rozmiar" in resp.json()["detail"]
+    assert not store._jobs
+
+
+def test_jobs_are_processed_at_most_n_in_parallel(tmp_path, monkeypatch):
+    import threading
+
+    from odw2json.api import jobs as jobs_mod
+
+    store = JobStore(tmp_path / "jobs", max_parallel=2)
+    gate = threading.Event()
+    lock = threading.Lock()
+    running = {"now": 0, "max": 0}
+
+    def slow(pdf, registry, ingest_cfg=None):
+        with lock:
+            running["now"] += 1
+            running["max"] = max(running["max"], running["now"])
+        gate.wait(10)
+        with lock:
+            running["now"] -= 1
+        raise RuntimeError("koniec")
+
+    monkeypatch.setattr(jobs_mod.pipeline, "process_file_ex", slow)
+    jobs = [store.create([("a.pdf", b"%PDF-1.4")]) for _ in range(4)]
+    threads = [threading.Thread(target=store.process, args=(j.id,)) for j in jobs]
+    for th in threads:
+        th.start()
+    t0 = time.monotonic()
+    while running["now"] < 2 and time.monotonic() - t0 < 5:
+        time.sleep(0.01)
+    time.sleep(0.1)
+    statuses = sorted(store.snapshot(j)["status"] for j in jobs)
+    assert running["now"] == 2
+    assert statuses == ["pending", "pending", "running", "running"], "pozostałe czekają w kolejce"
+    gate.set()
+    for th in threads:
+        th.join(10)
+    assert running["max"] == 2
+    assert all(store.snapshot(j)["status"] == "done" for j in jobs)
+
+
+@pytest.mark.parametrize("bad", ["..", ".", "...", "/", "a/.."])
+def test_legacy_process_rejects_dot_names_with_400(client, bad):
+    resp = client.post("/api/process", files=[("files", (bad, (P01 / "pelnomocnictwo.pdf").read_bytes()))])
+    assert resp.status_code == 400, resp.text
+    assert "nazw" in resp.json()["detail"]
+
+
+def test_legacy_process_strips_path_from_name(client):
+    content = (P01 / "pelnomocnictwo.pdf").read_bytes()
+    resp = client.post("/api/process", files=[("files", ("../../zła nazwa.pdf", content))])
+    assert resp.status_code == 200
+    (r,) = resp.json()
+    assert r["file"] == "zła nazwa.pdf"
+    assert r["classification"]["doc_type"] == "pelnomocnictwo"
+
+
+@pytest.mark.parametrize("bad", ["..", "."])
+def test_jobs_report_dot_names_as_file_error(client, bad):
+    job_id = _submit(client, [(bad, (P01 / "pelnomocnictwo.pdf").read_bytes(), "application/pdf")])
+    (f,) = _wait(client, job_id)["files"]
+    assert f["status"] == "error" and "nazw" in f["error"]
+
+
+def test_queued_jobs_do_not_hold_server_threads(tmp_path, monkeypatch):
+    """Joby czekają w kolejce własnego executora joba, a nie w wątkach puli serwera."""
+    import threading
+
+    from odw2json.api import jobs as jobs_mod
+
+    store = JobStore(tmp_path / "jobs", max_parallel=2)
+    gate = threading.Event()
+
+    def slow(pdf, registry, ingest_cfg=None):
+        gate.wait(10)
+        raise RuntimeError("koniec")
+
+    monkeypatch.setattr(jobs_mod.pipeline, "process_file_ex", slow)
+    jobs = [store.create([("a.pdf", b"%PDF-1.4")]) for _ in range(6)]
+    t0 = time.monotonic()
+    for j in jobs:
+        store.submit(j.id)  # nie blokuje wywołującego
+    assert time.monotonic() - t0 < 1
+    deadline = time.monotonic() + 5
+    while sum(store.snapshot(j)["status"] == "running" for j in jobs) < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    statuses = [store.snapshot(j)["status"] for j in jobs]
+    assert statuses.count("running") == 2 and statuses.count("pending") == 4
+    gate.set()
+    store.shutdown()
+    assert all(store.snapshot(j)["status"] == "done" for j in jobs)
+
+
+def test_legacy_process_shares_processing_slots(client, store, monkeypatch):
+    used = []
+    real = store.run_limited
+
+    def spy(fn, *args):
+        used.append(fn.__name__)
+        return real(fn, *args)
+
+    monkeypatch.setattr(store, "run_limited", spy)
+    resp = client.post("/api/process", files=[("files", _pdf("pelnomocnictwo.pdf"))])
+    assert resp.status_code == 200
+    assert used == ["process_file"]
+
+
+def test_non_numeric_content_length_is_400(client):
+    resp = client.post(
+        "/api/jobs",
+        content=b"x",
+        headers={"content-length": "abc", "content-type": "multipart/form-data; boundary=x"},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.parametrize("raw", [".pdf", "...pdf", " .PDF"])
+def test_name_made_only_of_extension_keeps_pdf_extension(raw):
+    from odw2json.api.files import display_name, storage_name
+
+    shown = display_name(raw)
+    assert shown.lower().endswith(".pdf") and shown[:-4].strip(". ")
+    assert storage_name(shown, set()).lower().endswith(".pdf")
