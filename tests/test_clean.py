@@ -17,6 +17,7 @@ EXPECTED = {
     "unicode_nfc",
     "nbsp_to_space",
     "ligatures",
+    "ocr_artifacts",
     "quotes",
     "dashes",
     "dehyphenate",
@@ -67,6 +68,42 @@ def test_nbsp_to_space():
 
 def test_ligatures():
     assert CLEAN_STEPS["ligatures"]("ﬁx ﬂ ﬀ ﬃ ﬄ") == "fix fl ff ffi ffl"
+
+
+def test_ocr_artifacts_typographic_and_lookalikes():
+    f = CLEAN_STEPS["ocr_artifacts"]
+    assert f("ıdentyfikator ſłowo") == "identyfikator słowo"
+    assert f("GDAÑSK gdañsk ZAMÓWIEÑ NADWIŚLAÑSKI") == "GDAŃSK gdańsk ZAMÓWIEŃ NADWIŚLAŃSKI"
+    assert f("ktőrym Ő") == "którym Ó"
+    assert f("okolicznošci raċhunek ż ŠČŽ čas") == "okoliczności rachunek ż ŚĆŻ ćas"
+
+
+def test_ocr_artifacts_stray_accents_on_latin_letters():
+    f = CLEAN_STEPS["ocr_artifacts"]
+    assert f("Zamáwiający wymaganià prowadzonègo Lublín wynikų") == (
+        "Zamawiający wymagania prowadzonego Lublin wyniku"
+    )
+    assert f("ÀÁÍÔ") == "AAIO"
+
+
+def test_ocr_artifacts_stray_marks_seen_in_scans():
+    f = CLEAN_STEPS["ocr_artifacts"]
+    assert f("rzetelņą wykoņawcy przyjęçia zașady") == "rzetelną wykonawcy przyjęcia zasady"
+
+
+def test_ocr_artifacts_leaves_polish_and_foreign_names_untouched():
+    f = CLEAN_STEPS["ocr_artifacts"]
+    text = f"{PL} Müller Citroën René Schröder ·  – NIP {NIP}\n\f\n"
+    assert f(text) == text
+
+
+def test_ocr_artifacts_does_not_touch_text_layer_corpus(samples):
+    for s in samples[:3]:
+        assert CLEAN_STEPS["ocr_artifacts"](s) == s
+
+
+def test_ocr_artifacts_before_quotes_in_default_order():
+    assert DEFAULT_ORDER.index("ocr_artifacts") < DEFAULT_ORDER.index("quotes")
 
 
 def test_quotes():

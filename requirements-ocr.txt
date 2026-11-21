@@ -1,7 +1,3 @@
-# Opcjonalny OCR dla skanow (ingest.ocr w config/app.yaml). Instalacja: pip install -r requirements-ocr.txt
-# Bez tych pakietow aplikacja dziala normalnie; strony bez tekstu dostaja ostrzezenie "OCR niedostepny".
-# Licencje: rapidocr = Apache-2.0 (modele PP-OCRv6 w paczce), onnxruntime = MIT.
-# Modele sa dolaczone do wheela rapidocr (~27 MB), nic nie jest pobierane w czasie dzialania.
+# Alias zachowany dla kompatybilnosci: OCR (rapidocr + onnxruntime) jest od E2b obowiazkowy
+# i siedzi w requirements.txt. Stare polecenie `pip install -r requirements-ocr.txt` nadal dziala.
 -r requirements.txt
-rapidocr>=3.10
-onnxruntime>=1.20

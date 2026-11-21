@@ -261,8 +261,8 @@ def test_cache_filename_has_version_and_package_version(tmp_path, monkeypatch):
     pdf.write_bytes(b"%PDF-1.4 fake")
     ocr.ocr_page(pdf, 0, {"engine": "fake", "cache_dir": str(tmp_path / "c")})
     (f,) = (tmp_path / "c").glob("*.txt")
-    assert ocr.OCR_CACHE_VERSION == "1"
-    assert ".v1." in f.name and "9.9.9" in f.name
+    assert ocr.OCR_CACHE_VERSION == "2"
+    assert ".v2." in f.name and "9.9.9" in f.name
 
 
 def test_package_version_na_when_missing(monkeypatch):
@@ -333,3 +333,132 @@ def test_memo_is_bounded(tmp_path, monkeypatch):
     for i in range(ocr.MEMO_MAX + 20):
         ocr.ocr_page(pdf, i, {"engine": "fake"})
     assert len(ocr._MEMO) == ocr.MEMO_MAX
+
+
+# --- E2b-T3: parametry silnika, klucz cache, walidacja ---
+
+
+def test_cache_version_bumped_for_engine_params():
+    assert int(ocr.OCR_CACHE_VERSION) >= 2  # v1 nie znal engine_params: stare wpisy sa niewazne
+
+
+def test_cache_key_includes_engine_params(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    base = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    ocr.ocr_page(pdf, 0, base | {"engine_params": {"Global.use_cls": False}})
+    ocr.ocr_page(pdf, 0, base | {"engine_params": {"Global.use_cls": False}})  # ten sam klucz
+    assert len(runs) == 1
+    ocr.ocr_page(pdf, 0, base | {"engine_params": {"Global.use_cls": True}})  # inny parametr = miss
+    assert len(runs) == 2
+    ocr.ocr_page(pdf, 0, base)  # brak parametrow to tez inny klucz
+    assert len(runs) == 3
+    assert len(list((tmp_path / "c").glob("*.txt"))) == 3
+
+
+def test_engine_params_order_does_not_change_key(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    base = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    ocr.ocr_page(pdf, 0, base | {"engine_params": {"a.b": 1, "c.d": 2}})
+    ocr.ocr_page(pdf, 0, base | {"engine_params": {"c.d": 2, "a.b": 1}})
+    assert len(runs) == 1
+
+
+def test_dpi_still_part_of_cache_key(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    base = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    ocr.ocr_page(pdf, 0, base | {"dpi": 150})
+    ocr.ocr_page(pdf, 0, base | {"dpi": 200})
+    assert len(runs) == 2
+
+
+def test_engine_params_passed_to_rapidocr(monkeypatch):
+    seen: list[dict | None] = []
+
+    class FakeRapid:
+        def __init__(self, params=None):
+            seen.append(params)
+
+        def __call__(self, img):
+            return type("R", (), {"boxes": None, "txts": None})()
+
+    import sys
+    import types
+
+    from PIL import Image
+
+    monkeypatch.setitem(sys.modules, "rapidocr", types.SimpleNamespace(RapidOCR=FakeRapid))
+    ocr._rapidocr_engine.cache_clear()
+    try:
+        params = {"Global.use_cls": False, "Rec.rec_batch_num": 1}
+        assert ocr._rapidocr_run(Image.new("RGB", (4, 4)), {"engine_params": params}) == ""
+        ocr._rapidocr_run(Image.new("RGB", (4, 4)), {"engine_params": dict(params)})  # ten sam silnik
+        ocr._rapidocr_run(Image.new("RGB", (4, 4)), {})
+        assert seen == [params, None]
+    finally:
+        ocr._rapidocr_engine.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("ocr_cfg", "fragment"),
+    [
+        ({"engine_params": ["a"]}, "ocr.engine_params"),
+        ({"engine_params": {"": 1}}, "ocr.engine_params"),
+        ({"engine_params": {1: 1}}, "ocr.engine_params"),
+        ({"engine_params": {"Global": 1}}, "ocr.engine_params"),
+        ({"engine_params": {"Global.use_cls": {"a": 1}}}, "ocr.engine_params"),
+    ],
+)
+def test_validate_ocr_engine_params_odrzucone(ocr_cfg, fragment):
+    from odw2json import ingest
+
+    with pytest.raises(ValueError, match=fragment):
+        ingest.validate_ingest_cfg({"ocr": ocr_cfg})
+
+
+def test_validate_ocr_engine_params_poprawne():
+    from odw2json import ingest
+
+    ingest.validate_ingest_cfg(
+        {
+            "ocr": {
+                "enabled": True,
+                "dpi": 150,
+                "engine_params": {
+                    "Global.use_cls": False,
+                    "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+                },
+            }
+        }
+    )
+
+
+def test_konfiguracja_aplikacji_ma_poprawna_sekcje_ocr():
+    from odw2json import ingest
+    from odw2json.config_loader import load_app_config
+
+    cfg = load_app_config()["ingest"]
+    ingest.validate_ingest_cfg(cfg)
+    assert cfg["ocr"]["enabled"] is True
+    assert cfg["ocr"]["dpi"] == 150
+    assert cfg["ocr"]["engine_params"]["Global.use_cls"] is False
+    assert "ocr_artifacts" in cfg["clean"]
+    assert cfg["clean"].index("ocr_artifacts") < cfg["clean"].index("quotes")
+
+
+@pytest.mark.slow
+def test_prawdziwy_silnik_z_parametrami_z_konfiguracji():
+    pytest.importorskip("rapidocr")
+    from odw2json.config_loader import load_app_config
+
+    cfg = dict(load_app_config()["ingest"]["ocr"]) | {"cache_dir": None}
+    text = ocr.ocr_page(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), 0, cfg)
+    assert len(text.strip()) > 200
