@@ -304,3 +304,29 @@ def test_vendored_libraries_are_served_with_licenses(client):
     assert "Apache License" in (vendor / "pdfjs" / "LICENSE").read_text(encoding="utf-8")
     assert "SIL OPEN FONT LICENSE" in (vendor / "fonts" / "LICENSE").read_text(encoding="utf-8").upper()
     assert client.get("/static/vendor/fonts/open-sans-latin-ext-400-normal.woff2").status_code == 200
+
+
+@needs_node
+def test_edits_are_applied_to_a_copy_with_original_types():
+    out = _node(
+        """const f = await js('fields.js');
+        const data = {a: {kwota: 200, nip: '1', puste: null}, l: [{x: 'y'}]};
+        const edits = new Map([
+          ['a.kwota', f.parseEditedValue('7 500,50', 200)],
+          ['a.nip', f.parseEditedValue('  999  ', '1')],
+          ['a.puste', f.parseEditedValue('nowa', null)],
+          ['l[0].x', f.parseEditedValue('', 'y')],
+        ]);
+        const result = f.applyEdits(data, edits);
+        output({result, original: data, bad: f.parseEditedValue('abc', 5)});""",
+        None,
+    )
+    assert out["result"] == {"a": {"kwota": 7500.5, "nip": "999", "puste": "nowa"}, "l": [{"x": None}]}
+    assert out["original"]["a"]["kwota"] == 200, "oryginał bez zmian"
+    assert out["bad"] == "abc", "tekst, którego nie da się odczytać jako liczba, zostaje tekstem"
+
+
+def test_review_offers_edit_and_restore(client):
+    js = client.get("/static/js/review.js").text
+    for text in ("Zmień", "Przywróć wartość z dokumentu", "Zmieniono ręcznie"):
+        assert text in js
