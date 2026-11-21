@@ -1,0 +1,15 @@
+id: odwolanie
+title: Odwołanie do Krajowej Izby Odwoławczej
+output_template: schemas/odwolanie.json
+classify:
+  # frazy szukane po normalizacji (male litery, bez polskich znakow)
+  strong: ["odwolanie", "odwolujacy", "zarzut", "krajowej izby odwolawczej"]
+  weak: ["zamawiajacy", "prawo zamowien publicznych", "wnosze o"]
+  negative: ["ogloszenie o zamowieniu", "wyrok", "postanowienie", "udzielam pelnomocnictwa", "kwota przelewu"]
+  min_score: 3.0
+# Sektor B: opis pol (metoda, normalizacja, zrodla). Format wolny do czasu ustalenia przez B.
+fields:
+  OdwolanieKIO.czynnosc_opis:
+    derived: {lookup: czynnosc_powod, from: OdwolanieKIO.czynnosc_powod_id}
+llm:
+  prompt: prompts/odwolanie.md

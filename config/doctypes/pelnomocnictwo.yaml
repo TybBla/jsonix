@@ -1,0 +1,11 @@
+id: pelnomocnictwo
+title: Pełnomocnictwo
+output_template: schemas/pelnomocnictwo.json
+classify:
+  strong: ["pelnomocnictw", "udzielam", "udzielaja", "mocodawc"]
+  weak: ["do reprezentowania", "krajowej izby odwolawczej"]
+  negative: ["kwota przelewu", "zarzut nr", "ogloszenie o zamowieniu"]
+  min_score: 3.0
+fields: {}
+llm:
+  prompt: prompts/pelnomocnictwo.md

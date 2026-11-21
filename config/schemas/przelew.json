@@ -1,0 +1,10 @@
+{
+  "przelew_bankowy": {
+    "data_operacji": null,
+    "kwota": null,
+    "na_rachunek": null,
+    "numer_transakcji": null,
+    "tytul": null,
+    "z_rachunku": null
+  }
+}
