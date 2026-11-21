@@ -208,14 +208,18 @@ def test_regon_zla_dlugosc_zwraca_none(raw: str) -> None:
     assert regon(raw) is None
 
 
-def test_pesel_jako_int() -> None:
+def test_pesel_jako_string() -> None:
     wynik = pesel("85071204278")
-    assert wynik == 85071204278
-    assert isinstance(wynik, int)
+    assert wynik == "85071204278"
+    assert isinstance(wynik, str)
 
 
 def test_pesel_ze_spacjami() -> None:
-    assert pesel("850 712 04278") == 85071204278
+    assert pesel("850 712 04278") == "85071204278"
+
+
+def test_pesel_zachowuje_zera_wiodace() -> None:
+    assert pesel("01234567890") == "01234567890"
 
 
 @pytest.mark.parametrize("raw", ["8507120427", "850712042780", ""])

@@ -155,10 +155,9 @@ def regon(value: str) -> str | None:
     return _cyfry_o_dlugosci(value, (9, 14))
 
 
-def pesel(value: str) -> int | None:
-    """PESEL: 11 cyfr, zwracany jako int (bez walidacji sumy kontrolnej)."""
-    wynik = _cyfry_o_dlugosci(value, (11,))
-    return int(wynik) if wynik is not None else None
+def pesel(value: str) -> str | None:
+    """PESEL: 11 cyfr jako string (zera wiodące zachowane; bez walidacji sumy kontrolnej)."""
+    return _cyfry_o_dlugosci(value, (11,))
 
 
 # --- BZP / TED ------------------------------------------------------------
