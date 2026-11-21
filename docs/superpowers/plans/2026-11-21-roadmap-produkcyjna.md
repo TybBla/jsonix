@@ -65,6 +65,7 @@ Stan: testy 29/29, klasyfikacja 191/196, F1 = 0 (zaślepki ekstrakcji).
 - Polityka scalania i trace dla każdej wartości (metoda, fragment źródłowy, strona).
 - Walidacja konfiguracji z czytelnymi błędami (`odw2json validate-config`).
 - Typ referencyjny: **przelew** w całości na regułach.
+- Wstrzykiwanie LLM (z review E1): opcjonalny `llm: LLMClient | None` przekazywany przez `pipeline.run/process_file → classify/extract`; `usage_report()` trafia do `RunReport` i do `.logs/*.summary.json`.
 **Bramka:** przelew F1 ≥ 0.98 na dev i holdout bez LLM; testy jednostkowe każdego normalizatora; błędny YAML daje zrozumiały komunikat.
 
 ## E5 — Reguły dla pełnomocnictwa i odwołania
@@ -80,6 +81,7 @@ Stan: testy 29/29, klasyfikacja 191/196, F1 = 0 (zaślepki ekstrakcji).
 **Kryterium decyzji (do zatwierdzenia przy planie E6):** zostajemy bez LLM, jeśli strata F1 jest mniejsza niż wartość punktów za rozmiar modelu; w przeciwnym razie najmniejszy model, który domyka różnicę. Tryb `llm_enabled: false` musi zawsze działać, także jako zabezpieczenie na brak sieci.
 **Cel:** najmniejszy model z UE, który domyka pola semantyczne, albo udokumentowana decyzja o braku LLM.
 - Benchmark modeli (w toku w osobnej sesji: `scripts/bench_models.py` — Ministral 3B/8B/14B, Bielik 11B) → decyzja w `docs/decyzje/`.
+- Kasety LLM (z review E1): klucz kasety musi obejmować każdy parametr żądania zmieniający odpowiedź (`json_mode`, `max_tokens` obok model/system/user/temperature). Każda zmiana promptu wymaga ponownego nagrania kaset (`LLM_MODE=record`) — opisane w `eval/README.md`.
 - Prompty per typ z YAML: opisy pól, słownik powodów 1–12, reguła „tylko pierwszy zarzut”, mianownik imion; few-shot wyłącznie z dev.
 - Wyjście strukturalne (JSON mode/schema), walidacja, ponowienie z informacją o błędzie, limit kosztu i tokenów, licznik kosztu w raporcie.
 - LLM dostaje tylko brakujące pola i odpowiedni fragment tekstu, nie cały dokument.
