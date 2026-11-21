@@ -50,7 +50,8 @@ def _tylko_cyfry(tekst: str) -> str:
 
 # --- date -----------------------------------------------------------------
 
-_DATA_KROPKI = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$")
+# DD.MM.RRRR, DD-MM-RRRR, DD/MM/RRRR; ten sam separator w obu miejscach (\2).
+_DATA_DMY = re.compile(r"^(\d{1,2})([./-])(\d{1,2})\2(\d{4})$")
 _DATA_ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 _DATA_SLOWNIE = re.compile(r"^(\d{1,2})\s+([^\W\d_]+)\s+(\d{4})$")
 _SUFIKS_R = re.compile(r"\s*(r\.|r|roku)$", re.IGNORECASE)
@@ -71,8 +72,8 @@ def date(value: str) -> str | None:
     if not tekst:
         return None
 
-    if m := _DATA_KROPKI.match(tekst):
-        dzien, miesiac, rok = m.groups()
+    if m := _DATA_DMY.match(tekst):
+        dzien, _sep, miesiac, rok = m.groups()
         return _zbuduj_date(rok, int(miesiac), int(dzien))
 
     if m := _DATA_ISO.match(tekst):

@@ -257,7 +257,12 @@ class DocTypeConfig(BaseModel):
     config_dir: Path = CONFIG_DIR
 
     def check_paths(self) -> None:
-        """Ścieżki ``fields``/``lists`` muszą istnieć w szablonie wyniku (czytelny błąd przy starcie)."""
+        """Ścieżki ``fields``/``lists`` muszą istnieć w szablonie wyniku (czytelny błąd przy starcie).
+
+        Typ bez ``fields`` i ``lists`` nie ma czego sprawdzać, więc szablonu nie czytamy wcale.
+        """
+        if not self.fields and not self.lists:
+            return
         eng = _engine()
         tmpl = self.template()
         bad = [p for p in self.fields if not eng.template_has_path(tmpl, p)]

@@ -104,6 +104,42 @@ def test_date_przestepny_rok() -> None:
     assert date("29 lutego 2028") == "2028-02-29"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("04-07-2026", "2026-07-04"),
+        ("04-07-2026 r.", "2026-07-04"),
+        ("4-7-2026", "2026-07-04"),
+        ("04/07/2026", "2026-07-04"),
+        ("04/07/2026 r.", "2026-07-04"),
+        ("4/7/2026", "2026-07-04"),
+        ("31-12-2026", "2026-12-31"),
+    ],
+)
+def test_date_dzien_miesiac_rok_z_mysnikiem_i_ukosnikiem(raw: str, expected: str) -> None:
+    assert date(raw) == expected
+
+
+def test_date_iso_nadal_dziala_obok_mysnikow() -> None:
+    assert date("2026-07-04") == "2026-07-04"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "31-02-2026",
+        "04-13-2026",
+        "31/02/2026",
+        "04/13/2026",
+        "04-07/2026",  # mieszane separatory
+        "04.07-2026",
+        "04-07-26",  # rok dwucyfrowy nieobsługiwany
+    ],
+)
+def test_date_nieprawidlowe_z_mysnikiem_lub_ukosnikiem_zwraca_none(raw: str) -> None:
+    assert date(raw) is None
+
+
 # --- amount -----------------------------------------------------------------
 
 
