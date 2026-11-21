@@ -2,8 +2,9 @@
 
 Punktacja typu (szczegóły: ``features.evaluate``): frazy ``strong``/``weak``/``negative`` (obecność),
 ``title`` (fraza w nagłówku - gdziekolwiek albo jako osobna linia wg ``title_mode``; rozstrzelone litery
-zwinięte), ``patterns`` (regex z wagą), a dla wszystkich typów naraz kara ``foreign_titles`` z
-``config/classify.yaml`` (linia nagłówka zaczynająca się od „wyrok”, „faktura” itp.). Typ z
+zwinięte), ``patterns`` (regex z wagą) oraz kara ``foreign_titles`` z ``classify.yaml`` (linia nagłówka
+zaczynająca się od „wyrok”, „faktura” itp.; liczona per typ - typ nie jest karany za frazę pokrywającą
+się z własnym ``title`` ani za frazy z ``ignore_foreign``). Typ z
 niespełnionym ``required_any`` (frazy, regexy, grupy ``all_of``) odpada. Wygrywa typ o najwyższym
 wyniku, o ile wynik >= ``min_score`` tego typu i przewaga nad drugim typem >= ``min_margin``; inaczej
 dokument jest nieznany (``None``).
@@ -17,24 +18,32 @@ odrzucenia i cechy najlepszego kandydata). Typ wyłącznie z treści - nazwa pli
 from __future__ import annotations
 
 from functools import cache
+from pathlib import Path
 
 from odw2json.classify import features
-from odw2json.config_loader import ClassifySettings, DocTypeConfig, load_classify_settings
+from odw2json.config_loader import CONFIG_DIR, ClassifySettings, DocTypeConfig, load_classify_settings
 from odw2json.contracts import Classification, Document
 
 METHOD = "keywords"
 
 
 @cache
-def _global_settings() -> ClassifySettings:
-    return load_classify_settings()
+def _global_settings(config_dir: Path = CONFIG_DIR) -> ClassifySettings:
+    """``classify.yaml`` z katalogu konfiguracji (cache per katalog)."""
+    return load_classify_settings(config_dir)
+
+
+def _registry_config_dir(registry: dict[str, DocTypeConfig]) -> Path:
+    """Katalog konfiguracji rejestru (typy z ``load_registry(dir)`` niosą ``config_dir``)."""
+    return next(iter(registry.values())).config_dir if registry else CONFIG_DIR
 
 
 def classify(
     doc: Document, registry: dict[str, DocTypeConfig], settings: ClassifySettings | None = None
 ) -> Classification:
-    """Rozpoznaje typ; ``settings`` (domyślnie ``config/classify.yaml``) = globalne kary za nagłówki obce."""
-    settings = settings if settings is not None else _global_settings()
+    """Rozpoznaje typ; ``settings`` (domyślnie ``classify.yaml`` z katalogu konfiguracji rejestru) =
+    globalne kary za nagłówki obce."""
+    settings = settings if settings is not None else _global_settings(_registry_config_dir(registry))
     prepared = features.Prepared(doc.text)
     if not prepared.full:
         return Classification(doc_type=None, confidence=0.0, method="empty")

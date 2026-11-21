@@ -131,7 +131,42 @@ Pozostałe ograniczenia:
 ## Zmiana T4: szerszy `required_any` odwołania
 Prawdziwe odwołanie nie musi mieć etykiety „Odwołujący:” (bywa „Wykonawca:”), osobnej linii tytułu „ODWOŁANIE”
 ani zarzutów „Zarzut nr N” (bywa „Zarzut 1.”). Taki tekst miał wynik 9 ≥ `min_score` 8, ale odpadał na `required_any`.
-`required_any` rozszerzono o akt wniesienia (`wnosze odwolanie`, `wnosimy odwolanie`, `niniejszym wnosze odwolanie`)
+`required_any` rozszerzono o akt wniesienia (`wnosze odwolanie`, `wnosimy odwolanie`, `niniejszym wnosze odwolanie`;
+po review zastąpione jednym regexem — patrz niżej)
 oraz o numerację zarzutów bez „nr” (`zarzut\s*(nr\s*)?\d+`). Pisma do zamawiającego i wyroki KIO nie zawierają aktu
 wniesienia ani numerowanych zarzutów — negatywy bez zmian (test `test_letter_mentioning_odwolanie_without_filing_act_is_unknown`).
 Cyfry rzymskie pominięto celowo („zarzut i …” to spójnik).
+
+Zmianę T4 zainspirował jeden przypadek z **zestawu kontrolnego** (`tests/fixtures/classify_blind/`, napisany bez wglądu
+w konfigurację; jeden przypadek wpłynął na regułę T4). Zestaw nie jest więc w pełni niezależny — wynik na nim
+traktujemy jako kontrolę, nie jako miarę uogólnienia.
+
+## Poprawki po review
+1. **Sygnatura sprawy nie jest nagłówkiem obcym.** Usunięto `sygn. akt` z `foreign_titles`: odwołania,
+   pełnomocnictwa i potwierdzenia przelewu w aktach KIO często zaczynają się od „Sygn. akt KIO …”. Test
+   `test_case_signature_line_does_not_change_type` (12 pozytywów tekstowych z dev na typ = 36 dokumentów; dopisana
+   na początek linia):
+
+   | Dopisana linia | przed (błędy) | po (błędy) |
+   |---|---|---|
+   | (brak) | 0 / 36 | 0 / 36 |
+   | `Sygn. akt KIO 1234/26` | **17 / 36** (12 pełnomocnictw i 5 przelewów → `None`) | **0 / 36** |
+   | `KIO 1234/26` | 0 / 36 | 0 / 36 |
+
+2. **Pisma innych uczestników postępowania odwoławczego.** Do `foreign_titles` dodano `odpowiedz na odwolanie`,
+   `zgloszenie przystapienia`, `przystapienie do postepowania odwolawczego`, `stanowisko zamawiajacego`,
+   `pismo procesowe`. Nowe syntetyki (`neg_odpowiedz_na_odwolanie`, `neg_zgloszenie_przystapienia`, bez linii
+   sygnatury, z „Zarzut nr N”) przed zmianą były klasyfikowane jako `odwolanie`, po zmianie → `None`.
+3. **Kara `foreign_titles` per typ.** Typ nie jest karany za frazę pokrywającą się z własnym `title` (po
+   normalizacji jedna zaczyna drugą) ani za frazy z nowego pola `ignore_foreign`. Bez tego nie dało się dodać typu
+   „wyrok KIO” bez edycji listy globalnej (test z typem `wyrok_kio` w pamięci).
+4. **`classify.yaml` z katalogu konfiguracji rejestru** (`_global_settings(config_dir)`, cache per katalog) zamiast
+   zawsze z `config/`.
+5. **`required_any` odwołania:** trzy frazy wniesienia zastąpiono regexem
+   `(wnosz[eay]|wnosimy|wnosi|sklad(am|amy|a))\s+(niniejsze\s+)?odwolanie` — łapie „składam odwołanie”,
+   „Wykonawca wnosi odwołanie”, „wnosimy niniejsze odwołanie”; pismo zamawiającego z „odwołanie zostało wniesione”
+   (bez innych cech) nadal → `None`.
+
+Wyniki po poprawkach: `python -m eval.gate --split all --source tekst` → exit 0, `classification_errors=0`, negatywy
+12/12 (dev) i 10/10 (holdout); `python -m pytest -q -m "not slow"` → exit 0; `python -m pytest -q -m slow
+tests/test_classify.py` → exit 0.

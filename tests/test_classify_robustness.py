@@ -190,3 +190,39 @@ def test_unmodified_real_texts_are_baseline_ok():
 def test_noise_is_deterministic():
     t = "Rozstrzygnięcie ofert odwołującego oraz zamówienia " * 20
     assert _ocr_noise(t) == _ocr_noise(t)
+
+
+# --------------------------------- sygnatura sprawy nie zmienia typu (poprawki po review E3)
+
+SIGNATURE_PREFIXES = ["Sygn. akt KIO 1234/26\n", "KIO 1234/26\n"]
+PER_TYPE = 12
+
+
+@cache
+def _dev_positives() -> list[tuple[str, str, Document]]:
+    """Po PER_TYPE pozytywow tekstowych z dev na typ: (id, typ, dokument)."""
+    out: list[tuple[str, str, Document]] = []
+    counts = {t: 0 for t, _ in REAL_DOCS}
+    for case in load_splits()["dev"]:
+        if case.startswith("skany/"):
+            continue
+        for doc_type, stem in REAL_DOCS:
+            if counts[doc_type] < PER_TYPE and (TRAIN / case / f"{stem}.pdf").exists():
+                out.append((f"{case}/{stem}", doc_type, _real(case, stem)))
+                counts[doc_type] += 1
+    return out
+
+
+def test_signature_sample_covers_all_types():
+    counts = {t: sum(1 for _, dt, _ in _dev_positives() if dt == t) for t, _ in REAL_DOCS}
+    assert all(n >= 10 for n in counts.values()), counts
+
+
+@pytest.mark.parametrize("prefix", SIGNATURE_PREFIXES, ids=["sygn_akt", "kio_only"])
+def test_case_signature_line_does_not_change_type(prefix):
+    bad = []
+    for ident, doc_type, doc in _dev_positives():
+        got = classify.classify(_doc(prefix + doc.text), _registry())
+        if got.doc_type != doc_type:
+            bad.append(f"{ident}: oczekiwano {doc_type}, jest {got.doc_type} scores={got.scores}")
+    assert not bad, f"{len(bad)} z {len(_dev_positives())} zmienilo typ:\n" + "\n".join(bad)

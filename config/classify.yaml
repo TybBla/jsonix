@@ -1,15 +1,17 @@
 # Globalne ustawienia klasyfikatora typu dokumentu (odw2json/classify). Opis pol: docs/nowy-typ-dokumentu.md.
 # Frazy dzialaja na tekscie znormalizowanym (male litery, bez polskich znakow).
 foreign_titles:
-  # Kara dla WSZYSTKICH typow (raz), gdy ktoras linia w pierwszych header_chars znakach ZACZYNA SIE od frazy
+  # Sygnatury sprawy ("Sygn. akt KIO ...") celowo NIE ma na liscie: stoi tez na odwolaniach i zalacznikach.
+  # Kara dla KAZDEGO typu osobno (raz), gdy ktoras linia w pierwszych header_chars znakach ZACZYNA SIE od frazy
   # (granica slowa; rozstrzelone litery sa zwijane). Naglowek wyroku, faktury, wezwania itp. to dokument
   # obcy - nawet jesli w tresci pada duzo slow domenowych (odwolanie, zarzut, przelew...).
+  # Typ nie jest karany za fraze pokrywajaca sie z jego wlasnym `title` (jedna zaczyna druga) ani za frazy
+  # z jego `classify.ignore_foreign`.
   weight: -10
   header_chars: 600
   phrases:
     - wyrok
     - postanowienie
-    - sygn. akt
     - ogloszenie o
     - zawiadomienie
     - faktura
@@ -18,3 +20,9 @@ foreign_titles:
     - umowa
     - protokol
     - informacja z otwarcia ofert
+    # pisma innych uczestnikow postepowania odwolawczego (odpowiedz zamawiajacego, przystapienie)
+    - odpowiedz na odwolanie
+    - zgloszenie przystapienia
+    - przystapienie do postepowania odwolawczego
+    - stanowisko zamawiajacego
+    - pismo procesowe
