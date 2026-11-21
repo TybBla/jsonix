@@ -163,9 +163,15 @@ liter (chyba że `case: true`); grupa nazwana `v` = wartość.
 | `section_line` | `section_line: nagłówek` | `n` (1; 0 = linia nagłówka), `line_start` | `n`-ta niepusta linia po linii nagłówka |
 | `near` | `near: [frazy]` | `direction` (after/before/both), `max_chars` (200), `value`, `case` | wartość typu pola najbliżej frazy |
 | `const` | `const: 7` | — | stała |
+| `flag` | `flag: [frazy]` | `value` (1) | `value`, gdy w zakresie jest któraś z fraz (np. `przez-pelnomocnika`: `- flag: [reprezentowany przez]` + `- const: 0`) |
+| `phrase_lookup` | `phrase_lookup: słownik` | — | klasyfikacja fragmentu słownikiem `config/lookups/<słownik>.yaml` = lista `{id, phrases}`; **kolejność wpisów = priorytet** (np. `czynnosc_powod_frazy.yaml` → `czynnosc_powod_id`) |
 | `derived` | (klucz pola) | `lookup`, `from` | wartość z innego pola przez słownik `config/lookups/<lookup>.yaml` (bez `lookup` — kopia) |
 
-`scope`: `after` (brak frazy = pole `null`), `before`, `max_chars`. Normalizatory (`normalize`, łańcuch po
+`scope`: `after` (brak frazy = pole `null`), `before`, `max_chars`. Każdy ekstraktor przyjmuje też opcję
+**`within`** — okno w zakresie pola o tych samych kluczach albo lista okien zawężanych po kolei (brak frazy
+`after` = ten ekstraktor pomijany, następny próbuje dalej), np.
+`- phrase_lookup: czynnosc_powod_frazy` + `within: [{after: 'wnosze odwolanie', before: zaskarzonym}, {after: 're:1\.\s', before: 're:2\.\s'}]`.
+Normalizator `ocr_digits` zamienia `o`/`O` w ciągach cyfr na `0` (OCR). Normalizatory (`normalize`, łańcuch po
 kolei; `None` = odrzut): `ws`, `date` (→ ISO), `amount` (→ liczba), `iban` (26 cyfr), `digits`, `int`, `email`,
 `company`, `name` (mianownik), `trim_quotes`, `upper`, `lower` oraz z `odw2json/extract/normalize.py`
 (`bzp`, `ted`, `ocr_fix`, `nip`…). Walidatory (`validate`): `regex`, `min_len`, `max_len`, `min`, `max`, `one_of`.

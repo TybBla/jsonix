@@ -1,0 +1,59 @@
+# Frazy -> czynnosc_powod_id (1-12, opisy w czynnosc_powod.yaml). Uzywa ekstraktor phrase_lookup.
+# KOLEJNOSC WPISOW = PRIORYTET: wygrywa pierwszy wpis, ktorego fraza wystepuje w oknie (zdanie o
+# zaskarzonej czynnosci albo pierwszy zarzut), niezaleznie od pozycji frazy. Dlatego zaniechania
+# ("nie odrzucil", "zaniechal wykluczenia") stoja przed czynnosciami ("odrzucenie", "wykluczenie"),
+# a szczegolowe dokumenty (odpowiedzi/modyfikacja SWZ, OPZ) przed sama publikacja SWZ.
+# Frazy: male litery bez polskich znakow, granice slow; prefiks re: = regex na takim tekscie.
+- id: 7   # Zaniechanie odrzucenia oferty
+  phrases:
+    - nie odrzucil
+    - 're:zaniecha\w*\s+(?:\w+\s+){0,2}odrzuceni'
+    - 're:bezpodstawne\w*\s+nieodrzuceni'
+- id: 8   # Zaniechanie wykluczenia wykonawcy
+  phrases:
+    - nie wykluczyl
+    - 're:zaniecha\w*\s+(?:\w+\s+){0,2}wykluczeni'
+- id: 10  # Zaniechanie uniewaznienia postepowania
+  phrases:
+    - nie uniewaznil
+    - 're:zaniecha\w*\s+(?:\w+\s+){0,2}uniewaznieni'
+- id: 9   # Decyzja o uniewaznieniu postepowania
+  phrases:
+    - 're:uniewazni\w*\s+postepowani'   # uniewaznil / uniewaznienie / literowka "uniewazniil"
+- id: 1   # Decyzja o odrzuceniu oferty
+  phrases:
+    - 're:odrzuceni\w*\s+(?:\w+\s+){0,2}ofert'
+    - 're:odrzucil\w*\s+(?:\w+\s+){0,2}ofert'
+- id: 3   # Decyzja o wykluczeniu wykonawcy
+  phrases:
+    - 're:wykluczeni\w*'
+    - 're:wykluczyl\w*'
+- id: 2   # Ogloszenie wyboru oferty
+  phrases:
+    - 're:wyb(?:or|oru|orze)\s+(?:\w+\s+){0,2}ofert'
+    - 're:wybral\w*\s+(?:\w+\s+){0,2}ofert'
+    - 're:uznal\w*\s+(?:\w+\s+){0,2}za\s+najkorzystniejsz'
+- id: 12  # Projektowane postanowienia umowy
+  phrases:
+    - 're:projektowan\w*\s+postanowie\w*\s+umowy'
+    - 're:istotn\w*\s+postanowie\w*\s+umowy'
+    - 're:wz(?:or|oru|orze)\s+umowy'
+- id: 6   # Odpowiedzi/wyjasnienia do SWZ
+  phrases:
+    - 're:odpowiedz\w*\s+(?:\w+\s+){0,3}(?:pytani|wyjasnieni|wnios)'
+    - 're:wyjasnie\w*\s+(?:\w+\s+){0,2}(?:tresci\s+)?(?:swz|specyfikacji)'
+- id: 5   # Modyfikacja tresci SWZ
+  phrases:
+    - 're:zmodyfikowal\w*'
+    - 're:modyfikacj\w*\s+(?:\w+\s+){0,2}(?:swz|specyfikacji)'
+    - 're:zmienil\w*\s+(?:\w+\s+){0,1}(?:tresc|swz|specyfikacj)'
+- id: 11  # Opis przedmiotu zamowienia (OPZ)
+  phrases:
+    - 're:opis\w*\s+przedmiotu\s+zamowienia'
+    - opz
+- id: 4   # Publikacja SWZ
+  phrases:
+    - 're:specyfikacj\w*\s+warunkow\s+zamowienia'
+    - swz
+    - 're:ogloszeni\w*\s+o\s+zamowieniu'
+    - 're:dokument\w*\s+zamowienia'
