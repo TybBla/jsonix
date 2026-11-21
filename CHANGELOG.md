@@ -2,6 +2,51 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v1.0.0 — wydanie zgłoszeniowe (SZKIC, do uzupełnienia przy scaleniu)
+
+> Szkic przygotowany 22.11.2026 przed scaleniem PR-ów. Właściciel repo: popraw listę według faktycznie scalonych
+> gałęzi, wpisz liczby z `python scripts/quality_report.py` po scaleniu E4 i usuń tę notkę. Notatki wydania dla
+> GitHub Release: [docs/wydanie-v1.0.md](docs/wydanie-v1.0.md).
+
+**E4+E5 — ekstrakcja** (`etap/E4-ekstrakcja`)
+- Silnik pól sterowany YAML (`fields`/`lists`, ekstraktory, normalizatory, walidatory w rejestrach), reguły dla
+  wszystkich pól 3 typów, imiona w mianowniku, trace (strona + fragment) dla GUI.
+
+**E6 — bez LLM** (`etap/E6-bez-llm`)
+- Decyzja `docs/decyzje/E6-bez-llm.md`: reguły spełniają bramkę etapu, 20/20 pkt za moc modelu, limit czasu UZP;
+  warstwa LLM zostaje jako opcja (≤ 8B, dostawca z UE).
+
+**E10 — rozszerzalność** (`etap/E10-nowy-typ`)
+- Przykład 4. typu (orzeczenie KIO, 8 pól) wyłącznie konfiguracją w `examples/nowy-typ/`; test „0 linii kodu”,
+  nowe pole w istniejącym typie samą konfiguracją; typ nieaktywny w `config/` (UZP: orzeczenie = `{}`).
+
+**E11 — pakowanie i uruchomienie** (`etap/E11-docker`, `etap/E11-instalacja`, `etap/E11-limit-czasu`, `etap/E11-wydajnosc`)
+- Docker Compose bez wymaganego `.env`, healthcheck, `scripts/smoke_docker.py` (wynik w kontenerze = CLI, także skan z OCR).
+- `start.bat`/`start-gui.bat` same przygotowują środowisko (Python 3.13/3.14, `.venv`); instalacja działa też na
+  Pythonie 3.15 (bez OCR); przypięte wersje `requirements-lock.txt`; CI na 3.13 i 3.14; „test jury” (`docs/test-jury.md`).
+- Limit czasu UZP: `{}` dla każdego PDF przed przetwarzaniem, więc przerwany przebieg zostawia częściowe wyniki;
+  pomiar czasu `scripts/bench_cases.py` (99% czasu to OCR skanów).
+
+**E12 — dokumentacja i zgłoszenie** (`etap/E12-dokumentacja`, `etap/E12-raport-jakosci`, `etap/E12-demo`, `etap/kryteria-uzp-2111`)
+- `docs/architektura.md`, `docs/zgloszenie.md` (checklista regulaminu, licencje), ustalenia UZP z 21.11 wieczorem.
+- Raport jakości `scripts/quality_report.py` → `docs/raport-jakosci.md`.
+- Scenariusz demo, prezentacja `docs/prezentacja.html`, GIF z GUI (plan B).
+
+**GUI** (`etap/E9-dlaczego-typ`)
+- „Dlaczego ten typ?” zdaniami po polsku (surowe cechy w „Szczegółach technicznych”); poprawka kontrastu
+  podświetleń w PDF w trybie wysokiego kontrastu.
+
+**Dane** (`etap/dane-iban-pl`)
+- GT przelewów: numer rachunku z „PL”, gdy ma go dokument (96 pól) — ustalenie UZP; normalizator `iban` w E4 do zmiany.
+
+| Bramka (pomiar 21.11 na gałęzi E4, Docker, OCR) | dev | holdout |
+|---|---|---|
+| F1 — dokumenty z tekstem | 0,999 | 0,997 |
+| F1 — skany | 0,975 | 0,903 |
+| Błędy klasyfikacji | 0 | 0 |
+| Negatywy (tekst) | 12/12 | 10/10 |
+| Czas: dokument z tekstem / skan (średnio) | 0,01 s / 3,95 s | |
+
 ## v0.3.0 — E3: klasyfikacja + E8+E9: aplikacja (2026-11-21)
 
 - Klasyfikacja sterowana YAML: tytuł jako linia nagłówka (z rozstrzelonymi literami), wzorce strukturalne, `required_any`, `min_score`/`min_margin`, pewność z marginesu, uzasadnienie (`evidence`) w trace.
