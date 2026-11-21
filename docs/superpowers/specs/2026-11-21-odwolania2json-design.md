@@ -49,7 +49,7 @@ Co decyduje o wygranej:
 | B. Tylko reguły/regex | deterministyczne, darmowe | nazwy podmiotów, odmiana imion, powód odwołania, tytuł — nie do opanowania na ukrytych wariantach |
 | **C. Hybryda: reguły + mały LLM, sterowana konfiguracją (WYBRANE)** | pola o sztywnym formacie z regex (pewne), LLM tylko do pól semantycznych → mały model wystarczy (punkty za rozmiar); każde pole ma źródło i metodę (transparentność); nowe typy dokumentów = nowy plik YAML | więcej projektowania kontraktów na starcie |
 
-Zasada łączenia: dla każdego pola konfiguracja mówi `regex` / `llm` / `derived` (np. opis ze słownika) i kolejność. Wartość regexowa wygrywa, LLM uzupełnia; walidator (format, suma kontrolna NIP/REGON/PESEL/IBAN) odrzuca śmieci → `null` (FP kosztuje tyle co FN, a `null` przy braku w GT daje TN).
+Zasada łączenia: dla każdego pola konfiguracja mówi `regex` / `llm` / `derived` (np. opis ze słownika) i kolejność. Wartość regexowa wygrywa, LLM uzupełnia; walidator (tylko format; sumy kontrolne NIP/REGON/PESEL NIE odrzucają — dane demo mają je celowo błędne, potwierdzone przez UZP; co najwyżej ostrzeżenie w logu) odrzuca śmieci → `null` (FP kosztuje tyle co FN, a `null` przy braku w GT daje TN).
 
 ## 5. Architektura
 
@@ -169,7 +169,7 @@ Workflow: `main` chroniony, tylko przez PR; gałęzie `feat/a-ingest-classify`, 
 
 ### Sektor B — ekstrakcja, konfiguracja, normalizacja
 - `config_loader` + walidacja YAML (pydantic); rejestr typów dokumentów.
-- Regexy: KRS/NIP/REGON/PESEL (z sumami kontrolnymi), IBAN, kwoty, daty słownie („20 marca 2026”) → ISO, BZP/TED z normalizacją, nagłówek „Miejscowość, dnia…”.
+- Regexy: KRS/NIP/REGON/PESEL (sama długość/format, bez wymuszania sum kontrolnych), IBAN, kwoty, daty słownie („20 marca 2026”) → ISO, BZP/TED z normalizacją, nagłówek „Miejscowość, dnia…”.
 - LLM: prompt per typ z opisami pól (przeniesione z komentarzy w `oczekiwane-json`), few-shot z danych treningowych, wybór `czynnosc_powod_id` tylko z pierwszego zarzutu, imiona w mianowniku.
 - merge + walidacja → `null` przy niepewności; budowa wyniku dokładnie wg szablonu (kolejność kluczy, typy: int vs str, float kwoty).
 - Done: F1 ≥ 0.95 na zbiorze treningowym (hold-out ~15 spraw nieużywanych w promptach), wynik zgodny ze schematem w 100%.
