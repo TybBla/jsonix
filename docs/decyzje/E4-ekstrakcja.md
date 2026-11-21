@@ -85,6 +85,41 @@ Pól z F1 < 0,8 brak. Uwagi do pól < 1:
   (dwa odwołania, jedno potwierdzenie przelewu, w tym typ nietknięty w T4); ponowny przebieg: 0 błędów.
   Wygląda na niedeterminizm OCR pod obciążeniem — do zbadania w E2b/T6.
 
+### Odporność — odwołanie
+Recenzja odporności (warianty tekstu dev w pamięci, F1 wg reguł UZP) wykazała, że reguły trzymały się dosłownych
+etykiet i układu linii z danych. Poprawki są wyłącznie w `config/doctypes/odwolanie.yaml` (sekcja `classify` bez
+zmian); testy: `tests/test_extract_robustness_odwolanie.py` (warianty na 46 dev PDF-ach z warstwą tekstu, próg F1 ≥ 0,97,
+`MIN_DOCS` = 10) oraz `test_party_label_synonyms_and_name_boundaries` w `tests/test_extract_odwolanie.py`.
+
+| Wariant (dev, odwołania) | n | F1 przed | F1 po |
+|---|---|---|---|
+| `Odwołujący:` → `Wykonawca wnoszący odwołanie:` | 46 | 0,726 | 0,998 |
+| `Zamawiający:` → `Instytucja zamawiająca:` | 45 | 0,888 | 0,998 |
+| zamiana kolejności stron (Zamawiający przed Odwołującym) | 46 | 0,998 | 0,998 |
+| zawinięcie całego tekstu do 55 znaków (nazwa kancelarii) | 46 | 0,985 | 0,998 |
+| odwinięcie linii (adres „doklejony” do nazwy) | 46 | 0,993 | 0,998 |
+
+Holdout (kontrola, bez strojenia): te same warianty 0,996–0,997 (= bazowy F1 typu).
+
+- **Etykiety stron — synonimy:** `Odwołujący się`, `Wykonawca wnoszący odwołanie`, `Wykonawca (Odwołujący)`;
+  `Instytucja/Strona/Podmiot zamawiająca/-y`, `Zamawiający – nazwa`. Obsługa w `lists.*.split.start/end`
+  (początek bloku jednej strony = koniec bloku drugiej, w dowolnej kolejności — wcześniej blok Zamawiającego po
+  zamianie „połykał” dane Odwołującego, bo nie widział własnego końca) oraz w etykietach `nazwa`.
+- **Nazwa strony ucinana przed dopiskami w tej samej linii:** przecinek, ` ul.`/` al.`/` pl.`/` os.`,
+  `reprezentowan…`, `KRS/NIP/REGON/tel./e-mail/adres`, kod pocztowy `\d\d-\d\d\d` (wzorzec wartości `&name_line`,
+  współdzielony przez Lidera konsorcjum, „pod firmą” i etykietę Odwołującego; dla Zamawiającego dodatkowo jedna
+  zawinięta linia).
+- **Nazwa kancelarii pełnomocnika:** do przecinka lub ` ul.`, ale kontynuuje w następnych liniach (dowolne
+  zawinięcie), dopóki linia nie zaczyna się od adresu (`ul./al./pl./os.`), cyfry, `tel.`/`e-mail`/`KRS`/`NIP`/`@`
+  ani nagłówka kolejnej sekcji (`dotyczy`, `Zamawiający`, `Odwołujący`, …). Wcześniej linia wyłącznie do końca wiersza
+  („Kancelaria Adwokacka Spółka z”).
+- **Nazwisko pełnomocnika wersalikami:** wzorzec przyjmuje `Jan NOWAK` / `JAN NOWAK` (z pominięciem tytułów
+  `ADWOKAT`, `RADCA PRAWNY`, …), pole ma jawne `normalize: [ws, name]`; zamiana na `Jan Nowak` należy do `names.py`
+  (osobna zmiana). Test końcowy dopasowania `Jan Nowak` ma `xfail(strict=False)` do czasu jej scalenia.
+- **Poza zakresem tej poprawki (zostaje):** `b12` (numer BZP z przyrostkiem `/01` wg GT bez przyrostka — zgodne
+  z `bzp` w `normalize.py`), `d1` (brak numeru TED → pojedyncze FP przy innych liczbach), `d3` (brak linii
+  „Miejscowość, data” → `null`; zamierzone).
+
 ## pełnomocnictwo (E4-T5)
 
 Reguły: `config/doctypes/pelnomocnictwo.yaml`, testy: `tests/test_extract_pelnomocnictwo.py`.

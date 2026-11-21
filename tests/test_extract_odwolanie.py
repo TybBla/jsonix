@@ -236,6 +236,28 @@ def test_konsorcjum_gives_leader(cfg):
     assert o["przez-pelnomocnika"] == 0 and o["pelnomocnik"]["imie_nazwisko"] is None
 
 
+SYN = """Instytucja zamawiająca: Gmina Rudnik Wielki, ul. Polna 5, 00-001 Rudnik, NIP: 9990264287
+Wykonawca wnoszący odwołanie:
+DUDEK-TECH Jarosław Dudek reprezentowany przez: adw. Natalia GÓRECKA
+adres do korespondencji: Kancelaria Adwokacka Spółka z
+ograniczoną odpowiedzialnością, ul. Jasionowa 19, 80-994 Gdańsk
+tel. 000 000 000, e-mail: biuro@kancelaria.example
+dotyczy: x
+"""
+
+
+def test_party_label_synonyms_and_name_boundaries(cfg):
+    d = extract(_doc(SYN), cfg).data
+    assert [z["nazwa"] for z in d["Zamawiajacy"]] == ["Gmina Rudnik Wielki"]
+    assert d["Zamawiajacy"][0]["nip"] == "9990264287"
+    o = d["Odwolujacy"][0]
+    assert o["nazwa"] == "DUDEK-TECH Jarosław Dudek"
+    assert o["pelnomocnik"]["nazwa"] == "Kancelaria Adwokacka Spółka z ograniczoną odpowiedzialnością"
+    assert o["pelnomocnik"]["mail"] == "biuro@kancelaria.example"
+    # wersaliki: wzorzec łapie całe „Imię NAZWISKO” (wielkość liter poprawia names.py)
+    assert o["pelnomocnik"]["imie_nazwisko"].lower() == "natalia górecka"
+
+
 def test_header_date_only_from_place_line(cfg):
     text = "Prezes Krajowej Izby Odwoławczej\nul. Postępu 17A\n02-676 Warszawa\n" + HEAD
     k = extract(_doc(text + "ustawy z dnia 11 września 2019 r.\n"), cfg).data["OdwolanieKIO"]
