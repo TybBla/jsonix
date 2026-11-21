@@ -116,12 +116,13 @@ _SEPARATORY = re.compile(r"[\s\-]")
 
 
 def iban(value: str) -> str | None:
-    """IBAN PL → 26 cyfr bez prefiksu PL, spacji i myślników."""
+    """Rachunek jak w dokumencie: „PL” + 26 cyfr (gdy prefiks jest) albo 26 cyfr; bez separatorów."""
     tekst = _SEPARATORY.sub("", value)
-    if tekst[:2].upper() == "PL":
-        tekst = tekst[2:]
+    prefiks = ""
+    if tekst.startswith("PL"):
+        prefiks, tekst = "PL", tekst[2:]
     if re.fullmatch(r"\d{26}", tekst):
-        return tekst
+        return prefiks + tekst
     return None
 
 
