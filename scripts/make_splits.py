@@ -33,6 +33,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--out", type=Path, default=OUT, help="plik wyjsciowy (domyslnie data/splits.yaml)")
     out = ap.parse_args(argv).out
     cases = sorted(p.name for p in TRAIN.iterdir() if p.is_dir() and p.name.startswith("przyklad_"))
+    cases += sorted(
+        f"skany/{typ.name}/{sprawa.name}"
+        for typ in (TRAIN / "skany").iterdir()
+        if typ.is_dir()
+        for sprawa in typ.iterdir()
+        if sprawa.is_dir()
+    )
     dev = [c for c in cases if assign_split(c) == "dev"]
     holdout = [c for c in cases if assign_split(c) == "holdout"]
     body = yaml.safe_dump(

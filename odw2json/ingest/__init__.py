@@ -4,7 +4,8 @@ Backend ekstrakcji tekstu wybierany konfiguracją (``config/app.yaml`` -> ``inge
 z fallbackiem na kolejne backendy. Rozpoznaje pliki, których nie da się wczytać (``IngestError``).
 Tekst dokumentu = strony złączone ``"\\n\\f\\n"``; ``page_offsets`` wskazują początek każdej strony.
 
-OCR (opcjonalny, ``ingest.ocr``): strona z tekstem krótszym niż ``min_chars_per_page`` przechodzi przez
+OCR (obowiązkowy w requirements, ``ingest.ocr``): strona z tekstem krótszym niż
+``min_chars_per_page`` przechodzi przez
 ``ocr.ocr_page``; brak pakietu OCR daje ostrzeżenie, a nie wyjątek.
 """
 
@@ -63,6 +64,35 @@ def _validate_ocr_cfg(ocr_cfg: object) -> None:
         if val is not None and (isinstance(val, bool) or not isinstance(val, int) or val <= 0):
             raise ValueError(
                 f"Błąd konfiguracji ingest: ocr.{key} musi być dodatnią liczbą całkowitą (jest {val!r})"
+            )
+    params = ocr_cfg.get("engine_params")
+    if params is not None:
+        if not isinstance(params, dict):
+            raise ValueError(
+                "Błąd konfiguracji ingest: ocr.engine_params musi być słownikiem parametrów silnika"
+            )
+        for k, v in params.items():
+            if not isinstance(k, str) or "." not in k.strip(".") or k.startswith(".") or k.endswith("."):
+                raise ValueError(
+                    f"Błąd konfiguracji ingest: ocr.engine_params: klucz {k!r} "
+                    "musi mieć postać 'Sekcja.parametr'"
+                )
+            if isinstance(v, dict | list):
+                raise ValueError(
+                    f"Błąd konfiguracji ingest: ocr.engine_params[{k!r}] "
+                    f"musi być wartością skalarną (jest {v!r})"
+                )
+    post = ocr_cfg.get("postprocess")
+    if post is not None:
+        if not isinstance(post, list) or not all(isinstance(x, str) for x in post):
+            raise ValueError(
+                "Błąd konfiguracji ingest: ocr.postprocess musi być listą nazw kroków czyszczenia"
+            )
+        bad = [x for x in post if x not in clean.CLEAN_STEPS]
+        if bad:
+            raise ValueError(
+                f"Błąd konfiguracji ingest: nieznane kroki czyszczenia (ingest.ocr.postprocess): "
+                f"{', '.join(bad)}. Dostępne: {', '.join(sorted(clean.CLEAN_STEPS))}"
             )
     enabled = ocr_cfg.get("enabled")
     if enabled is not None and not isinstance(enabled, bool):
@@ -168,7 +198,8 @@ def _apply_ocr(
     """OCR stron bez wystarczającej warstwy tekstowej. Zwraca strony i nazwę silnika (gdy coś rozpoznano).
 
     Strony z tekstem (>= ``min_chars_per_page`` znaków) nigdy nie trafiają do OCR. Rozpoznany tekst
-    zastępuje stronę tylko wtedy, gdy jest dłuższy od tego, co już było.
+    zastępuje stronę tylko wtedy, gdy jest dłuższy od tego, co już było. Kroki ``ocr.postprocess``
+    (np. ``ocr_artifacts``) dotyczą wyłącznie tekstu z OCR i są stosowane przed ogólnym czyszczeniem.
     """
     if not ocr_cfg.get("enabled"):
         return pages, None
@@ -181,6 +212,7 @@ def _apply_ocr(
         warnings.extend(f"OCR niedostępny – strona {i + 1} bez tekstu" for i in todo)
         return pages, None
     pages = list(pages)
+    post = list(ocr_cfg.get("postprocess") or [])
     used = False
     for i in todo:
         try:
@@ -188,6 +220,8 @@ def _apply_ocr(
         except Exception as e:  # błąd OCR jednej strony nie przerywa wczytywania dokumentu
             warnings.append(f"OCR strony {i + 1} nieudany ({type(e).__name__}: {e})")
             continue
+        if post:
+            text = clean.clean_text(text, post)
         if len(text.strip()) > len(pages[i].strip()):
             pages[i] = text
             used = True

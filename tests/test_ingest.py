@@ -156,7 +156,7 @@ def test_cleaning_that_removes_page_break_is_rejected(odwolanie, monkeypatch):
     monkeypatch.setitem(clean.CLEAN_STEPS, "zjedz_f", lambda t: t.replace("\f", ""))
     monkeypatch.setitem(backends.BACKENDS, "pypdf", _fake_backend(["a", "b"]))
     with pytest.raises(RuntimeError, match="liczb"):
-        ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": ["zjedz_f"]})
+        ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": ["zjedz_f"], "ocr": {"enabled": False}})
 
 
 def test_fix_pdfium_text_removes_soft_hyphen_marker_and_normalizes_newlines():
@@ -214,7 +214,7 @@ def test_pipeline_run_fails_fast_on_bad_ingest_cfg(tmp_path, train_dir, monkeypa
     inp.mkdir()
     shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "dobry.pdf")
     calls = []
-    monkeypatch.setattr(pipeline, "process_file", lambda *a, **k: calls.append(a))
+    monkeypatch.setattr(pipeline, "process_file_ex", lambda *a, **k: calls.append(a))
     with pytest.raises(ValueError):
         pipeline.run(inp, tmp_path / "output", app_cfg={"ingest": bad, "write_trace": False})
     assert calls == []
@@ -351,7 +351,7 @@ def test_pipeline_run_fails_fast_on_bad_ocr_cfg(tmp_path, train_dir, monkeypatch
     inp.mkdir()
     shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "dobry.pdf")
     calls = []
-    monkeypatch.setattr(pipeline, "process_file", lambda *a, **k: calls.append(a))
+    monkeypatch.setattr(pipeline, "process_file_ex", lambda *a, **k: calls.append(a))
     with pytest.raises(ValueError):
         pipeline.run(inp, tmp_path / "output", app_cfg={"ingest": {"ocr": bad}, "write_trace": False})
     assert calls == []

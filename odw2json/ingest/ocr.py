@@ -1,10 +1,11 @@
 """OCR dla stron bez warstwy tekstowej (opcjonalny; brak pakietu nie psuje aplikacji).
 
-Strona PDF jest renderowana przez pypdfium2 (~200 DPI), a obraz trafia do silnika wybranego w
-``config/app.yaml`` -> ``ingest.ocr.engine``. Silniki siedzą w rejestrze ``OCR_ENGINES``; ich
+Strona PDF jest renderowana przez pypdfium2 (domyślnie 200 DPI, produkcyjnie 150), a obraz trafia
+do silnika wybranego w ``config/app.yaml`` -> ``ingest.ocr.engine``. Silniki siedzą w rejestrze
+``OCR_ENGINES``; ich
 biblioteki są importowane leniwie, a ``ocr_available`` sprawdza obecność pakietów bez importu.
 
-Domyślny silnik ``rapidocr`` (``pip install -r requirements-ocr.txt``) używa modelu PP-OCRv6 "multi"
+Domyślny silnik ``rapidocr`` (obowiązkowy: ``requirements.txt``) używa modelu PP-OCRv6 "multi"
 dołączonego do paczki (bez pobierania modeli w czasie działania), który obsługuje m.in. język polski.
 """
 
@@ -13,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import importlib.util
+import json
 import os
 from collections import OrderedDict
 from collections.abc import Callable
@@ -25,7 +27,9 @@ from odw2json import config_loader
 
 DEFAULT_ENGINE = "rapidocr"
 DEFAULT_DPI = 200
-OCR_CACHE_VERSION = "1"  # podbić przy zmianie renderowania/składania wierszy, żeby unieważnić stary cache
+OCR_CACHE_VERSION = (
+    "2"  # podbić przy zmianie renderowania/składania wierszy/parametrów, żeby unieważnić stary cache
+)
 MEMO_MAX = 256
 
 
@@ -47,11 +51,22 @@ def _has_modules(*names: str) -> bool:
 # --- RapidOCR -----------------------------------------------------------------------------------
 
 
-@lru_cache(maxsize=1)
-def _rapidocr_engine():
+def _params_key(params: dict | None) -> str:
+    """Kanoniczny zapis ``engine_params`` (kolejność kluczy nie ma znaczenia); pusty = brak parametrów."""
+    return json.dumps(params, sort_keys=True, ensure_ascii=True, default=str) if params else ""
+
+
+def _params_tag(params: dict | None) -> str:
+    """Krótki skrót parametrów silnika do nazwy pliku cache i klucza pamięci procesu."""
+    key = _params_key(params)
+    return hashlib.sha1(key.encode()).hexdigest()[:8] if key else "p0"
+
+
+@lru_cache(maxsize=4)
+def _rapidocr_engine(params_key: str = ""):
     from rapidocr import RapidOCR
 
-    return RapidOCR()
+    return RapidOCR(params=json.loads(params_key) if params_key else None)
 
 
 def _group_lines(boxes, texts) -> str:
@@ -83,7 +98,8 @@ def _group_lines(boxes, texts) -> str:
 def _rapidocr_run(image, cfg: dict) -> str:
     import numpy as np
 
-    result = _rapidocr_engine()(np.asarray(image.convert("RGB")))
+    engine = _rapidocr_engine(_params_key(cfg.get("engine_params")))
+    result = engine(np.asarray(image.convert("RGB")))
     boxes = getattr(result, "boxes", None)
     texts = getattr(result, "txts", None)
     if boxes is None or texts is None:
@@ -201,25 +217,27 @@ def _write_cache(path: Path, text: str) -> None:
 def ocr_page(path: Path, page_index: int, cfg: dict | None = None) -> str:
     """Tekst strony ``page_index`` (0-based) pliku ``path`` rozpoznany OCR-em.
 
-    ``cfg`` = sekcja ``ingest.ocr`` (``engine``, opcjonalnie ``dpi`` i ``cache_dir``: katalog z
-    wynikami OCR kluczowanymi hashem pliku, wersją cache i wersją pakietu OCR; względny ``cache_dir``
-    liczony od korzenia repozytorium). Wynik jest też pamiętany w procesie (LRU; klucz: hash
-    zawartości pliku, więc kopie pliku też trafiają). Rzuca wyjątek, gdy silnik jest nieznany lub
-    niezainstalowany; wołający powinien wcześniej sprawdzić ``ocr_available``.
+    ``cfg`` = sekcja ``ingest.ocr`` (``engine``, opcjonalnie ``dpi``, ``engine_params`` (płaski słownik
+    parametrów silnika, np. RapidOCR ``Global.use_cls``) i ``cache_dir``: katalog z wynikami OCR
+    kluczowanymi hashem pliku, DPI, parametrami silnika, wersją cache i wersją pakietu OCR;
+    względny ``cache_dir`` liczony od korzenia repozytorium). Wynik jest też pamiętany w procesie
+    (LRU; klucz: hash zawartości pliku, więc kopie pliku też trafiają). Rzuca wyjątek, gdy silnik
+    jest nieznany lub niezainstalowany; wołający powinien wcześniej sprawdzić ``ocr_available``.
     """
     cfg = cfg or {}
     name = cfg.get("engine") or DEFAULT_ENGINE
     engine = _engine(name)
     dpi = int(cfg.get("dpi") or DEFAULT_DPI)
     digest = _file_digest(Path(path))
-    key = (digest, page_index, name, dpi)
+    ptag = _params_tag(cfg.get("engine_params"))
+    key = (digest, page_index, name, dpi, ptag)
     hit = _memo_get(key)
     if hit is not None:
         return hit
     cache = None
     if cfg.get("cache_dir"):
         tag = f"v{OCR_CACHE_VERSION}.{_package_version()}"
-        cache = resolve_cache_dir(cfg["cache_dir"]) / f"{digest}.{page_index}.{name}.{dpi}.{tag}.txt"
+        cache = resolve_cache_dir(cfg["cache_dir"]) / f"{digest}.{page_index}.{name}.{dpi}.{ptag}.{tag}.txt"
         cached = _read_cache(cache)
         if cached is not None:
             _memo_put(key, cached)

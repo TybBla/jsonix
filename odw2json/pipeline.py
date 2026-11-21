@@ -11,7 +11,7 @@ from pathlib import Path
 
 from odw2json import classify, extract, ingest
 from odw2json.config_loader import DocTypeConfig, load_app_config, load_registry
-from odw2json.contracts import Classification, ExtractionResult
+from odw2json.contracts import Classification, Document, ExtractionResult
 from odw2json.logging_setup import new_run_id
 
 log = logging.getLogger("odw2json")
@@ -33,14 +33,22 @@ class RunReport:
     total_ms: int = 0
 
 
-def process_file(
+def process_file_ex(
     pdf: Path, registry: dict[str, DocTypeConfig], ingest_cfg: dict | None = None
-) -> tuple[Classification, ExtractionResult | None]:
+) -> tuple[Document, Classification, ExtractionResult | None]:
+    """Jak ``process_file``, ale zwraca też ``Document`` (``ocr_used``/``backend``/``warnings`` do trace)."""
     doc = ingest.load(pdf, cfg=ingest_cfg)
     cls = classify.classify(doc, registry)
     if cls.doc_type is None:
-        return cls, None
-    return cls, extract.extract(doc, registry[cls.doc_type])
+        return doc, cls, None
+    return doc, cls, extract.extract(doc, registry[cls.doc_type])
+
+
+def process_file(
+    pdf: Path, registry: dict[str, DocTypeConfig], ingest_cfg: dict | None = None
+) -> tuple[Classification, ExtractionResult | None]:
+    _, cls, res = process_file_ex(pdf, registry, ingest_cfg)
+    return cls, res
 
 
 def _dump(obj) -> str:
@@ -55,6 +63,7 @@ def write_outputs(
     res: ExtractionResult | None,
     app_cfg: dict,
     run_id: str | None = None,
+    doc: Document | None = None,
 ) -> Path | None:
     rel = pdf.relative_to(input_dir).with_suffix(".json")
     target = output_dir / rel
@@ -75,6 +84,9 @@ def write_outputs(
                 {
                     "run_id": run_id,
                     "source": str(pdf),
+                    "ocr_used": doc.ocr_used if doc else None,
+                    "backend": doc.backend if doc else None,
+                    "warnings": list(doc.warnings) if doc else [],
                     "classification": asdict(cls),
                     "trace": [asdict(f) for f in res.trace] if res else [],
                 }
@@ -106,8 +118,8 @@ def run(
         t0 = time.perf_counter()
         rel = str(pdf.relative_to(input_dir))
         try:
-            cls, res = process_file(pdf, registry, ingest_cfg)
-            write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg, run_id)
+            doc, cls, res = process_file_ex(pdf, registry, ingest_cfg)
+            write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg, run_id, doc=doc)
             report.processed += 1
             key = cls.doc_type or "nieznany"
             report.by_type[key] = report.by_type.get(key, 0) + 1

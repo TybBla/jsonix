@@ -12,3 +12,7 @@ uvicorn>=0.30
 python-multipart>=0.0.9
 pytest>=8.0
 httpx>=0.27            # testy API (TestClient)
+# OCR dla skanow (obowiazkowy od E2b; licencje: rapidocr Apache-2.0, onnxruntime MIT).
+# Modele PP-OCRv6 sa w wheelu rapidocr (~27 MB), nic nie jest pobierane w czasie dzialania.
+rapidocr>=3.10
+onnxruntime>=1.20

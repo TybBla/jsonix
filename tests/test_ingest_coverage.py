@@ -144,6 +144,7 @@ def test_przyklad_01_with_current_loader():
 
 
 @pytest.mark.slow
+@pytest.mark.ocr_live  # CLI pokrycia OCR-uje skany (kilka minut na zimno)
 def test_cli_json_dump(tmp_path: Path):
     out = tmp_path / "cov.json"
     proc = subprocess.run(
@@ -184,3 +185,74 @@ def test_explicit_backend_serves_itself(monkeypatch):
     assert rep.load_errors == []
     assert rep.foreign_backend == []
     assert rep.total.found > 0
+
+
+# ------------------------------------------- E2b: skany, typ z kluczy GT, zrodlo
+
+SCAN_DIR = TRAIN / "skany" / "potwierdzenia" / "0001"
+
+
+@pytest.fixture
+def mini_train(tmp_path, monkeypatch):
+    """Skan 0001 (GT 0001.json) + sprawa klasyczna; OCR podmieniony tekstem z wartosciami GT."""
+    import shutil
+
+    from odw2json.ingest import ocr as ocr_mod
+
+    train = tmp_path / "train"
+    shutil.copytree(SCAN_DIR, train / "skany" / "potwierdzenia" / "0001")
+    classic = train / "przyklad_01"
+    classic.mkdir(parents=True)
+    shutil.copy2(TRAIN / "przyklad_01" / "potwierdzenie_przelewu.pdf", classic)
+    shutil.copy2(TRAIN / "przyklad_01" / "przelew.json", classic)
+    gt_text = json.dumps(
+        json.loads((SCAN_DIR / "0001.json").read_text(encoding="utf-8-sig")), ensure_ascii=False
+    )
+
+    monkeypatch.setattr(ocr_mod, "ocr_page", lambda path, page_index, cfg=None: gt_text)
+    return train
+
+
+CASES = ["przyklad_01", "skany/potwierdzenia/0001"]
+
+
+def test_coverage_splits_by_source_and_infers_type(mini_train):
+    import eval.ingest_coverage as ic
+
+    rep = ic.run_coverage("dev", train_dir=mini_train, cases=CASES)
+    assert rep.load_errors == [] and rep.docs == 2
+    assert set(rep.by_source) == {"tekst", "skan"}
+    assert rep.docs_by_source == {"tekst": 1, "skan": 1}
+    assert rep.by_source["skan"].total > 0
+    assert rep.by_source["skan"].rate == 1.0  # fikcyjny OCR zawiera wszystkie wartosci GT
+    assert set(rep.by_type) == {"przelew"}  # typ z kluczy GT (skan: plik 0001.json)
+    assert set(rep.by_type_source) == {"przelew/tekst", "przelew/skan"}
+    assert (rep.by_source["skan"] + rep.by_source["tekst"]).total == rep.total.total
+    out = rep.to_dict()
+    assert out["by_source"]["skan"]["total"] == rep.by_source["skan"].total
+    assert set(out["by_type_source"]) == {"przelew/tekst", "przelew/skan"}
+    assert out["docs_by_source"] == {"tekst": 1, "skan": 1}
+    assert "WG ZRODLA" in ic.format_report(rep)
+
+
+def test_coverage_scan_without_ocr_result_is_still_scan(mini_train, monkeypatch):
+    """OCR nic nie rozpoznal (ocr_used False), ale PDF nie ma warstwy tekstu -> zrodlo 'skan'."""
+    import eval.ingest_coverage as ic
+    from odw2json.ingest import ocr as ocr_mod
+
+    monkeypatch.setattr(ocr_mod, "ocr_page", lambda path, page_index, cfg=None: "")
+    rep = ic.run_coverage("dev", train_dir=mini_train, cases=CASES)
+    assert rep.docs_by_source == {"tekst": 1, "skan": 1}
+    assert rep.by_source["skan"].found == 0 and rep.by_source["skan"].total > 0
+
+
+def test_coverage_load_error_uses_text_layer_heuristic(mini_train, monkeypatch):
+    import eval.ingest_coverage as ic
+
+    def boom(path):
+        raise RuntimeError("padl")
+
+    monkeypatch.setattr(ic, "_make_loader", lambda backend: boom)
+    rep = ic.run_coverage("dev", train_dir=mini_train, cases=CASES)
+    assert len(rep.load_errors) == 2
+    assert rep.docs_by_source == {"tekst": 1, "skan": 1}

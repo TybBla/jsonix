@@ -55,3 +55,39 @@ def test_unknown_as_empty_file(tmp_path, train_dir):
 def test_output_is_utf8_not_escaped():
     raw = pipeline._dump({"nazwa": "Zespół Szkół Łódź"})
     assert "Zespół Szkół Łódź" in raw
+
+
+def test_trace_has_ocr_used_backend_and_warnings(tmp_path, train_dir):
+    inp, out = _mk_input(tmp_path, train_dir), tmp_path / "output"
+    pipeline.run(inp, out, app_cfg={"unknown_output": "none", "write_trace": True})
+    tr = json.loads((out / ".trace" / "case1" / "przyklad odwolanie.trace.json").read_text(encoding="utf-8"))
+    assert tr["ocr_used"] is False
+    assert tr["backend"] == "pypdfium2"
+    assert isinstance(tr["warnings"], list)
+    assert "classification" in tr and "trace" in tr
+
+
+def test_trace_marks_ocr_used(tmp_path, train_dir, monkeypatch):
+    from odw2json import ingest
+
+    inp, out = _mk_input(tmp_path, train_dir), tmp_path / "output"
+    real_load = ingest.load
+
+    def fake_load(path, **kw):
+        doc = real_load(path, **kw)
+        doc.ocr_used, doc.backend, doc.warnings = True, "pypdfium2+ocr:rapidocr", ["OCR strony 1"]
+        return doc
+
+    monkeypatch.setattr(ingest, "load", fake_load)
+    pipeline.run(inp, out, app_cfg={"unknown_output": "none", "write_trace": True})
+    tr = json.loads((out / ".trace" / "case1" / "przyklad odwolanie.trace.json").read_text(encoding="utf-8"))
+    assert tr["ocr_used"] is True
+    assert tr["backend"] == "pypdfium2+ocr:rapidocr"
+    assert tr["warnings"] == ["OCR strony 1"]
+
+
+def test_process_file_signature_unchanged(train_dir):
+    from odw2json.config_loader import load_registry
+
+    cls, res = pipeline.process_file(train_dir / "przyklad_01" / "odwolanie.pdf", load_registry())
+    assert cls.doc_type and res is not None

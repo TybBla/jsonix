@@ -33,6 +33,43 @@ _QUOTES = {
     **dict.fromkeys(map(ord, "„“”‟«»"), '"'),
     **dict.fromkeys(map(ord, "‚‘’‛"), "'"),
 }
+# Artefakty OCR: znaki, ktorych polszczyzna nie uzywa, a ktore silnik "multi" podstawia za polskie litery
+# lub za litery lacinskie z bledna diakrytyka (obserwacje: docs/decyzje/E2b-ocr-wydajnosc.md).
+# Celowo pominiete: ä/ë/ö/ü (czeste w nazwiskach obcych) i wszystko, co jest polska litera.
+_OCR_ARTIFACTS = {
+    **dict.fromkeys(map(ord, "ı"), "i"),
+    **dict.fromkeys(map(ord, "ſ"), "s"),
+    **dict.fromkeys(map(ord, "ñň"), "ń"),
+    **dict.fromkeys(map(ord, "ÑŇ"), "Ń"),
+    ord("ő"): "ó",
+    ord("Ő"): "Ó",
+    ord("š"): "ś",
+    ord("Š"): "Ś",
+    ord("č"): "ć",
+    ord("Č"): "Ć",
+    ord("ž"): "ż",
+    ord("Ž"): "Ż",
+    ord("ě"): "ę",
+    ord("Ě"): "Ę",
+    **dict.fromkeys(map(ord, "àáâãåāă"), "a"),
+    **dict.fromkeys(map(ord, "ÀÁÂÃÅĀĂ"), "A"),
+    **dict.fromkeys(map(ord, "ċç"), "c"),
+    **dict.fromkeys(map(ord, "ĊÇ"), "C"),
+    ord("ņ"): "n",
+    ord("Ņ"): "N",
+    ord("ș"): "s",
+    ord("Ș"): "S",
+    **dict.fromkeys(map(ord, "èêēĕė"), "e"),
+    **dict.fromkeys(map(ord, "ÈÊĒĔĖ"), "E"),
+    **dict.fromkeys(map(ord, "ìíîïī"), "i"),
+    **dict.fromkeys(map(ord, "ÌÍÎÏĪ"), "I"),
+    **dict.fromkeys(map(ord, "òôõō"), "o"),
+    **dict.fromkeys(map(ord, "ÒÔÕŌ"), "O"),
+    **dict.fromkeys(map(ord, "ùúûūůűų"), "u"),
+    **dict.fromkeys(map(ord, "ÙÚÛŪŮŰŲ"), "U"),
+    **dict.fromkeys(map(ord, "ýÿ"), "y"),
+    **dict.fromkeys(map(ord, "ÝŸ"), "Y"),
+}
 _DASHES = dict.fromkeys(map(ord, "‐‑‒–—―−"), "-")
 
 # litera, myslnik, koniec wiersza, mala litera (wielka po lewej/prawej = nie ruszamy)
@@ -56,6 +93,11 @@ def nbsp_to_space(text: str) -> str:
 
 def ligatures(text: str) -> str:
     return text.translate(_LIGATURES)
+
+
+def ocr_artifacts(text: str) -> str:
+    """Naprawia znaki, ktore OCR podstawia za polskie litery (np. ``Ñ`` za ``Ń``, ``á`` za ``a``)."""
+    return text.translate(_OCR_ARTIFACTS)
 
 
 def quotes(text: str) -> str:
@@ -165,6 +207,7 @@ CLEAN_STEPS: dict[str, Callable[[str], str]] = {
     "unicode_nfc": unicode_nfc,
     "nbsp_to_space": nbsp_to_space,
     "ligatures": ligatures,
+    "ocr_artifacts": ocr_artifacts,
     "quotes": quotes,
     "dashes": dashes,
     "dehyphenate": dehyphenate,
@@ -178,6 +221,7 @@ DEFAULT_ORDER: list[str] = [
     "nbsp_to_space",
     "ligatures",
     "quotes",
+    # "ocr_artifacts" pominiete: stosowany tylko do tekstu z OCR (config: ingest.ocr.postprocess).
     # "dashes" pominiete: UZP GT zachowuje "–" w tytulach; krok dostepny dla innych typow dokumentow.
     "strip_page_artifacts",
     "dehyphenate",

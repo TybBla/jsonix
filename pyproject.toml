@@ -20,6 +20,7 @@ testpaths = ["tests"]
 markers = [
     "slow: wolne testy (pomijane w pre-commit)",
     "live_llm: testy wymagające prawdziwego wywołania LLM przez sieć",
+    "ocr_live: testy uruchamiające prawdziwy silnik OCR (rapidocr); pomijane w CI",
 ]
 filterwarnings = [
     "ignore:_pytest.python.CallSpec2:pytest.PytestRemovedIn10Warning",
