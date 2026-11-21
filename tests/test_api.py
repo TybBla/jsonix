@@ -343,3 +343,7 @@ def test_ascii_fallback_transliterates_polish_letters():
 
     cd = content_disposition("Pełnomocnictwo Łódź żółć.json")
     assert 'filename="Pelnomocnictwo Lodz zolc.json"' in cd
+
+
+def test_openapi_title_is_project_display_name(client):
+    assert client.get("/openapi.json").json()["info"]["title"] == "jsonix"

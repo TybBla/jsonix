@@ -81,7 +81,9 @@ def test_document_basics(page):
     assert html.get("lang") == "pl"
     assert page.find("meta", charset="utf-8") or page.find("meta", charset="UTF-8")
     assert page.find("meta", name="viewport")
-    assert "Odwołania2JSON" in page.title
+    assert "jsonix" in page.title
+    assert "jsonix" in page.raw
+    assert "Odwołania2JSON" not in page.raw
 
 
 def test_landmarks_and_skip_link(page):

@@ -1,6 +1,6 @@
 // Wspólne elementy interfejsu: tworzenie elementów, komunikaty, ekrany, stepper.
 
-const APP_NAME = "Odwołania2JSON";
+const APP_NAME = "jsonix";
 
 /** Tworzy element: el("p", {class: "x", text: "..."}, [dzieci]). Tekst zawsze przez textContent. */
 export function el(tag, attrs = {}, children = []) {

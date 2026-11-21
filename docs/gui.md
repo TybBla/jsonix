@@ -1,6 +1,6 @@
-# GUI — wgrywanie dokumentów, wyniki i podgląd źródła
+# GUI jsonix — wgrywanie dokumentów, wyniki i podgląd źródła
 
-GUI to statyczne pliki HTML/CSS/JS w `web/static/`, serwowane przez FastAPI. Nie wymaga Node ani kroku budowania i działa offline: PDF.js i font Open Sans są dołączone w `web/static/vendor/` (licencje i wersje: `web/static/vendor/README.md`).
+GUI jsonix to statyczne pliki HTML/CSS/JS w `web/static/`, serwowane przez FastAPI. Nie wymaga Node ani kroku budowania i działa offline: PDF.js i font Open Sans są dołączone w `web/static/vendor/` (licencje i wersje: `web/static/vendor/README.md`).
 
 ## Uruchomienie
 

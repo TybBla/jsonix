@@ -1,4 +1,4 @@
-// Odwołania2JSON — GUI: wgrywanie plików, analiza w tle (joby API), wyniki klasyfikacji.
+// jsonix — GUI: wgrywanie plików, analiza w tle (joby API), wyniki klasyfikacji.
 
 import { $, announce, clearErrors, el, formatSize, initA11yBar, showErrors, showScreen, setTitle } from "./ui.js";
 

@@ -56,7 +56,7 @@ async def _lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Odwołania2JSON", version="0.2.0", lifespan=_lifespan)
+app = FastAPI(title="jsonix", version="0.2.0", lifespan=_lifespan)
 
 
 @app.get("/api/health")

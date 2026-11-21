@@ -1,6 +1,6 @@
-# Odwołania2JSON — HackNation 2026 (UZP)
+# jsonix — HackNation 2026 (UZP)
 
-Klasyfikacja i ekstrakcja danych z dokumentów spraw odwoławczych KIO (odwołanie, pełnomocnictwo, potwierdzenie przelewu) do JSON zgodnego ze schematami UZP. Dokumenty spoza tych typów są rozpoznawane jako **nieznane**.
+**jsonix** zamienia dokumenty PDF spraw odwoławczych KIO (odwołanie, pełnomocnictwo, potwierdzenie przelewu) na dane JSON zgodne ze schematami UZP: rozpoznaje typ dokumentu z treści i wyodrębnia pola, pokazując, skąd pochodzi każda wartość. Dokumenty spoza tych typów są rozpoznawane jako **nieznane**.
 
 ## Szybki start (Windows, Python 3.13+)
 
@@ -31,7 +31,7 @@ start-gui.bat                    # = python -m odw2json serve + otwarcie http://
 python scripts/smoke_gui.py      # test dymny API + GUI (kod wyjścia 0/1)
 ```
 
-Wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, a potem przejrzyj wyodrębnione pola **obok podglądu PDF** z podświetleniem fragmentu, z którego pochodzi każda wartość. JSON pobierzesz dla jednego dokumentu albo dla wszystkich (ZIP). GUI działa offline (PDF.js i font dołączone lokalnie), styl wg Design System Gov.pl. Szczegóły i ograniczenia: [docs/gui.md](docs/gui.md).
+W GUI jsonix wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, a potem przejrzyj wyodrębnione pola **obok podglądu PDF** z podświetleniem fragmentu, z którego pochodzi każda wartość. JSON pobierzesz dla jednego dokumentu albo dla wszystkich (ZIP). GUI działa offline (PDF.js i font dołączone lokalnie), styl wg Design System Gov.pl. Szczegóły i ograniczenia: [docs/gui.md](docs/gui.md).
 
 ## Architektura
 
