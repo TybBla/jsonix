@@ -534,3 +534,47 @@ def test_required_group_title_token():
     assert classify.classify(_doc("Potwierdzenie\nalfa"), reg).doc_type is None  # brak cyfr
     assert classify.classify(_doc("Pismo\nalfa 1234"), reg).doc_type is None  # brak tytulu
     assert classify.classify(_doc("Pismo\nalfa nadawca odbiorca"), reg).doc_type == "t"
+
+
+_ODW_BEZ_TYTULU = """Warszawa, 10 marca 2025 r.
+
+Wykonawca:
+Budimex Przykład sp. z o.o.
+ul. Testowa 1, 00-001 Warszawa
+
+Zamawiający:
+Gmina Przykładowo
+
+Do Prezesa Krajowej Izby Odwoławczej
+ul. Postępowa 17a, 02-676 Warszawa
+
+Działając w imieniu Wykonawcy, na podstawie art. 505 ustawy Prawo zamówień publicznych,
+niniejszym wnoszę odwołanie od czynności Zamawiającego polegającej na odrzuceniu oferty.
+
+Zarzut 1. Naruszenie art. 226 ust. 1 pkt 5 ustawy Pzp przez bezpodstawne odrzucenie oferty.
+Zarzut 2. Naruszenie art. 16 ustawy Pzp przez naruszenie zasady równego traktowania.
+
+Wnoszę o uwzględnienie odwołania i nakazanie unieważnienia czynności odrzucenia oferty.
+"""
+
+_PISMO_DO_ZAMAWIAJACEGO = """Warszawa, 10 marca 2025 r.
+
+Gmina Przykładowo
+Zamawiający
+
+W związku z informacją o odrzuceniu oferty prosimy o udostępnienie protokołu postępowania.
+Rozważamy skorzystanie ze środków ochrony prawnej, w tym odwołanie do Krajowej Izby Odwoławczej,
+o ile wyjaśnienia Zamawiającego nie rozwieją naszych wątpliwości co do ustawy Prawo zamówień publicznych.
+
+Z poważaniem
+Wykonawca
+"""
+
+
+def test_odwolanie_without_title_or_label_recognized_by_filing_act():
+    c = classify.classify(_doc(_ODW_BEZ_TYTULU), _registry())
+    assert c.doc_type == "odwolanie"
+
+
+def test_letter_mentioning_odwolanie_without_filing_act_is_unknown():
+    assert classify.classify(_doc(_PISMO_DO_ZAMAWIAJACEGO), _registry()).doc_type is None

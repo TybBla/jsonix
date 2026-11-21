@@ -127,3 +127,11 @@ Pozostałe ograniczenia:
    pozytyw `pos_<id>_*.txt` (nazwa po prefiksie `pos_` = id typu).
 4. Dodaj typ do `REAL_DOCS`/`TITLE_RE` w teście odporności, jeśli są dla niego dane treningowe.
 5. Uruchom `python -m pytest tests/test_classify_robustness.py` oraz bramkę (`--split dev`, na końcu `holdout`).
+
+## Zmiana T4: szerszy `required_any` odwołania
+Prawdziwe odwołanie nie musi mieć etykiety „Odwołujący:” (bywa „Wykonawca:”), osobnej linii tytułu „ODWOŁANIE”
+ani zarzutów „Zarzut nr N” (bywa „Zarzut 1.”). Taki tekst miał wynik 9 ≥ `min_score` 8, ale odpadał na `required_any`.
+`required_any` rozszerzono o akt wniesienia (`wnosze odwolanie`, `wnosimy odwolanie`, `niniejszym wnosze odwolanie`)
+oraz o numerację zarzutów bez „nr” (`zarzut\s*(nr\s*)?\d+`). Pisma do zamawiającego i wyroki KIO nie zawierają aktu
+wniesienia ani numerowanych zarzutów — negatywy bez zmian (test `test_letter_mentioning_odwolanie_without_filing_act_is_unknown`).
+Cyfry rzymskie pominięto celowo („zarzut i …” to spójnik).
