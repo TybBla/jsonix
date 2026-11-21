@@ -12,18 +12,30 @@ classify:
     - potwierdzenie operacji
     - dowod wykonania przelewu
     - polecenie przelewu
+  title_mode: line
+  title_line_max_chars: 80     # tytul czesto z nazwa banku: "Bank X potwierdzenie przelewu krajowego"
+  title_line_min_cover: 0.4
   header_chars: 600
   strong: ["przelew", "beneficjent", "zleceniodawc", "rachunek nadawcy", "rachunek obciazany", "numer transakcji"]
   # Ogolne slowa (rachunek, kwota...) wystepuja tez w ogloszeniach i broszurach - tylko po +1.
   weak: ["kwota", "rachunek", "tytul", "pln", "data transakcji", "data operacji", "nadawca", "odbiorc", "platnik"]
-  negative: ["zarzut nr", "ogloszenie o zamowieniu", "odwolujacy"]
+  # Slowa faktury (3 punkty kary kazde): sam numer rachunku i kwota to nie potwierdzenie przelewu.
+  negative: ["zarzut nr", "ogloszenie o zamowieniu", "odwolujacy", "nabywca", "sprzedawca", "nip nabywcy", "stawka vat", "do zaplaty"]
   patterns:
     # numer rachunku (26 cyfr, opcjonalnie w grupach po 4) w poblizu etykiety kwoty z wartoscia
     - regex: '(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d).{0,800}(?:kwot[aye]|kwocie|wartosc)[^0-9]{0,40}\d+(?: ?\d{3})*[,.]\d{2}(?!\d)|(?:kwot[aye]|kwocie|wartosc)[^0-9]{0,40}\d+(?: ?\d{3})*[,.]\d{2}(?!\d).{0,800}(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
       weight: 4
-  # Potwierdzenie przelewu zawsze zawiera numer rachunku (IBAN, 26 cyfr).
+  # Potwierdzenie przelewu zawsze zawiera numer rachunku (IBAN, 26 cyfr) ORAZ albo tytul dokumentu
+  # (linia "Potwierdzenie ..."), albo komplet etykiet slipu bankowego: nadawca + odbiorca.
+  # Sam IBAN z kwota (faktura, umowa, SWZ, ogloszenie) nie wystarcza.
   required_any:
-    - 're:(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
+    - all_of:
+        - 're:(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
+        - "@title"
+    - all_of:
+        - 're:(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
+        - 're:(z rachunku|rachunek nadawcy|rachunek zleceniodawcy|rachunek obciazany|zleceniodawc|nadawc|numer transakcji)'
+        - 're:(na rachunek|beneficjent|odbiorc|kontrahent)'
   min_score: 6.0
   min_margin: 2.0
 fields: {}

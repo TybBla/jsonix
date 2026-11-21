@@ -25,16 +25,9 @@ FIXTURES = Path(__file__).parent / "fixtures" / "classify"
 NO_OCR = {"ocr": {"enabled": False}}
 
 # Znane niepowodzenia: id przypadku -> powod (xfail strict - ma byc widoczne i pilnowane).
-KNOWN_XFAIL: dict[str, str] = {
-    "neg_wyrok_kio": "wyrok KIO -> odwolanie (14.0; title 'odwolanie' w 1500 zn. +4, zarzut nr +3)",
-    "neg_zawiadomienie_o_wyborze": "zawiadomienie o wyborze -> odwolanie (14.0; title +4)",
-    "neg_postanowienie_kio_umorzenie": "postanowienie KIO -> odwolanie (11.0 vs 1.0; title +4)",
-    "neg_ogloszenie_bzp": "ogloszenie BZP -> odwolanie (11.0, przelew 3.0; title +4)",
-    "neg_swz_wadium": "SWZ (wadium) -> odwolanie (13.0, pelnomocnictwo 4.0, przelew 2.0; title +4)",
-    "neg_wezwanie_do_uzupelnienia": "wezwanie do uzupelnienia -> odwolanie (12.0; title +4)",
-    "neg_pismo_do_zamawiajacego": "pismo do zamawiajacego -> odwolanie (8.0 == min_score 8.0; bez title)",
-    "neg_faktura_vat": "faktura VAT -> przelew (9.0; wzorzec IBAN+kwota +4, 'przelew' +2, slowa ogolne +1)",
-}
+# Po E3-T3 (title_mode: line, foreign_titles, wymagania przelewu) lista jest pusta; nowy znany blad
+# dopisujemy tu zamiast oslabiac test.
+KNOWN_XFAIL: dict[str, str] = {}
 
 # Regexy tytulu per typ (podmieniany fragment w pierwszych 1500 znakach tekstu).
 TITLE_RE = {

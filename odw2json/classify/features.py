@@ -2,6 +2,12 @@
 
 Wszystkie dopasowania działają na tekście znormalizowanym (``textnorm.fold``: małe litery, bez polskich
 znaków), dzięki czemu błędy OCR typu ł->l czy Ę->E nie mają znaczenia. Żadna cecha nie widzi nazwy pliku.
+
+Dwa sposoby czytania nagłówka:
+- ``header(n)`` - jeden ciąg (pierwsze ``n`` znaków, rozstrzelone litery zwinięte); używa go
+  ``title_mode: anywhere``;
+- ``header_lines(n)`` - znormalizowane linie tych znaków (bez interpunkcji przy brzegach); używają
+  ``title_mode: line`` oraz kary za nagłówki dokumentów obcych (``foreign_titles``).
 """
 
 from __future__ import annotations
@@ -9,8 +15,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from odw2json.config_loader import REGEX_PREFIX, ClassifyConfig
+from odw2json.config_loader import (
+    REGEX_PREFIX,
+    TITLE_TOKEN,
+    ClassifyConfig,
+    ClassifySettings,
+    RequiredGroup,
+)
 from odw2json.textnorm import collapse_spaced_letters, fold
+
+_EDGE_JUNK = re.compile(r"^[\W_]+|[\W_]+$")
 
 
 @dataclass
@@ -29,6 +43,7 @@ class Prepared:
         self.raw = text
         self.full = fold(text)
         self._headers: dict[int, str] = {}
+        self._lines: dict[int, list[str]] = {}
 
     def header(self, n: int) -> str:
         """Nagłówek: pierwsze ``n`` znaków, rozstrzelone litery zwinięte, następnie ``fold``."""
@@ -36,9 +51,21 @@ class Prepared:
             self._headers[n] = fold(collapse_spaced_letters(self.raw[:n]))
         return self._headers[n]
 
+    def header_lines(self, n: int) -> list[str]:
+        """Niepuste linie nagłówka (``fold``, bez interpunkcji i znaków specjalnych przy brzegach)."""
+        if n not in self._lines:
+            lines = (fold(line) for line in collapse_spaced_letters(self.raw[:n]).splitlines())
+            stripped = (_EDGE_JUNK.sub("", line) for line in lines)
+            self._lines[n] = [line for line in stripped if line]
+        return self._lines[n]
+
 
 def _flags() -> int:
     return re.IGNORECASE
+
+
+def _word(phrase: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<!\w){re.escape(phrase)}(?!\w)")
 
 
 def _required_hit(item: str, text: str) -> bool:
@@ -47,7 +74,56 @@ def _required_hit(item: str, text: str) -> bool:
     return fold(item) in text
 
 
-def evaluate(prepared: Prepared, cfg: ClassifyConfig) -> TypeScore:
+def _title_hits(prepared: Prepared, cfg: ClassifyConfig) -> list[str]:
+    """Frazy ``title`` trafione w nagłówku wg ``title_mode``."""
+    if not cfg.title:
+        return []
+    if cfg.title_mode == "anywhere":
+        header = prepared.header(cfg.header_chars)
+        return [p for p in cfg.title if fold(p) in header]
+    lines = [ln for ln in prepared.header_lines(cfg.header_chars) if len(ln) <= cfg.title_line_max_chars]
+    return [
+        p for p in cfg.title if any(_is_title_line(fold(p), ln, cfg.title_line_min_cover) for ln in lines)
+    ]
+
+
+def _is_title_line(phrase: str, line: str, min_cover: float) -> bool:
+    """Linia jest tytulem, gdy zawiera fraze (granice slow) i fraza zajmuje >= ``min_cover`` linii.
+
+    Fraza wielowyrazowa dopasowywana jest tez bez spacji (``potwierdzenieprzelewu``): OCR i rozstrzelony
+    druk gubia odstepy miedzy wyrazami tytulu.
+    """
+    if _word(phrase).search(line):
+        return len(phrase) / len(line) >= min_cover
+    if " " in phrase:
+        compact, compact_line = phrase.replace(" ", ""), line.replace(" ", "")
+        return compact in compact_line and len(compact) / len(compact_line) >= min_cover
+    return False
+
+
+def _foreign_hits(prepared: Prepared, settings: ClassifySettings) -> list[str]:
+    ft = settings.foreign_titles
+    if not ft.phrases:
+        return []
+    lines = prepared.header_lines(ft.header_chars)
+    hits = []
+    for phrase in ft.phrases:
+        pat = re.compile(rf"^{re.escape(fold(phrase))}(?!\w)")
+        if any(pat.search(line) for line in lines):
+            hits.append(phrase)
+    return hits
+
+
+def _required_ok(item: str | RequiredGroup, text: str, title_hit: bool) -> bool:
+    entries = item.all_of if isinstance(item, RequiredGroup) else [item]
+    return all(title_hit if e == TITLE_TOKEN else _required_hit(e, text) for e in entries)
+
+
+def _describe(item: str | RequiredGroup) -> str:
+    return "(" + " + ".join(item.all_of) + ")" if isinstance(item, RequiredGroup) else item
+
+
+def evaluate(prepared: Prepared, cfg: ClassifyConfig, settings: ClassifySettings | None = None) -> TypeScore:
     """Punktuje dokument względem jednego typu; zwraca wynik, dowody i ewentualne wykluczenie."""
     w = cfg.weights
     text = prepared.full
@@ -66,18 +142,22 @@ def evaluate(prepared: Prepared, cfg: ClassifyConfig) -> TypeScore:
             if fold(phrase) in text:
                 add(weight, f"{kind}: {phrase!r}")
 
-    if cfg.title:
-        header = prepared.header(cfg.header_chars)
-        hits = [p for p in cfg.title if fold(p) in header]
-        if hits:  # tytuł liczy się raz, niezależnie od liczby pasujących wariantów
-            add(w.title, "title: " + ", ".join(repr(p) for p in hits))
+    title_hits = _title_hits(prepared, cfg)
+    if title_hits:  # tytuł liczy się raz, niezależnie od liczby pasujących wariantów
+        add(w.title, "title: " + ", ".join(repr(p) for p in title_hits))
 
     for pat in cfg.patterns:
         if re.search(pat.regex, text, _flags()):
             add(pat.weight, f"pattern: {pat.regex!r}")
 
-    if cfg.required_any and not any(_required_hit(item, text) for item in cfg.required_any):
-        res.excluded = "brak wymaganej cechy (required_any: " + ", ".join(cfg.required_any) + ")"
+    if settings is not None:
+        foreign = _foreign_hits(prepared, settings)
+        if foreign:  # kara raz, niezależnie od liczby trafień
+            add(settings.foreign_titles.weight, "foreign title: " + ", ".join(repr(p) for p in foreign))
+
+    if cfg.required_any and not any(_required_ok(item, text, bool(title_hits)) for item in cfg.required_any):
+        listed = ", ".join(_describe(i) for i in cfg.required_any)
+        res.excluded = f"brak wymaganej cechy (required_any: {listed})"
     return res
 
 
