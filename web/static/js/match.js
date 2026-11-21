@@ -69,6 +69,7 @@ function findValueInside(hay, from, to, needles) {
 }
 
 const MIN_PARTIAL = 12;
+const MAX_SNIPPET = 200;
 
 /**
  * Szuka fragmentu w tekście strony.
@@ -79,7 +80,8 @@ const MIN_PARTIAL = 12;
  */
 export function locate(pageText, snippet, value) {
   const hay = typeof pageText === "string" ? normalize(pageText) : pageText;
-  const snip = normalize(snippet).norm;
+  // długie fragmenty skracamy, żeby wyszukiwanie częściowe nie blokowało przeglądarki
+  const snip = normalize(snippet).norm.slice(0, MAX_SNIPPET);
   if (!snip || !hay.norm) return null;
   const needles = valueNeedles(value);
 

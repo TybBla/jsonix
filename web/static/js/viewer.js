@@ -10,10 +10,15 @@ let pdfjsPromise = null;
 
 function loadPdfjs() {
   if (!pdfjsPromise) {
-    pdfjsPromise = import(PDFJS_URL).then((lib) => {
-      lib.GlobalWorkerOptions.workerSrc = WORKER_URL;
-      return lib;
-    });
+    pdfjsPromise = import(PDFJS_URL)
+      .then((lib) => {
+        lib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+        return lib;
+      })
+      .catch((err) => {
+        pdfjsPromise = null; // pozwól ponowić po błędzie sieci
+        throw err;
+      });
   }
   return pdfjsPromise;
 }
@@ -58,13 +63,21 @@ export class PdfViewer {
     this.doc = null;
     this.width = 0;
     this._resizeTimer = null;
+    this.destroyed = false;
+    this._generation = 0;
     this._observer = new ResizeObserver(() => this._onResize());
   }
 
   async open(url) {
     const pdfjs = await loadPdfjs();
-    this.doc = await pdfjs.getDocument({ url, isEvalSupported: false }).promise;
+    const doc = await pdfjs.getDocument({ url, isEvalSupported: false }).promise;
+    if (this.destroyed) {
+      doc.destroy();
+      throw new Error("viewer destroyed");
+    }
+    this.doc = doc;
     await this._renderAll();
+    if (this.destroyed) throw new Error("viewer destroyed");
     this._observer.observe(this.container);
     return this.doc.numPages;
   }
@@ -75,12 +88,15 @@ export class PdfViewer {
 
   async _renderAll() {
     const pdfjs = await loadPdfjs();
+    const generation = ++this._generation;
+    const stale = () => this.destroyed || generation !== this._generation;
     this.container.replaceChildren();
     this.pages = [];
     this.width = this.container.clientWidth;
     const available = Math.max(200, this.width - 24);
     for (let i = 1; i <= this.doc.numPages; i += 1) {
       const page = await this.doc.getPage(i);
+      if (stale()) return;
       const base = page.getViewport({ scale: 1 });
       const viewport = page.getViewport({ scale: available / base.width });
       const ratio = window.devicePixelRatio || 1;
@@ -119,6 +135,7 @@ export class PdfViewer {
         viewport,
       });
       await textLayer.render();
+      if (stale()) return;
       const { text, nodes } = collectText(layer);
       this.pages.push({ div, layer, hlLayer, text, nodes });
     }
@@ -215,6 +232,8 @@ export class PdfViewer {
   }
 
   destroy() {
+    this.destroyed = true;
+    window.clearTimeout(this._resizeTimer);
     this._observer.disconnect();
     this.doc?.destroy();
     this.container.replaceChildren();
