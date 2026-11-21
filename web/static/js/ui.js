@@ -1,6 +1,6 @@
 // Wspólne elementy interfejsu: tworzenie elementów, komunikaty, ekrany, stepper.
 
-const APP_NAME = "Odwołania2JSON";
+const APP_NAME = "jsonix";
 
 /** Tworzy element: el("p", {class: "x", text: "..."}, [dzieci]). Tekst zawsze przez textContent. */
 export function el(tag, attrs = {}, children = []) {
@@ -18,6 +18,14 @@ export function el(tag, attrs = {}, children = []) {
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
   return node;
+}
+
+/** Odmiana po liczbie: plural(1, "plik", "pliki", "plików") → „plik”, 3 → „pliki”, 5 → „plików”. */
+export function plural(n, one, few, many) {
+  if (n === 1) return one;
+  const d = n % 10;
+  const t = n % 100;
+  return d >= 2 && d <= 4 && (t < 12 || t > 14) ? few : many;
 }
 
 export function $(selector, root = document) {

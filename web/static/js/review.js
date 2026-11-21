@@ -11,23 +11,63 @@ import {
   sourceState,
   traceIndex,
 } from "./fields.js";
-import { locateInDocument } from "./match.js";
-import { $, announce, el, setStep, showScreen } from "./ui.js";
+import { createHoverState, hoverReducer, hoverView } from "./hover.js";
+import { buildSourceMap } from "./match.js";
+import { $, announce, el, plural, setStep, showScreen } from "./ui.js";
 import { PdfViewer } from "./viewer.js";
 
 const NARROW = window.matchMedia("(max-width: 63.99rem)");
 const NOT_FOUND = "Nie znaleziono tego fragmentu w dokumencie.";
 
-function plural(n, one, few, many) {
-  if (n === 1) return one;
-  const d = n % 10;
-  const t = n % 100;
-  return d >= 2 && d <= 4 && (t < 12 || t > 14) ? few : many;
-}
-
 let viewer = null;
 const EDITS = new Map(); // `${job_id}/${name}` → Map(path → wartość po edycji)
-let current = null; // {job, file, fields: Map(path -> {node, trace, state, button, source})}
+let current = null; // {job, file, fields: Map(path -> {node, trace, state, button, source, badge}), sourceMap}
+
+// --- podgląd przy najechaniu / fokusie (logika stanów: hover.js) ---
+let hover = createHoverState();
+let shown = { preview: null, badge: null, reveal: null }; // co jest teraz wyróżnione w DOM
+
+function dispatchHover(action) {
+  hover = hoverReducer(hover, action);
+  renderHover();
+}
+
+function setBadge(path, page) {
+  const old = shown.badge && current?.fields.get(shown.badge);
+  if (old) old.badge.hidden = true;
+  shown.badge = null;
+  const entry = path && current?.fields.get(path);
+  if (!entry || page === null) return;
+  entry.badge.textContent = `strona ${page + 1}`;
+  entry.badge.hidden = false;
+  shown.badge = path;
+}
+
+/** Dyskretnie przewija listę pól, gdy rubryka jest poza widokiem (bez przenoszenia fokusu). */
+function revealField(entry) {
+  if (NARROW.matches) return; // na wąskim ekranie lista pól jest wtedy ukryta
+  const r = entry.button.getBoundingClientRect();
+  if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+  entry.button.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/** Przełącza wyłącznie klasy CSS i znacznik strony; dopasowania fragmentów są już w current.sourceMap. */
+function renderHover() {
+  if (!current) return;
+  const view = hoverView(hover, current.sourceMap || new Map(), viewer?.visibleRange() ?? null);
+  if (shown.preview !== view.preview) {
+    current.fields.get(shown.preview)?.button.classList.remove("is-preview");
+    current.fields.get(view.preview)?.button.classList.add("is-preview");
+    shown.preview = view.preview;
+  }
+  viewer?.preview(view.docPreview);
+  setBadge(view.preview, view.badgePage);
+  if (view.revealField && view.revealField !== shown.reveal) {
+    const entry = current.fields.get(view.revealField);
+    if (entry) revealField(entry);
+  }
+  shown.reveal = view.revealField;
+}
 
 function fieldId(path) {
   return `pole-${path.replace(/[^\w]+/g, "-")}`;
@@ -80,6 +120,8 @@ function renderField(node, index, ocr) {
   const shown = displayValue(edited ? current.edits.get(node.path) : node.value);
   const id = fieldId(node.path);
   const source = el("p", { class: "field-source", id: `${id}-zrodlo` });
+  // znacznik „strona N” przy podglądzie fragmentu spoza widoku; czytnik ekranu dostaje to samo z opisu źródła
+  const badge = el("span", { class: "page-badge", "aria-hidden": "true", hidden: true });
   const button = el(
     "button",
     {
@@ -90,14 +132,19 @@ function renderField(node, index, ocr) {
       "aria-describedby": source.id,
     },
     [
-      el("span", { class: "field-label", text: node.label }),
+      el("span", { class: "field-label" }, [node.label, badge]),
       el("span", { class: "field-value", text: shown ?? "Nie podano" }),
     ],
   );
-  const entry = { node, trace, state, button, source, ocr: trace && ocr.has(trace.page) };
+  const entry = { node, trace, state, button, source, badge, ocr: trace && ocr.has(trace.page) };
   entry.controls = el("div", { class: "field-controls" });
   renderSource(entry);
-  button.addEventListener("focus", () => select(node.path, { scroll: true, fromField: true }));
+  // najechanie / fokus = podgląd (bez przewijania PDF); kliknięcie = zaznaczenie z przewinięciem
+  const path = node.path;
+  button.addEventListener("mouseenter", () => dispatchHover({ type: "enter", source: "field-pointer", path }));
+  button.addEventListener("mouseleave", () => dispatchHover({ type: "leave", source: "field-pointer", path }));
+  button.addEventListener("focus", () => dispatchHover({ type: "enter", source: "field-focus", path }));
+  button.addEventListener("blur", () => dispatchHover({ type: "leave", source: "field-focus", path }));
   button.addEventListener("click", () => {
     select(node.path, { scroll: true, fromField: true });
     if (NARROW.matches && viewer?.highlights.has(node.path)) {
@@ -259,6 +306,7 @@ function select(path, { scroll = true, fromField = false } = {}) {
   for (const entry of current.fields.values()) entry.button.classList.toggle("is-selected", entry.node.path === path);
   const entry = current.fields.get(path);
   if (!entry) return;
+  dispatchHover({ type: "select", path });
   const found = viewer?.activate(path, { scroll }) ?? false;
   if (!fromField) {
     if (NARROW.matches) setView("fields");
@@ -353,14 +401,29 @@ async function openReview(job, file) {
   viewer = null;
   const key = editKey(job, file);
   if (!EDITS.has(key)) EDITS.set(key, new Map());
-  current = { job, file, fields: new Map(), edits: EDITS.get(key) };
+  current = { job, file, fields: new Map(), edits: EDITS.get(key), sourceMap: new Map() };
+  hover = createHoverState();
+  shown = { preview: null, badge: null, reveal: null };
   const docBox = buildScreen(job, file);
   setView("fields");
   updateDownloadInfo();
   showScreen("review", `Sprawdź dane: ${file.file}`);
 
   const status = $("#doc-status");
-  const mine = new PdfViewer(docBox, { onSelect: (path) => select(path, { scroll: false }) });
+  const mine = new PdfViewer(docBox, {
+    onSelect: (path) => select(path, { scroll: false }),
+    onPreview: (path, source) => dispatchHover({ type: "enter", source, path }),
+    onLeave: (path, source) => dispatchHover({ type: "leave", source, path }),
+  });
+  let scrollFrame = 0;
+  docBox.addEventListener("scroll", () => {
+    // znacznik „strona N” zależy od widocznych stron: odśwież po przewinięciu (raz na klatkę)
+    if (scrollFrame || !shown.preview) return;
+    scrollFrame = window.requestAnimationFrame(() => {
+      scrollFrame = 0;
+      if (viewer === mine) renderHover();
+    });
+  });
   const cur = current;
   viewer = mine;
   let pages;
@@ -379,15 +442,23 @@ async function openReview(job, file) {
   }
   if (viewer !== mine) return;
   {
-    const texts = mine.pageTexts();
+    // dopasowania liczone RAZ: mapa pole ↔ obszar na stronie; hover tylko przełącza klasy CSS
+    const withSource = [...cur.fields.values()].filter((entry) => entry.state === "source");
+    cur.sourceMap = buildSourceMap(
+      mine.pageTexts(),
+      withSource.map((entry) => ({
+        path: entry.node.path,
+        page: entry.trace.page,
+        snippet: entry.trace.source_snippet,
+        value: entry.node.value,
+        // skan bez warstwy tekstowej: komunikat zamiast zgadywania miejsca na innej stronie
+        skip: entry.ocr,
+      })),
+    );
     let found = 0;
     let missing = 0;
-    for (const entry of cur.fields.values()) {
-      if (entry.state !== "source") continue;
-      // skan bez warstwy tekstowej: komunikat zamiast zgadywania miejsca na innej stronie
-      const hit = entry.ocr
-        ? null
-        : locateInDocument(texts, entry.trace.page, entry.trace.source_snippet, entry.node.value);
+    for (const entry of withSource) {
+      const hit = cur.sourceMap.get(entry.node.path);
       if (hit) {
         mine.addHighlight(entry.node.path, entry.node.label, hit);
         found += 1;
@@ -399,7 +470,7 @@ async function openReview(job, file) {
     status.textContent =
       `Dokument ma ${pages} ${plural(pages, "stronę", "strony", "stron")}. ` +
       `Podświetlono źródło dla ${found} ${plural(found, "pola", "pól", "pól")}.` +
-      (missing ? ` Nie znaleziono fragmentu dla ${missing} pól.` : "");
+      (missing ? ` Nie znaleziono fragmentu dla ${missing} ${plural(missing, "pola", "pól", "pól")}.` : "");
     status.classList.add("visually-hidden");
   }
 }
@@ -408,5 +479,7 @@ NARROW.addEventListener("change", () => viewer?.redraw());
 document.addEventListener("o2j:leave-review", () => {
   viewer?.destroy();
   viewer = null;
+  hover = createHoverState();
+  shown = { preview: null, badge: null, reveal: null };
 });
 setReviewOpener(openReview);

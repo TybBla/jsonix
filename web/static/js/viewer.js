@@ -1,6 +1,7 @@
 // Podgląd PDF (PDF.js dołączony lokalnie w /static/vendor/pdfjs) z warstwą tekstową
 // i podświetleniami fragmentów źródłowych.
 
+import { visibleRange } from "./hover.js";
 import { el } from "./ui.js";
 
 const PDFJS_URL = "/static/vendor/pdfjs/pdf.min.mjs";
@@ -52,11 +53,17 @@ function domPoint(index, nodes, isEnd) {
 export class PdfViewer {
   /**
    * @param {HTMLElement} container przewijany kontener podglądu
-   * @param {{onSelect: (path: string) => void}} options
+   * @param {{onSelect: (path: string) => void,
+   *          onPreview?: (path: string, source: string) => void,
+   *          onLeave?: (path: string, source: string) => void}} options
+   *   onPreview/onLeave: najechanie kursorem lub fokus na podświetlonym fragmencie i zejście z niego.
    */
-  constructor(container, { onSelect }) {
+  constructor(container, { onSelect, onPreview = () => {}, onLeave = () => {} }) {
     this.container = container;
     this.onSelect = onSelect;
+    this.onPreview = onPreview;
+    this.onLeave = onLeave;
+    this.previewed = null; // pole z lekkim podświetleniem (podgląd przy najechaniu)
     this.pages = []; // {div, layer, hlLayer, text, nodes, viewportWidth}
     this.highlights = new Map(); // path -> {page, start, end, label, boxes: []}
     this.active = null;
@@ -141,7 +148,7 @@ export class PdfViewer {
     }
   }
 
-  /** Dodaje podświetlenie pola (hit = wynik locateInDocument). */
+  /** Dodaje podświetlenie pola (hit = wynik locateInDocument / wpis mapy buildSourceMap). */
   addHighlight(path, label, hit) {
     this.highlights.set(path, { ...hit, label, boxes: [] });
     this._draw(path);
@@ -151,6 +158,11 @@ export class PdfViewer {
     const h = this.highlights.get(path);
     const page = this.pages[h.page];
     if (!page) return;
+    if (h.boxes.length) {
+      // usunięte węzły nie dostaną pewnego mouseleave/blur: zamknij podgląd z dokumentu jawnie
+      this.onLeave(path, "doc-pointer");
+      this.onLeave(path, "doc-focus");
+    }
     for (const b of h.boxes) b.remove();
     h.boxes = [];
     const a = domPoint(h.start, page.nodes, false);
@@ -163,6 +175,10 @@ export class PdfViewer {
     const rects = [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5);
     rects.forEach((r, i) => {
       const box = el("div", { class: "hl-box", dataset: { path } });
+      if (path === this.active) box.classList.add("is-active");
+      if (path === this.previewed) box.classList.add("is-preview");
+      box.addEventListener("mouseenter", () => this.onPreview(path, "doc-pointer"));
+      box.addEventListener("mouseleave", () => this.onLeave(path, "doc-pointer"));
       box.style.left = `${r.left - origin.left - 2}px`;
       box.style.top = `${r.top - origin.top - 2}px`;
       box.style.width = `${r.width + 4}px`;
@@ -178,6 +194,8 @@ export class PdfViewer {
               ev.stopPropagation();
               this.onSelect(path);
             },
+            onfocus: () => this.onPreview(path, "doc-focus"),
+            onblur: () => this.onLeave(path, "doc-focus"),
           },
           [el("span", { class: "visually-hidden", text: "Przejdź do pola: " }), h.label],
         );
@@ -198,6 +216,29 @@ export class PdfViewer {
     for (const b of h.boxes) b.classList.add("is-active");
     if (scroll && h.boxes[0]) this._scrollTo(h.boxes[0]);
     return true;
+  }
+
+  /**
+   * Lekkie podświetlenie fragmentu pola (podgląd) albo jego usunięcie (path = null).
+   * Tylko przełącza klasy CSS gotowych obszarów: bez wyszukiwania i bez przewijania podglądu.
+   */
+  preview(path) {
+    const next = path && this.highlights.has(path) ? path : null;
+    if (next === this.previewed) return;
+    for (const b of this.highlights.get(this.previewed)?.boxes || []) b.classList.remove("is-preview");
+    this.previewed = next;
+    for (const b of this.highlights.get(next)?.boxes || []) b.classList.add("is-preview");
+  }
+
+  /** Zakres widocznych stron ({first, last}, 0-based) albo null, gdy podgląd jest ukryty. */
+  visibleRange() {
+    const box = this.container.getBoundingClientRect();
+    if (!box.height || !this.pages.length) return null;
+    const spans = this.pages.map(({ div }) => {
+      const r = div.getBoundingClientRect();
+      return { top: r.top - box.top, bottom: r.bottom - box.top };
+    });
+    return visibleRange(spans, 0, box.height);
   }
 
   /** Przerysowuje podświetlenia (np. po pokazaniu ukrytego podglądu). */
