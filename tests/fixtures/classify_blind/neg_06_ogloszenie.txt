@@ -1,0 +1,27 @@
+OGŁOSZENIE O ZAMÓWIENIU
+Dostawy
+
+Numer ogłoszenia: 2026/BZP 00700123
+Data publikacji: 2026-07-30
+
+SEKCJA I - ZAMAWIAJĄCY
+Nazwa: Powiat Bielski
+Adres: ul. Piastowska 1, 43-300 Bielsko-Biała
+Adres strony internetowej prowadzonego postępowania: platformazakupowa.example/bielski
+Rodzaj zamawiającego: jednostka samorządu terytorialnego
+
+SEKCJA II - PRZEDMIOT ZAMÓWIENIA
+Tytuł: Dostawa sprzętu komputerowego dla placówek oświatowych
+Tryb udzielenia zamówienia: tryb podstawowy bez negocjacji
+Wartość zamówienia: 380 000 PLN bez VAT
+Termin realizacji: 45 dni od zawarcia umowy
+
+SEKCJA III - WARUNKI UDZIAŁU
+Wykonawca wykaże zdolność techniczną: wykonanie co najmniej dwóch dostaw o wartości 100 000 PLN.
+
+SEKCJA IV - TERMINY
+Termin składania ofert: 2026-08-20 godz. 10:00
+Termin otwarcia ofert: 2026-08-20 godz. 10:30
+Wadium: 5 000 PLN, wnoszone przelewem na rachunek 55 1020 0000 0000 1111 2222 3333.
+
+Środki ochrony prawnej: odwołanie do KIO przysługuje wykonawcom na zasadach określonych w dziale IX ustawy Pzp.

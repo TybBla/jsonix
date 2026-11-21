@@ -1,0 +1,61 @@
+# Blind evaluation set: file -> expected (odwolanie|pelnomocnictwo|przelew|null)
+pos_odw_1.txt:
+  expected: odwolanie
+  note: "standalone title ODWOŁANIE"
+pos_odw_2.txt:
+  expected: odwolanie
+  note: "title embedded in 'Dotyczy: Odwołanie od czynności ...'"
+pos_pel_1.txt:
+  expected: pelnomocnictwo
+  note: "formal, with paragraphs"
+pos_pel_2.txt:
+  expected: pelnomocnictwo
+  note: "letter style 'Niniejszym udzielam pełnomocnictwa'"
+pos_prz_1.txt:
+  expected: przelew
+  note: "labels Zleceniodawca/Odbiorca/Kwota/Tytuł"
+pos_prz_2.txt:
+  expected: przelew
+  note: "labels Rachunek nadawcy/odbiorcy/Data operacji"
+neg_01_wyrok.txt:
+  expected: null
+neg_02_postanowienie.txt:
+  expected: null
+neg_03_odpowiedz.txt:
+  expected: null
+  note: "response to appeal by contracting authority"
+neg_04_przystapienie.txt:
+  expected: null
+  note: "joining proceedings; not an appeal"
+neg_05_informacja.txt:
+  expected: null
+  note: "informs about an appeal, is not the appeal itself"
+neg_06_ogloszenie.txt:
+  expected: null
+neg_07_uniewaznienie.txt:
+  expected: null
+neg_08_protokol.txt:
+  expected: null
+neg_09_oferta.txt:
+  expected: null
+neg_10_proforma.txt:
+  expected: null
+neg_11_nota.txt:
+  expected: null
+neg_12_umowa_prawna.txt:
+  expected: null
+  note: "contract; contains 'pełnomocnik' wording only"
+neg_13_odwolanie_pelnomocnictwa.txt:
+  expected: null
+  note: "revocation of power of attorney, not a grant; title contains 'ODWOŁANIE'/'PEŁNOMOCNICTWO'"
+neg_14_zaswiadczenie.txt:
+  expected: null
+neg_15_wyciag.txt:
+  expected: null
+  note: "bank statement with many transactions, not a single transfer confirmation (ambiguity: low)"
+neg_16_wezwanie_wpis.txt:
+  expected: null
+neg_17_cv.txt:
+  expected: null
+neg_18_referencje.txt:
+  expected: null
