@@ -107,16 +107,16 @@
 <section class="slide" aria-label="Slajd 4">
   <h2>Jakość: F1 wg reguł UZP</h2>
   <div class="kpis">
-    <div class="kpi"><b class="todo">⟨F1 dev⟩</b>zbiór roboczy</div>
-    <div class="kpi"><b class="todo">⟨F1 holdout⟩</b>zbiór kontrolny (bez strojenia)</div>
-    <div class="kpi"><b class="todo">⟨F1 skany⟩</b>dokumenty z OCR</div>
+    <div class="kpi"><b>99,9%</b>dokumenty z tekstem, dev</div>
+    <div class="kpi"><b>99,7%</b>dokumenty z tekstem, holdout (bez strojenia)</div>
+    <div class="kpi"><b>97,5%</b>skany z OCR, dev (holdout 90,3%)</div>
   </div>
   <ul>
-    <li>Klasyfikacja: <span class="todo">⟨100% dev/holdout⟩</span>, dokumenty spoza typów rozpoznane <span class="todo">⟨12/12⟩</span>.</li>
+    <li>Klasyfikacja: <strong>0 błędów</strong> na dev i holdout, dokumenty spoza typów rozpoznane <strong>12/12 i 10/10</strong>.</li>
     <li>F1 liczone dokładnie wg reguł organizatora (<code>eval/score.py</code>): długie teksty z progiem 80%, reszta dokładnie, listy po treści.</li>
     <li>Bramka regresji w CI: każda zmiana, która obniża F1, jest zatrzymywana. Raport: <code>python scripts/quality_report.py</code>.</li>
   </ul>
-  <footer><span>jsonix · uzupełnij liczby z docs/raport-jakosci.md po scaleniu E4</span><span>4</span></footer>
+  <footer><span>jsonix · pomiar 21.11 (gałąź E4, Docker, OCR); potwierdź: scripts/quality_report.py</span><span>4</span></footer>
 </section>
 
 <section class="slide" aria-label="Slajd 5">
@@ -137,7 +137,7 @@
   <h2>Bez LLM, z wyboru</h2>
   <div class="cols even">
     <ul>
-      <li>Reguły z konfiguracji osiągają <span class="todo">⟨F1⟩</span> bez kosztów i bez wysyłania danych poza komputer.</li>
+      <li>Reguły z konfiguracji osiągają <strong>F1 99,9% / 99,7%</strong> bez kosztów i bez wysyłania danych poza komputer.</li>
       <li><strong>20/20 pkt</strong> za rozmiar modelu (bez LLM = maksimum wg UZP).</li>
       <li>Brak ryzyka zmyślania wartości: gdy dokument czegoś nie podaje, wynik to <code>null</code>.</li>
     </ul>
@@ -156,7 +156,7 @@
       <li>Nowy typ = <code>config/doctypes/&lt;typ&gt;.yaml</code> + szablon <code>config/schemas/&lt;typ&gt;.json</code>.</li>
       <li>Nowe pole = wpis w YAML: gdzie szukać, czym, jak znormalizować i sprawdzić.</li>
       <li>W Dockerze <code>config/</code> jest montowany, więc nie trzeba przebudowywać obrazu.</li>
-      <li class="todo">⟨Demo 4. typu dodanego samą konfiguracją (E10)⟩</li>
+      <li><strong>Demo:</strong> 4. typ (orzeczenie KIO, 8 pól) to trzy pliki w <code>examples/nowy-typ/</code>; test „0 linii kodu” w CI.</li>
     </ul>
 <pre>id: pelnomocnictwo
 title: Pełnomocnictwo
@@ -201,7 +201,7 @@ fields:
     <ul>
       <li>CI: testy, bramka F1 (dev i holdout), smoke na Windows i Linux, <code>docker build</code>.</li>
       <li>Smoke Docker: wynik w kontenerze = wynik CLI, także dla skanu z OCR.</li>
-      <li>Czas na dokument na CPU: <span class="todo">⟨z raportu jakości⟩</span>.</li>
+      <li>Czas na CPU: dokument z tekstem <strong>0,01 s</strong>, skan z OCR średnio <strong>4 s</strong>.</li>
     </ul>
   </div>
   <footer><span>jsonix · README</span><span>9</span></footer>
