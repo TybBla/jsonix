@@ -5,6 +5,7 @@ ZMIANY TYLKO PRZEZ PR DO main Z AKCEPTACJĄ CAŁEGO ZESPOŁU.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,8 +17,21 @@ class Document:
 
     path: Path
     text: str
-    pages: list[str]
+    pages: list[str]  # tekst stron po czyszczeniu
     ocr_used: bool = False
+    page_offsets: list[int] = field(default_factory=list)  # offset początku strony i w `text`
+    backend: str = ""  # np. "pypdf", "pypdfium2", "ocr:rapidocr"
+    warnings: list[str] = field(default_factory=list)
+
+    def page_of(self, offset: int) -> int | None:
+        """Numer strony (0-based) dla offsetu w `text`; None poza tekstem lub bez offsetów."""
+        if not self.page_offsets or offset < 0 or offset >= len(self.text):
+            return None
+        return bisect_right(self.page_offsets, offset) - 1
+
+
+class IngestError(Exception):
+    """Plik nie do wczytania (uszkodzony, zaszyfrowany, nie-PDF); komunikat czytelny dla człowieka."""
 
 
 @dataclass

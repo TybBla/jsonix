@@ -1,5 +1,7 @@
 # Python 3.13+
 pypdf>=5.0
+pdfplumber>=0.11
+pypdfium2>=4.30
 PyYAML>=6.0
 pydantic>=2.7
 rapidfuzz>=3.9
