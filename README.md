@@ -24,6 +24,15 @@ docker compose up --build        # to samo w Dockerze
 
 **OCR (opcjonalny).** Skany bez warstwy tekstowej czyta OCR po `pip install -r requirements-ocr.txt` (~107 MB, modele w paczce, bez sieci w czasie działania). Obraz Dockera domyślnie go nie zawiera: skan dostaje wtedy ostrzeżenie, a pusty tekst jest traktowany jako dokument nieznany.
 
+## GUI
+
+```powershell
+start-gui.bat                    # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
+python scripts/smoke_gui.py      # test dymny API + GUI (kod wyjścia 0/1)
+```
+
+Wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, a potem przejrzyj wyodrębnione pola **obok podglądu PDF** z podświetleniem fragmentu, z którego pochodzi każda wartość. JSON pobierzesz dla jednego dokumentu albo dla wszystkich (ZIP). GUI działa offline (PDF.js i font dołączone lokalnie), styl wg Design System Gov.pl. Szczegóły i ograniczenia: [docs/gui.md](docs/gui.md).
+
 ## Architektura
 
 ```
