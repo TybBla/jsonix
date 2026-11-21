@@ -109,33 +109,127 @@ def test_all_empty_text_on_nonempty_pdf_is_not_an_error_when_every_backend_empty
     assert doc.warnings
 
 
-def test_clean_steps_missing_module_warns(odwolanie, monkeypatch):
-    import builtins
+def _fake_backend(pages):
+    return lambda path: list(pages)
 
-    real_import = builtins.__import__
 
-    def fake_import(name, *a, **kw):
-        if name == "odw2json.ingest.clean":
-            raise ImportError("brak")
-        return real_import(name, *a, **kw)
+def clean_default_order():
+    from odw2json.ingest.clean import DEFAULT_ORDER
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    doc = ingest.load(odwolanie, cfg={"clean": ["collapse_spaces"]})
-    assert any("czyszczen" in w.lower() for w in doc.warnings)
-    assert "Odwołujący" in doc.text
+    return list(DEFAULT_ORDER)
 
 
 def test_clean_steps_applied_and_offsets_stay_exact(odwolanie, monkeypatch):
-    import sys
-    import types
+    from odw2json.ingest import clean
 
-    fake = types.ModuleType("odw2json.ingest.clean")
-    fake.clean_text = lambda text, steps: text.upper() if "upper" in steps else text
-    monkeypatch.setitem(sys.modules, "odw2json.ingest.clean", fake)
+    monkeypatch.setitem(clean.CLEAN_STEPS, "upper", str.upper)
     doc = ingest.load(odwolanie, cfg={"clean": ["upper"]})
     assert "ODWOŁUJĄCY" in doc.text
     for off, page in zip(doc.page_offsets, doc.pages, strict=True):
         assert doc.text[off : off + len(page)] == page
+
+
+def test_cleaning_runs_on_joined_document_footer_kept_on_first_page(odwolanie, monkeypatch):
+    footer = "Kancelaria Prawna X, ul. Długa 1, tel. 000"
+    pages = [
+        f"Odwołujący strona jeden\n{footer}",
+        f"Zarzut nr 2 treść\n{footer}",
+        f"Trzecia strona\n{footer}",
+    ]
+    monkeypatch.setitem(backends.BACKENDS, "pypdf", _fake_backend(pages))
+    doc = ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": clean_default_order()})
+    assert len(doc.pages) == 3
+    assert footer in doc.pages[0]
+    assert footer not in doc.pages[1]
+    assert footer not in doc.pages[2]
+    assert doc.text == "\n\f\n".join(doc.pages)
+    for i, (off, page) in enumerate(zip(doc.page_offsets, doc.pages, strict=True)):
+        assert doc.text[off : off + len(page)] == page
+        assert doc.page_of(off) == i
+    assert doc.page_of(doc.text.index("Zarzut nr 2")) == 1
+
+
+def test_cleaning_that_removes_page_break_is_rejected(odwolanie, monkeypatch):
+    from odw2json.ingest import clean
+
+    monkeypatch.setitem(clean.CLEAN_STEPS, "zjedz_f", lambda t: t.replace("\f", ""))
+    monkeypatch.setitem(backends.BACKENDS, "pypdf", _fake_backend(["a", "b"]))
+    with pytest.raises(RuntimeError, match="liczb"):
+        ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": ["zjedz_f"]})
+
+
+def test_fix_pdfium_text_removes_soft_hyphen_marker_and_normalizes_newlines():
+    assert backends._fix_pdfium_text("zidentyfiko￾wany") == "zidentyfikowany"
+    assert backends._fix_pdfium_text("a\r\nb\rc￾\r\nd") == "a\nb\nc\nd"
+    assert backends._fix_pdfium_text("Łódź ąęśćżźńó") == "Łódź ąęśćżźńó"
+
+
+def test_pypdfium2_backend_has_no_fffe(odwolanie):
+    assert all("￾" not in p for p in backends.BACKENDS["pypdfium2"](odwolanie))
+
+
+# --- walidacja konfiguracji ---
+
+
+def test_validate_ingest_cfg_accepts_defaults_and_empty():
+    ingest.validate_ingest_cfg({})
+    ingest.validate_ingest_cfg(
+        {"backend": "pypdf", "fallback_backends": ["pypdfium2"], "clean": clean_default_order()}
+    )
+
+
+@pytest.mark.parametrize(
+    ("cfg", "fragment"),
+    [
+        ({"backend": "nie_ma"}, "nie_ma"),
+        ({"backend": "pypdf", "fallback_backends": ["pypdfium2", "zly_fallback"]}, "zly_fallback"),
+        ({"clean": ["collapse_spaces", "zly_krok"]}, "zly_krok"),
+    ],
+)
+def test_validate_ingest_cfg_rejects_unknown(cfg, fragment):
+    with pytest.raises(ValueError, match="konfiguracj") as exc:
+        ingest.validate_ingest_cfg(cfg)
+    assert fragment in str(exc.value)
+
+
+def test_validate_unknown_clean_step_lists_available():
+    with pytest.raises(ValueError, match="dehyphenate"):
+        ingest.validate_ingest_cfg({"clean": ["zly_krok"]})
+
+
+def test_load_validates_explicit_cfg(odwolanie):
+    with pytest.raises(ValueError, match="nie_ma"):
+        ingest.load(odwolanie, cfg={"backend": "nie_ma"})
+    with pytest.raises(ValueError, match="zly_krok"):
+        ingest.load(odwolanie, cfg={"clean": ["zly_krok"]})
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"backend": "nie_ma"}, {"fallback_backends": ["nie_ma"]}, {"clean": ["zly_krok"]}],
+)
+def test_pipeline_run_fails_fast_on_bad_ingest_cfg(tmp_path, train_dir, monkeypatch, bad):
+    inp = tmp_path / "input"
+    inp.mkdir()
+    shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "dobry.pdf")
+    calls = []
+    monkeypatch.setattr(pipeline, "process_file", lambda *a, **k: calls.append(a))
+    with pytest.raises(ValueError):
+        pipeline.run(inp, tmp_path / "output", app_cfg={"ingest": bad, "write_trace": False})
+    assert calls == []
+
+
+def test_pipeline_run_passes_ingest_cfg_to_load(tmp_path, train_dir, monkeypatch):
+    inp = tmp_path / "input"
+    inp.mkdir()
+    shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "dobry.pdf")
+    seen = []
+    real_load = ingest.load
+    monkeypatch.setattr(ingest, "load", lambda path, **kw: (seen.append(kw), real_load(path, **kw))[1])
+    cfg = {"backend": "pdfplumber"}
+    report = pipeline.run(inp, tmp_path / "output", app_cfg={"ingest": cfg, "write_trace": False})
+    assert report.processed == 1 and not report.errors
+    assert seen == [{"cfg": cfg}]
 
 
 def test_empty_file_raises(tmp_path):
@@ -160,6 +254,21 @@ def test_leading_whitespace_before_header_is_accepted(tmp_path, odwolanie):
     except IngestError:
         pytest.skip("pypdf nie czyta przesuniętych offsetów xref")
     assert doc.pages
+
+
+@pytest.mark.parametrize("junk", [b"\xef\xbb\xbf", b"JUNK\x00\x01 garbage\n", b"X" * 500])
+def test_junk_before_pdf_header_is_accepted(tmp_path, odwolanie, junk):
+    p = tmp_path / "smieci.pdf"
+    p.write_bytes(junk + odwolanie.read_bytes())
+    doc = ingest.load(p, cfg={})
+    assert "Odwołujący" in doc.text
+
+
+def test_header_beyond_first_kilobyte_is_rejected(tmp_path, odwolanie):
+    p = tmp_path / "daleko.pdf"
+    p.write_bytes(b"X" * 2000 + odwolanie.read_bytes())
+    with pytest.raises(IngestError, match="nie jest PDF"):
+        ingest.load(p, cfg={})
 
 
 def test_encrypted_pdf_raises(tmp_path, odwolanie):
@@ -199,3 +308,10 @@ def test_pipeline_records_ingest_error_and_continues(tmp_path, train_dir):
     errors = {e.path.name: e.error for e in report.errors}
     assert set(errors) == {"pusty.pdf", "html.pdf"}
     assert all(msg.startswith("IngestError: ") for msg in errors.values())
+
+
+def test_default_config_enables_full_cleaning_order():
+    from odw2json.config_loader import load_app_config
+    from odw2json.ingest.clean import DEFAULT_ORDER
+
+    assert load_app_config()["ingest"]["clean"] == DEFAULT_ORDER
