@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Smoke: swiezy venv + requirements.txt (bez dev) + start.sh na malym wejsciu.
+# Dotyczy Linux/macOS (na Windows uzyj scripts/smoke.ps1).
 # Uzycie: bash scripts/smoke.sh
 set -euo pipefail
 
@@ -27,7 +28,7 @@ cp "$REPO/data/train/negatywne/KIO_KIO 2617-21.pdf" "$IN/case1/KIO_KIO 2617-21.p
 # Wywolanie przez `sh`, bo bit wykonywalny moze nie byc ustawiony.
 PATH="$VBIN:$PATH" LLM_MODE="${LLM_MODE:-replay}" sh "$REPO/start.sh" "$IN" "$OUT" || fail "start.sh zwrocil blad"
 
-PATH="$VBIN:$PATH" python - "$OUT/case1" <<'PY' || fail "asercje wyniku"
+"$VBIN/python" - "$OUT/case1" <<'PY' || fail "asercje wyniku"
 import json
 import sys
 from pathlib import Path

@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from eval.score import GT_NAME_FOR_PDF, Report, load_json, score_dirs
+from eval.score import GT_NAME_FOR_PDF, Report, score_dirs
 from odw2json import pipeline
 from odw2json.config_loader import ROOT_DIR, DocTypeConfig, load_app_config, load_registry
 from odw2json.logging_setup import new_run_id
@@ -182,42 +182,99 @@ def _prepare(
 # ------------------------------------------------------------------ metryki
 
 
+def _read_raw(path: Path) -> tuple[bool, str | None]:
+    """(istnieje, tekst) dla surowego pliku wyniku; tekst None gdy brak lub nieczytelny."""
+    if not path.is_file():
+        return False, None
+    try:
+        return True, path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError):
+        return True, None
+
+
+def _negative_ok(raw_path: Path, unknown_output: str) -> tuple[bool, bool, str]:
+    """Scisle sprawdza negatyw wg `unknown_output`: (poprawny, blad_schematu, opis)."""
+    exists, text = _read_raw(raw_path)
+    if unknown_output == "none":
+        return (not exists), False, "oczekiwano braku pliku, plik istnieje"
+    if not exists:
+        return False, False, "brak pliku wyniku (oczekiwano wyniku dla nieznanego dokumentu)"
+    if unknown_output == "empty_file":
+        return text == "", False, "oczekiwano pustego pliku"
+    # empty_object
+    try:
+        ok = json.loads(text or "") == {}
+    except json.JSONDecodeError:
+        return False, True, "niepoprawny JSON (oczekiwano {})"
+    return ok, False, "oczekiwano {}"
+
+
 def _inspect_outputs(
-    out_dir: Path, gt_dir: Path, registry: dict[str, DocTypeConfig]
-) -> tuple[int, int, list[str], list[str]]:
-    """(bledy schematu, bledy klasyfikacji, szczegoly schematu, szczegoly klasyfikacji)."""
+    out_dir: Path,
+    gt_dir: Path,
+    registry: dict[str, DocTypeConfig],
+    unknown_output: str = "empty_object",
+) -> tuple[int, int, list[str], list[str], list[str]]:
+    """(bledy schematu, bledy klasyfikacji, opisy schematu, opisy klasyfikacji, pliki z bledem)."""
     schema_n = cls_n = 0
     schema_msgs: list[str] = []
     cls_msgs: list[str] = []
+    cls_files: list[str] = []
+
+    def cls_err(rel: str, msg: str) -> None:
+        nonlocal cls_n
+        cls_n += 1
+        cls_msgs.append(f"{rel}: {msg}")
+        cls_files.append(rel)
+
     for pdf in sorted(gt_dir.rglob("*.pdf")):
         rel_dir = pdf.parent.relative_to(gt_dir)
         rel = (rel_dir / pdf.name).as_posix()
         gt_stem = GT_NAME_FOR_PDF.get(pdf.stem, pdf.stem)
         positive = (gt_dir / rel_dir / f"{gt_stem}.json").is_file()
-        data = load_json(out_dir / rel_dir / f"{pdf.stem}.json")  # None: brak/pusty/zepsuty plik
+        raw_path = out_dir / rel_dir / f"{pdf.stem}.json"
         if not positive:
-            if data is not None and not is_unknown_output(data):
-                cls_n += 1
-                cls_msgs.append(f"{rel}: negatyw ma niepusty wynik")
+            ok, is_schema, why = _negative_ok(raw_path, unknown_output)
+            if not ok:
+                cls_err(rel, f"negatyw: {why}")
+                if is_schema:
+                    schema_n += 1
+                    schema_msgs.append(f"{rel}: {why}")
+            continue
+        exists, text = _read_raw(raw_path)
+        data = None
+        if not exists or text is None or not text.strip():
+            schema_n += 1
+            schema_msgs.append(f"{rel}: brak lub pusty plik wyniku (pozytyw)")
+            continue
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            schema_n += 1
+            schema_msgs.append(f"{rel}: niepoprawny JSON wyniku: {e}")
             continue
         cfg = registry.get(gt_stem)
-        if data is None or not isinstance(data, dict) or is_unknown_output(data):
-            cls_n += 1
-            cls_msgs.append(f"{rel}: oczekiwano {gt_stem}, wynik pusty/niepoprawny")
+        if not isinstance(data, dict) or is_unknown_output(data):
+            cls_err(rel, f"oczekiwano {gt_stem}, wynik pusty/niepoprawny")
             continue
         if cfg is None:
             continue
         if not set(data) & set(cfg.template()):
-            cls_n += 1
-            cls_msgs.append(f"{rel}: oczekiwano {gt_stem}, klucze {sorted(data)} to inny typ")
+            cls_err(rel, f"oczekiwano {gt_stem}, klucze {sorted(data)} to inny typ")
             continue  # zly typ to blad klasyfikacji, nie schematu
         errs = validate_output(data, cfg)
         schema_n += len(errs)
         schema_msgs.extend(f"{rel}: {e}" for e in errs)
-    return schema_n, cls_n, schema_msgs, cls_msgs
+    return schema_n, cls_n, schema_msgs, cls_msgs, sorted(cls_files)
 
 
-def build_metrics(rep: Report, schema_errors: int, classification_errors: int, pipeline_errors: int) -> dict:
+def build_metrics(
+    rep: Report,
+    schema_errors: int,
+    classification_errors: int,
+    pipeline_errors: int,
+    classification_error_files: list[str] | None = None,
+) -> dict:
     t = rep.total
     return {
         "f1": t.f1,
@@ -230,6 +287,7 @@ def build_metrics(rep: Report, schema_errors: int, classification_errors: int, p
         "schema_errors": schema_errors,
         "classification_errors": classification_errors,
         "pipeline_errors": pipeline_errors,
+        "classification_error_files": sorted(classification_error_files or []),
     }
 
 
@@ -252,7 +310,8 @@ def compare_metrics(base: dict, cur: dict, tolerance: float) -> tuple[list[Row],
 
     Wyzsze=lepsze (f1, odsetek poprawnych negatywow): spadek wiekszy niz tolerancja (+1e-9) to regresja.
     schema_errors i pipeline_errors > 0 to awaria niezaleznie od baseline; classification_errors powyzej
-    baseline to regresja. Pola/typy nieobecne w baseline to "new" (bez bledu).
+    baseline to regresja, podobnie kazdy plik z bledem klasyfikacji spoza zbioru z baseline
+    (porownanie zbiorow, nie liczb). Pola/typy nieobecne w baseline to "new" (bez bledu).
     """
     rows: list[Row] = []
     reg: list[str] = []
@@ -289,6 +348,15 @@ def compare_metrics(base: dict, cur: dict, tolerance: float) -> tuple[list[Row],
             if c > b:
                 flag = "REGRESSION"
                 reg.append(f"{key}: {b} -> {c}")
+            base_files, cur_files = (
+                base.get("classification_error_files"),
+                cur.get("classification_error_files"),
+            )
+            if base_files is not None and cur_files is not None:
+                new_files = sorted(set(cur_files) - set(base_files))
+                if new_files:
+                    flag = "REGRESSION"
+                    reg.append(f"classification_error_files: nowe pliki z bledem {new_files}")
         elif c > 0:
             flag = "FAIL"
             reg.append(f"{key}: {c} (musi byc 0)")
@@ -378,10 +446,12 @@ def run_gate(
         out_dir = work / "out"
         run_report = pipeline.run(in_dir, out_dir, app_cfg=app_cfg, registry=registry, run_id=run_id)
         rep = score_dirs(out_dir, gt_dir)
-        schema_n, cls_n, schema_msgs, cls_msgs = _inspect_outputs(out_dir, gt_dir, registry)
+        schema_n, cls_n, schema_msgs, cls_msgs, cls_files = _inspect_outputs(
+            out_dir, gt_dir, registry, app_cfg.get("unknown_output", "empty_object")
+        )
 
     pipe_errors = [{"file": str(e.path.name), "error": e.error} for e in run_report.errors]
-    metrics = build_metrics(rep, schema_n, cls_n, len(pipe_errors))
+    metrics = build_metrics(rep, schema_n, cls_n, len(pipe_errors), cls_files)
     metrics["updated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     metrics["commit"] = _git_commit()
 

@@ -51,8 +51,15 @@
     "schema_errors": 0,
     "classification_errors": 5,
     "pipeline_errors": 0,
-    "updated": "2026-11-21T13:01:03Z",
-    "commit": "62cdede84ee462d166e9231b991e987acc17665a"
+    "classification_error_files": [
+      "negatywne/2025_S 112-383751.pdf",
+      "negatywne/Broszura_JPK_FA(2).pdf",
+      "przyklad_02/pelnomocnictwo.pdf",
+      "przyklad_04/2025_S 112-383751.pdf",
+      "przyklad_32/pelnomocnictwo.pdf"
+    ],
+    "updated": "2026-11-21T13:14:56Z",
+    "commit": "a052e35b5843dd153452f2d7c4d9ae95c29d8fa2"
   },
   "holdout": {
     "f1": 0.0,
@@ -106,7 +113,11 @@
     "schema_errors": 0,
     "classification_errors": 2,
     "pipeline_errors": 0,
-    "updated": "2026-11-21T13:01:08Z",
-    "commit": "62cdede84ee462d166e9231b991e987acc17665a"
+    "classification_error_files": [
+      "negatywne/2025_S 112-383751.pdf",
+      "negatywne/Broszura_JPK_FA(2).pdf"
+    ],
+    "updated": "2026-11-21T13:15:00Z",
+    "commit": "a052e35b5843dd153452f2d7c4d9ae95c29d8fa2"
   }
 }

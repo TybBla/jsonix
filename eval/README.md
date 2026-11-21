@@ -45,7 +45,15 @@ Kody wyjscia:
 - `2` - blad uzycia albo brak sekcji splitu w baseline (bez `--update-baseline`).
 
 Pola/typy nieobecne w baseline sa raportowane jako `new` (nie sa bledem). `classification_errors` to negatyw
-z niepustym wynikiem albo pozytyw z `{}` / kluczami innego typu.
+z niepustym wynikiem albo pozytyw z `{}` / kluczami innego typu. Negatywy sprawdzane sa scisle na SUROWYM
+pliku wg `unknown_output` z `config/app.yaml` (`empty_object`: plik z `{}`; `empty_file`: pusty plik;
+`none`: brak pliku); brak pliku, `null`, niepoprawny JSON czy niepusty obiekt to blad klasyfikacji
+(niepoprawny JSON takze blad schematu). Brakujacy lub nieparsowalny wynik pozytywu to blad schematu.
+Baseline przechowuje `classification_error_files` (posortowane sciezki); regresja = jakikolwiek plik z bledem
+spoza zbioru z baseline, nawet gdy liczba bledow jest taka sama lub nizsza.
+
+Kasety LLM: klucz kasety obejmuje wszystkie parametry zmieniajace odpowiedz; po kazdej zmianie promptu
+nagraj kasety ponownie (`LLM_MODE=record`).
 
 `--update-baseline` nadpisuje tylko wskazane sekcje i drukuje roznice wzgledem poprzedniej; odmawia zapisu
 (kod 1), gdy wynik ma bledy schematu albo wyjatki pipeline. Pelny wynik trafia do `output/.gate/<split>.json`
