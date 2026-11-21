@@ -4,7 +4,8 @@ Backend ekstrakcji tekstu wybierany konfiguracją (``config/app.yaml`` -> ``inge
 z fallbackiem na kolejne backendy. Rozpoznaje pliki, których nie da się wczytać (``IngestError``).
 Tekst dokumentu = strony złączone ``"\\n\\f\\n"``; ``page_offsets`` wskazują początek każdej strony.
 
-OCR (opcjonalny, ``ingest.ocr``): strona z tekstem krótszym niż ``min_chars_per_page`` przechodzi przez
+OCR (obowiązkowy w requirements, ``ingest.ocr``): strona z tekstem krótszym niż
+``min_chars_per_page`` przechodzi przez
 ``ocr.ocr_page``; brak pakietu OCR daje ostrzeżenie, a nie wyjątek.
 """
 
@@ -64,6 +65,23 @@ def _validate_ocr_cfg(ocr_cfg: object) -> None:
             raise ValueError(
                 f"Błąd konfiguracji ingest: ocr.{key} musi być dodatnią liczbą całkowitą (jest {val!r})"
             )
+    params = ocr_cfg.get("engine_params")
+    if params is not None:
+        if not isinstance(params, dict):
+            raise ValueError(
+                "Błąd konfiguracji ingest: ocr.engine_params musi być słownikiem parametrów silnika"
+            )
+        for k, v in params.items():
+            if not isinstance(k, str) or "." not in k.strip(".") or k.startswith(".") or k.endswith("."):
+                raise ValueError(
+                    f"Błąd konfiguracji ingest: ocr.engine_params: klucz {k!r} "
+                    "musi mieć postać 'Sekcja.parametr'"
+                )
+            if isinstance(v, dict | list):
+                raise ValueError(
+                    f"Błąd konfiguracji ingest: ocr.engine_params[{k!r}] "
+                    f"musi być wartością skalarną (jest {v!r})"
+                )
     enabled = ocr_cfg.get("enabled")
     if enabled is not None and not isinstance(enabled, bool):
         raise ValueError(
