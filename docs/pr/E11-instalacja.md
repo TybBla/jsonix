@@ -16,7 +16,8 @@ Wymóg UZP to „Python 3.13+”, a aktualny Python to 3.15. Dla 3.15 paczki `on
 - **`start.sh`**: wybiera Pythona 3.13+ (najpierw `python3.13` i `python3.14`), a dla 3.15+ wypisuje ostrzeżenie.
 - **CI**: macierz Pythona `3.13` i `3.14` (testy i smoke).
 - **README**: szybki start przez `start.bat`, zalecana wersja Pythona i instalacja ręczna.
-- **`tests/test_install.py`** sprawdza znaczniki OCR, skrypty startowe, CRLF w `.bat`, `start.sh` i macierz CI.
+- **`requirements-lock.txt`** (punkt 5 z listy luk): przypięte wersje jako plik ograniczeń pip (`-c`), żeby nowe wydanie biblioteki w dniu oceny niczego nie zepsuło. `requirements.txt` dalej mówi, *co* instalujemy, a lock, *które wersje*. Lock wygenerowałem z działającego obrazu (3.13). Używają go `Dockerfile`, `setup-env.bat`, CI i oba smoke. Sprawdzone na 3.13 (obraz, `smoke_docker` OK), 3.14 (kontener) i 3.15 (Windows).
+- **`tests/test_install.py`** sprawdza znaczniki OCR, skrypty startowe, CRLF w `.bat`, `start.sh` i macierz CI oraz to, że każda zależność ma wersję w locku i lock jest używany wszędzie, gdzie instalujemy.
 
 ### Sprawdzone
 - **Windows, tylko Python 3.15, świeże `.venv`** (`start.bat` z `JSONIX_VENV` w katalogu tymczasowym): instalacja OK (70 s), 3 PDF z tekstem przetworzone, skan → `{}` z ostrzeżeniem.
