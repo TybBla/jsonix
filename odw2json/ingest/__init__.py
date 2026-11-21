@@ -4,7 +4,8 @@ Backend ekstrakcji tekstu wybierany konfiguracją (``config/app.yaml`` -> ``inge
 z fallbackiem na kolejne backendy. Rozpoznaje pliki, których nie da się wczytać (``IngestError``).
 Tekst dokumentu = strony złączone ``"\\n\\f\\n"``; ``page_offsets`` wskazują początek każdej strony.
 
-TODO(T5): OCR dla stron bez tekstu.
+OCR (opcjonalny, ``ingest.ocr``): strona z tekstem krótszym niż ``min_chars_per_page`` przechodzi przez
+``ocr.ocr_page``; brak pakietu OCR daje ostrzeżenie, a nie wyjątek.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from odw2json.config_loader import load_app_config
 from odw2json.contracts import Document, IngestError
-from odw2json.ingest import backends, clean
+from odw2json.ingest import backends, clean, ocr
 
 PAGE_SEPARATOR = "\n\f\n"
 DEFAULT_BACKEND = "pypdf"
@@ -135,6 +136,41 @@ def _clean_pages(pages: list[str], steps: list[str]) -> list[str]:
     return cleaned
 
 
+def _apply_ocr(
+    path: Path, pages: list[str], ocr_cfg: dict, warnings: list[str]
+) -> tuple[list[str], str | None]:
+    """OCR stron bez wystarczającej warstwy tekstowej. Zwraca strony i nazwę silnika (gdy coś rozpoznano).
+
+    Strony z tekstem (>= ``min_chars_per_page`` znaków) nigdy nie trafiają do OCR. Rozpoznany tekst
+    zastępuje stronę tylko wtedy, gdy jest dłuższy od tego, co już było.
+    """
+    if not ocr_cfg.get("enabled"):
+        return pages, None
+    threshold = int(ocr_cfg.get("min_chars_per_page", 30))
+    todo = [i for i, p in enumerate(pages) if len(p.strip()) < threshold]
+    if not todo:
+        return pages, None
+    engine = ocr_cfg.get("engine") or ocr.DEFAULT_ENGINE
+    if not ocr.ocr_available(engine):
+        warnings.extend(f"OCR niedostępny – strona {i + 1} bez tekstu" for i in todo)
+        return pages, None
+    pages = list(pages)
+    used = False
+    for i in todo:
+        try:
+            text = ocr.ocr_page(path, i, ocr_cfg)
+        except Exception as e:  # błąd OCR jednej strony nie przerywa wczytywania dokumentu
+            warnings.append(f"OCR strony {i + 1} nieudany ({type(e).__name__}: {e})")
+            continue
+        if len(text.strip()) > len(pages[i].strip()):
+            pages[i] = text
+            used = True
+            warnings.append(f"OCR strony {i + 1}")
+        else:
+            warnings.append(f"OCR strony {i + 1}: nie rozpoznano tekstu")
+    return pages, (engine if used else None)
+
+
 def _join(pages: list[str]) -> tuple[str, list[int]]:
     offsets: list[int] = []
     pos = 0
@@ -153,14 +189,15 @@ def load(path: Path, backend: str | None = None, cfg: dict | None = None) -> Doc
     _check_file(path)
     warnings: list[str] = []
     used, pages = _extract(path, primary, list(cfg.get("fallback_backends") or []), warnings)
+    pages, ocr_engine = _apply_ocr(path, pages, cfg.get("ocr") or {}, warnings)
     pages = _clean_pages(pages, list(cfg.get("clean") or []))
     text, offsets = _join(pages)
     return Document(
         path=path,
         text=text,
         pages=pages,
-        ocr_used=False,
+        ocr_used=ocr_engine is not None,
         page_offsets=offsets,
-        backend=used,
+        backend=f"{used}+ocr:{ocr_engine}" if ocr_engine else used,
         warnings=warnings,
     )
