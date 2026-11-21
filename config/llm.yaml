@@ -1,8 +1,11 @@
 # Wartosci z .env maja pierwszenstwo (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY)
 base_url: null
-model: null
+# Kasety sa kluczowane modelem: zmiana modelu wymaga ponownego nagrania kaset (LLM_MODE=record).
+model: ministral-8b-latest   # env LLM_MODEL wygrywa
 temperature: 0
 max_tokens: 2000
 timeout_s: 120
 retries: 2
-cache_dir: .cache/llm
+mode: auto            # live | record | replay | auto (env LLM_MODE wygrywa; w pytest domyslnie replay)
+cassette_dir: tests/cassettes
+json_mode: true       # false, gdy dostawca nie obsluguje response_format=json_object

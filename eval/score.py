@@ -2,6 +2,7 @@
 
 Uzycie: python -m eval.score --pred output --gt data/train
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,16 +22,21 @@ GT_NAME_FOR_PDF: dict = {"potwierdzenie_przelewu": "przelew"}
 @dataclass
 class ScoreConfig:
     # Pola "dlugi string" (prog podobienstwa) wg UZP, Discord 2026-11-21 13:26.
-    fuzzy_paths: frozenset = frozenset({
-        "Odwolujacy[].nazwa", "Zamawiajacy[].nazwa", "Odwolujacy[].pelnomocnik.nazwa",
-        "ZamowieniePubliczne.tytul", "przelew_bankowy.tytul",
-    })
+    fuzzy_paths: frozenset = frozenset(
+        {
+            "Odwolujacy[].nazwa",
+            "Zamawiajacy[].nazwa",
+            "Odwolujacy[].pelnomocnik.nazwa",
+            "ZamowieniePubliczne.tytul",
+            "przelew_bankowy.tytul",
+        }
+    )
     # Klucze traktowane rozmyto tylko przy PAROWANIU elementow list (nie przy ocenie).
     fuzzy_keys: frozenset = frozenset({"nazwa", "tytul", "imie_nazwisko"})
     threshold: float = 0.8
-    lenient_types: bool = False      # "123" == 123
-    casefold_exact: bool = False     # pola dokladne: ignoruj wielkosc liter
-    min_match_sim: float = 0.0       # min. podobienstwo elementow listy do sparowania
+    lenient_types: bool = False  # "123" == 123
+    casefold_exact: bool = False  # pola dokladne: ignoruj wielkosc liter
+    min_match_sim: float = 0.0  # min. podobienstwo elementow listy do sparowania
     gt_name_for_pdf: dict = field(default_factory=lambda: dict(GT_NAME_FOR_PDF))
 
 
@@ -42,7 +48,7 @@ class Counts:
     fn: int = 0
     fields: dict = field(default_factory=dict, compare=False, repr=False)
 
-    def __add__(self, o: "Counts") -> "Counts":
+    def __add__(self, o: Counts) -> Counts:
         r = Counts(self.tp + o.tp, self.tn + o.tn, self.fp + o.fp, self.fn + o.fn)
         for src in (self.fields, o.fields):
             for k, v in src.items():
@@ -71,9 +77,16 @@ class Counts:
         return (self.tp + self.tn) / n if n else 0.0
 
     def to_dict(self) -> dict:
-        return {"tp": self.tp, "tn": self.tn, "fp": self.fp, "fn": self.fn,
-                "precision": self.precision, "recall": self.recall,
-                "f1": self.f1, "accuracy": self.accuracy}
+        return {
+            "tp": self.tp,
+            "tn": self.tn,
+            "fp": self.fp,
+            "fn": self.fn,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
+            "accuracy": self.accuracy,
+        }
 
 
 def _norm(v: Any) -> Any:
@@ -151,8 +164,12 @@ def _compare(p: Any, g: Any, path: str, cfg: ScoreConfig, acc: Counts) -> None:
     p_struct = isinstance(p, (dict, list))
     g_struct = isinstance(g, (dict, list))
     if isinstance(p, dict) or isinstance(g, dict):
-        if (p_struct and not isinstance(p, dict)) or (g_struct and not isinstance(g, dict)) \
-                or (p is not None and not p_struct) or (g is not None and not g_struct):
+        if (
+            (p_struct and not isinstance(p, dict))
+            or (g_struct and not isinstance(g, dict))
+            or (p is not None and not p_struct)
+            or (g is not None and not g_struct)
+        ):
             _add(acc, path, _leaf_counts(_flat(p), _flat(g), path, cfg))
             return
         pd = p or {}
@@ -188,8 +205,7 @@ def _elem_sim(a: Any, b: Any, cfg: ScoreConfig) -> float:
     """Srednie podobienstwo lisci (po polach niepustych w ktorymkolwiek elemencie)."""
     la = {k: _norm(v) for k, v in _leaves(a).items()}
     lb = {k: _norm(v) for k, v in _leaves(b).items()}
-    keys = [k for k in dict.fromkeys(list(la) + list(lb))
-            if la.get(k) is not None or lb.get(k) is not None]
+    keys = [k for k in dict.fromkeys(list(la) + list(lb)) if la.get(k) is not None or lb.get(k) is not None]
     if not keys:
         return 1.0
     total = 0.0
@@ -206,9 +222,10 @@ def _elem_sim(a: Any, b: Any, cfg: ScoreConfig) -> float:
 
 
 def _compare_lists(pl: list, gl: list, path: str, cfg: ScoreConfig, acc: Counts) -> None:
-    pairs = sorted(((_elem_sim(a, b, cfg), i, j)
-                    for i, a in enumerate(pl) for j, b in enumerate(gl)),
-                   key=lambda t: (-t[0], t[1], t[2]))
+    pairs = sorted(
+        ((_elem_sim(a, b, cfg), i, j) for i, a in enumerate(pl) for j, b in enumerate(gl)),
+        key=lambda t: (-t[0], t[1], t[2]),
+    )
     used_p: set = set()
     used_g: set = set()
     matched = []
@@ -222,13 +239,16 @@ def _compare_lists(pl: list, gl: list, path: str, cfg: ScoreConfig, acc: Counts)
         _compare(pl[i], gl[j], path, cfg, acc)
     for i, x in enumerate(pl):
         if i not in used_p:
-            _compare(x, _empty_like(x), path, cfg, acc)      # nadmiarowy -> FP
+            _compare(x, _empty_like(x), path, cfg, acc)  # nadmiarowy -> FP
     for j, y in enumerate(gl):
         if j not in used_g:
-            _compare(_empty_like(y), y, path, cfg, acc)      # brakujacy -> FN/TN
+            _compare(_empty_like(y), y, path, cfg, acc)  # brakujacy -> FN/TN
 
 
-def score_pair(pred: dict | None, gt: dict | None, cfg: ScoreConfig = ScoreConfig()) -> Counts:
+_DEFAULT_CFG = ScoreConfig()
+
+
+def score_pair(pred: dict | None, gt: dict | None, cfg: ScoreConfig = _DEFAULT_CFG) -> Counts:
     """Porownuje jeden dokument. None = brak pliku. Zwraca Counts z .fields (per pole)."""
     acc = Counts()
     p = pred if pred is not None else _empty_like(gt)
@@ -238,6 +258,7 @@ def score_pair(pred: dict | None, gt: dict | None, cfg: ScoreConfig = ScoreConfi
 
 
 # ---------------------------------------------------------------- katalogi
+
 
 @dataclass
 class DocResult:
@@ -249,8 +270,12 @@ class DocResult:
     neg_correct: bool = False
 
     def to_dict(self) -> dict:
-        return {"doc": self.rel, "type": self.doc_type, "pred_missing": self.pred_missing,
-                **self.counts.to_dict()}
+        return {
+            "doc": self.rel,
+            "type": self.doc_type,
+            "pred_missing": self.pred_missing,
+            **self.counts.to_dict(),
+        }
 
 
 @dataclass
@@ -270,8 +295,11 @@ class Report:
             "total": self.total.to_dict(),
             "by_type": {k: v.to_dict() for k, v in self.by_type.items()},
             "fields": {k: v.to_dict() for k, v in sorted(self.fields.items())},
-            "negatives": {"total": self.neg_total, "correct": self.neg_correct,
-                          "rate": self.neg_correct / self.neg_total if self.neg_total else None},
+            "negatives": {
+                "total": self.neg_total,
+                "correct": self.neg_correct,
+                "rate": self.neg_correct / self.neg_total if self.neg_total else None,
+            },
             "docs": [d.to_dict() for d in self.docs],
         }
 
@@ -290,8 +318,7 @@ def load_json(p: Path) -> Any:
         return None
 
 
-
-def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = ScoreConfig()) -> Report:
+def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = _DEFAULT_CFG) -> Report:
     pred_root, gt_root = Path(pred_root), Path(gt_root)
     rep = Report()
     for pdf in sorted(gt_root.rglob("*.pdf")):
@@ -316,9 +343,11 @@ def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = ScoreConfig())
 
 # --------------------------------------------------------------------- CLI
 
+
 def _row(name: str, c: Counts, w: int) -> str:
-    return (f"{name:<{w}} {c.tp:>5} {c.tn:>5} {c.fp:>5} {c.fn:>5}  "
-            f"{c.precision:6.3f} {c.recall:6.3f} {c.f1:6.3f}")
+    return (
+        f"{name:<{w}} {c.tp:>5} {c.tn:>5} {c.fp:>5} {c.fn:>5}  {c.precision:6.3f} {c.recall:6.3f} {c.f1:6.3f}"
+    )
 
 
 def _hdr(w: int) -> str:
@@ -328,14 +357,15 @@ def _hdr(w: int) -> str:
 def format_report(rep: Report, worst: int = 10) -> str:
     L = []
     t = rep.total
-    L += ["== GLOBALNIE ==", _hdr(12), _row("razem", t, 12),
-          f"accuracy (z TN): {t.accuracy:.3f}", ""]
+    L += ["== GLOBALNIE ==", _hdr(12), _row("razem", t, 12), f"accuracy (z TN): {t.accuracy:.3f}", ""]
     L += ["== WG TYPU DOKUMENTU ==", _hdr(16)]
     for k in sorted(rep.by_type):
         L.append(_row(k, rep.by_type[k], 16))
     if rep.neg_total:
-        L.append(f"negatywy: poprawnie odrzucone {rep.neg_correct}/{rep.neg_total} "
-                 f"({rep.neg_correct / rep.neg_total:.1%})")
+        L.append(
+            f"negatywy: poprawnie odrzucone {rep.neg_correct}/{rep.neg_total} "
+            f"({rep.neg_correct / rep.neg_total:.1%})"
+        )
     L += ["", "== POLA (od najgorszego F1) =="]
     fl = sorted(rep.fields.items(), key=lambda kv: (kv[1].f1, -(kv[1].fp + kv[1].fn), kv[0]))
     w = min(50, max([len(k) for k, _ in fl] + [5]))
@@ -343,12 +373,16 @@ def format_report(rep: Report, worst: int = 10) -> str:
     for k, c in fl:
         L.append(_row(k[:w], c, w))
     L += ["", f"== {worst} NAJGORSZYCH DOKUMENTOW =="]
-    bad = sorted((d for d in rep.docs if d.counts.fp + d.counts.fn > 0),
-                 key=lambda d: (d.counts.f1, -(d.counts.fp + d.counts.fn)))[:worst]
+    bad = sorted(
+        (d for d in rep.docs if d.counts.fp + d.counts.fn > 0),
+        key=lambda d: (d.counts.f1, -(d.counts.fp + d.counts.fn)),
+    )[:worst]
     for d in bad:
         c = d.counts
-        L.append(f"{d.rel:<60} {d.doc_type:<14} F1={c.f1:.3f} FP={c.fp} FN={c.fn}"
-                 + ("  [brak pliku pred]" if d.pred_missing else ""))
+        L.append(
+            f"{d.rel:<60} {d.doc_type:<14} F1={c.f1:.3f} FP={c.fp} FN={c.fn}"
+            + ("  [brak pliku pred]" if d.pred_missing else "")
+        )
     return "\n".join(L)
 
 
@@ -362,8 +396,7 @@ def main(argv: list | None = None) -> int:
     ap.add_argument("--lenient-types", action="store_true")
     ap.add_argument("--casefold-exact", action="store_true")
     a = ap.parse_args(argv)
-    cfg = ScoreConfig(threshold=a.threshold, lenient_types=a.lenient_types,
-                      casefold_exact=a.casefold_exact)
+    cfg = ScoreConfig(threshold=a.threshold, lenient_types=a.lenient_types, casefold_exact=a.casefold_exact)
     rep = score_dirs(a.pred, a.gt, cfg)
     try:
         sys.stdout.reconfigure(encoding="utf-8")

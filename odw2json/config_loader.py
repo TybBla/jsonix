@@ -1,9 +1,10 @@
 """Ładowanie konfiguracji: typy dokumentów (config/doctypes/*.yaml), lookupy, app.yaml."""
+
 from __future__ import annotations
 
 import copy
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +40,7 @@ class DocTypeConfig(BaseModel):
         return (self.config_dir / p).read_text(encoding="utf-8") if p else None
 
 
-@lru_cache(maxsize=None)
+@cache
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 

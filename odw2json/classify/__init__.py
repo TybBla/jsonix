@@ -3,6 +3,7 @@
 Wersja bazowa: punktacja słów kluczowych (strong=+2, weak=+1, negative=-3, liczona obecność).
 TODO(A): wagi pozycji (nagłówek), LLM fallback przy niskiej pewności, kalibracja na negatywach.
 """
+
 from __future__ import annotations
 
 from odw2json.config_loader import DocTypeConfig

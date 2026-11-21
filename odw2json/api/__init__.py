@@ -3,6 +3,7 @@
 Wersja bazowa: health, lista typów, przetworzenie wgranych PDF-ów. TODO(C): wyniki z trace,
 podgląd PDF, edycja konfiguracji typów, front React.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -38,9 +39,14 @@ async def process(files: list[UploadFile]) -> list[dict]:
             p.write_bytes(await f.read())
             try:
                 cls, res = pipeline.process_file(p, registry)
-                out.append({"file": p.name, "classification": asdict(cls),
-                            "data": res.data if res else None,
-                            "trace": [asdict(t) for t in res.trace] if res else []})
+                out.append(
+                    {
+                        "file": p.name,
+                        "classification": asdict(cls),
+                        "data": res.data if res else None,
+                        "trace": [asdict(t) for t in res.trace] if res else [],
+                    }
+                )
             except Exception as e:
                 out.append({"file": p.name, "error": f"{type(e).__name__}: {e}"})
     return out

@@ -3,6 +3,7 @@
 Wersja bazowa: warstwa tekstowa przez pypdf. TODO(A): czyszczenie tekstu, OCR fallback
 dla stron bez tekstu (Tesseract/rapidocr, bez GPU), ewentualnie pdfplumber dla układu.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
