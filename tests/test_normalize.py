@@ -155,13 +155,20 @@ def test_date_nieprawidlowe_z_mysnikiem_lub_ukosnikiem_zwraca_none(raw: str) -> 
         ("1.234,56 zł", 1234.56),
         ("200,00 zł", 200.0),
         ("0,00", 0.0),
+        ("10.000,00 zł", 10000.0),
+        ("10.000 zł", 10000.0),
+        ("1.234.567,89 PLN", 1234567.89),
+        ("10 000 PLN", 10000.0),
+        ("17 zł", 17.0),
+        ("17", 17.0),
+        ("PLN 17,00", 17.0),
     ],
 )
 def test_amount_formaty(raw: str, expected: float) -> None:
     assert amount(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["abc", "", "zł", "12,34,56"])
+@pytest.mark.parametrize("raw", ["abc", "", "zł", "12,34,56", "11.09.2026"])
 def test_amount_nieprawidlowa_zwraca_none(raw: str) -> None:
     assert amount(raw) is None
 

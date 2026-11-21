@@ -92,7 +92,8 @@ def date(value: str) -> str | None:
 
 # --- kwoty ----------------------------------------------------------------
 
-_WALUTA = re.compile(r"\s*(zł|zl|pln)\.?$", re.IGNORECASE)
+_WALUTA = re.compile(r"^\s*(?:pln|zł|zl)\.?\s*|\s*(?:zł|zl|pln)\.?$", re.IGNORECASE)
+_TYSIACE_KROPKA = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
 _KWOTA = re.compile(r"^-?\d+(\.\d+)?$")
 
 
@@ -102,6 +103,8 @@ def amount(value: str) -> float | None:
     tekst = re.sub(r"\s", "", tekst)
     if "," in tekst:
         tekst = tekst.replace(".", "").replace(",", ".")
+    elif _TYSIACE_KROPKA.match(tekst):  # 10.000 -> kropka jako separator tysięcy
+        tekst = tekst.replace(".", "")
     if not _KWOTA.match(tekst):
         return None
     return float(tekst)
