@@ -15,13 +15,19 @@ Otwórz http://127.0.0.1:8000. Opis API (OpenAPI): http://127.0.0.1:8000/docs.
 1. **Dodaj pliki** — przeciągnij pliki PDF na pole albo wybierz je przyciskiem „Dodaj plik”. Pliki są sprawdzane od razu (format PDF, pusty plik, limit 25 MB). Błędy są pokazywane przy pliku i w podsumowaniu na górze strony.
 2. **Analizuj** — pliki trafiają do `POST /api/jobs`. Pasek postępu pokazuje wysyłkę (%), a potem „Przeanalizowano N z M”. Stan joba jest odpytywany z `GET /api/jobs/{id}`.
 3. **Wyniki klasyfikacji** — tabela z typem dokumentu, pewnością (niska pewność ma ikonę i słowo „niska”), ostrzeżeniami i błędami. Dokument nierozpoznany ma oznaczenie „Nieznany dokument” (wynikowy JSON to `{}`). Pobierzesz tu JSON każdego pliku albo wszystkie naraz (ZIP).
-4. **Sprawdź dane** — po lewej pola pogrupowane jak w JSON, po prawej dokument PDF. Wybierz pole (kliknięciem albo klawiszem Tab), a podgląd przewinie się do fragmentu źródłowego i podświetli go (obramowanie + etykieta pola). Kliknięcie podświetlenia zaznacza pole. Na wąskim ekranie przełączasz widok przyciskami „Pola / Dokument”.
+4. **Sprawdź dane** — po lewej pola pogrupowane jak w JSON, po prawej dokument PDF. Najechanie kursorem albo przejście klawiszem Tab na pole lekko podświetla jego fragment w dokumencie (bez przewijania podglądu); gdy fragment jest na stronie poza widokiem, przy polu pojawia się znacznik „strona N”. Kliknięcie pola (albo Enter) przewija podgląd do fragmentu i zaznacza go (obramowanie + etykieta pola). Działa to też w drugą stronę: najechanie na podświetlony fragment w dokumencie wyróżnia odpowiadające mu pole (lista pól przewija się, jeśli pole jest poza widokiem), a kliknięcie fragmentu zaznacza pole. Zejście kursorem lub fokusem przywraca zaznaczenie z ostatniego kliknięcia. Na wąskim ekranie przełączasz widok przyciskami „Pola / Dokument”.
 5. **Popraw wartość (opcjonalnie)** — „Zmień” przy polu otwiera edycję (Enter zapisuje, Esc anuluje, puste pole = `null`). Zmienione pole ma oznaczenie „Zmieniono ręcznie” i przycisk „Przywróć wartość z dokumentu”. Liczby zostają liczbami („7 500,50” → `7500.5`).
 6. **Pobierz JSON** — wynik dokumentu jako plik `.json` o nazwie jak PDF, razem z Twoimi zmianami.
 
 ## Skąd się bierze podświetlenie
 
 Każde pole ma w `trace` stronę (`page`, liczona od 0) i fragment tekstu (`source_snippet`). GUI szuka fragmentu w warstwie tekstowej PDF.js (`web/static/js/match.js`): porównuje tekst bez białych znaków, z ujednoliconymi cudzysłowami i myślnikami i z pominięciem dzielenia wyrazów na końcu wiersza. Jeśli w znalezionym fragmencie jest wartość pola, podświetlana jest sama wartość. Jeśli cały fragment się nie znajdzie, GUI szuka jego najdłuższej części (najpierw zawierającej wartość).
+
+Dopasowania są liczone **raz** po wczytaniu dokumentu (`buildSourceMap`): każda strona jest normalizowana jeden raz, na stronie z `page` szukany jest fragment także częściowo (wyszukiwanie liniowe względem długości strony), a na pozostałych stronach już tylko cały fragment. Powstaje mapa pole ↔ obszar na stronie, a podgląd przy najechaniu tylko przełącza klasy CSS (`is-preview`) gotowych obszarów. Logika stanów podglądu (najechanie, fokus, zaznaczenie z kliknięcia) jest w `web/static/js/hover.js`.
+
+![Podgląd przy najechaniu na pole NIP](img/gui-hover-pole.jpg)
+
+![Podgląd przy najechaniu na fragment w dokumencie](img/gui-hover-dokument.jpg)
 
 Przy każdym polu czytnik ekranu odczyta „Źródło: strona N, „…fragment…””.
 
@@ -42,5 +48,5 @@ Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), peł
 ## Testy
 
 - `tests/test_api.py` — API jobów (upload, walidacja, path traversal, pobieranie PDF/JSON/ZIP).
-- `tests/test_gui_static.py` — struktura strony (landmarki, ARIA, teksty Gov.pl, lokalne zasoby), a z Node.js także logika JS: dopasowanie fragmentów na prawdziwym tekście PDF z `przyklad_01` (każde pole z `page` w `tests/fixtures/gui/*.result.json` musi zostać znalezione na właściwej stronie).
+- `tests/test_gui_static.py` — struktura strony (landmarki, ARIA, teksty Gov.pl, lokalne zasoby), a z Node.js także logika JS: dopasowanie fragmentów na prawdziwym tekście PDF z `przyklad_01` (każde pole z `page` w `tests/fixtures/gui/*.result.json` musi zostać znalezione na właściwej stronie), mapa pól liczona raz (także czas dla długiego dokumentu) i stany podglądu przy najechaniu.
 - `scripts/smoke_gui.py` — test dymny na uruchomionym serwerze.
