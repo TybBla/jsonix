@@ -54,3 +54,27 @@ Gałęzie i zakresy: [docs/sektory.md](docs/sektory.md). Projekt: [docs/superpow
 ## Dane
 
 `data/train/` — zestawy treningowe UZP (https://github.com/Urzad-Zamowien-Publicznych/hacknation-2026), `data/oczekiwane-json/` — schematy z opisami pól.
+
+## Jakość i CI
+
+```powershell
+pip install -r requirements-dev.txt
+pre-commit install                       # hook: ruff + szybkie testy (bez slow/live_llm)
+ruff check . ; ruff format --check .     # lint i format
+python -m pytest -q -m "not slow"        # szybkie testy (tak jak w pre-commit)
+python -m pytest -q -m "not live_llm"    # pełny zestaw (z wolnymi), tak jak w CI; bez sieci
+python -m eval.gate --split all          # bramka regresji F1 (dev + holdout) względem eval/baseline.json
+python -m eval.gate --split dev --update-baseline   # TYLKO świadomie, razem ze zmianą poprawiającą wynik
+powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1   # Windows: smoke end-to-end
+bash scripts/smoke.sh                                         # Linux/macOS: smoke end-to-end
+```
+
+- **Gate**: szczegóły i kody wyjścia w [eval/README.md](eval/README.md); raporty trafiają do `output/.gate/`.
+- **Smoke**: tworzy świeży venv w katalogu tymczasowym, instaluje tylko `requirements.txt`, kopiuje jedną sprawę
+  i jeden negatyw, uruchamia `start.bat` / `start.sh` i sprawdza wynik (4 pliki JSON, negatyw = `{}`).
+  `start.bat` / `start.sh` robią `cd` do katalogu repozytorium, więc **ścieżki wejścia/wyjścia podawane
+  skryptom muszą być bezwzględne** (względne zostałyby rozwiązane względem katalogu repo).
+- **CI** (`.github/workflows/ci.yml`, push i PR, Ubuntu + Windows, Python 3.13, `LLM_MODE=replay`):
+  `ruff check`, `ruff format --check`, pełne testy (`-m "not live_llm"`), gate F1 dev i holdout (raporty
+  jako artefakt), potem smoke na obu systemach oraz `docker build`. `PYTHONUTF8` celowo nie jest ustawione,
+  aby sprawdzać odporność na kodowanie konsoli.

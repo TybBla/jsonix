@@ -12,6 +12,8 @@ from odw2json import classify as classify_mod
 from odw2json import extract as extract_mod
 from odw2json.contracts import Classification
 
+pytestmark = pytest.mark.slow
+
 TRAIN = Path(__file__).resolve().parents[1] / "data" / "train"
 CASES = ["przyklad_01", "przyklad_02"]
 NEGATIVES = ["KIO_KIO 2617-21.pdf"]
