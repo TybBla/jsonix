@@ -139,3 +139,9 @@ porównawczą (bez diakrytyków) i słownik form prawnych.
 - CI i testy nie powinny OCR-ować skanów na żywo: ok. 3,6 min dla 72 stron na tej maszynie, wolniej na dwurdzeniowych
   runnerach GitHub (do zmierzenia). Rozwiązanie to kasety z T4; test `slow` z silnikiem uruchamia jedną stronę (ok. 5 s).
 - Ryzyko: `intra_op_num_threads: 4` na maszynie z 2 rdzeniami bywa gorsze niż domyślne; wartość jest w konfiguracji.
+
+## Ryzyka
+
+- `Global.use_cls: false` (klasyfikator kąta wyłączony) przyspiesza OCR, ale strony obrócone o 90/180° w skanach
+  od jury zostaną źle odczytane. Próbka UZP nie zawierała takich stron.
+- Mitygacja, gdyby się pojawiły: ponownie włączyć `use_cls` w `config/app.yaml` (koszt ok. 2x czasu na stronę).

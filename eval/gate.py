@@ -478,8 +478,9 @@ def format_table(rows: list[Row], show_all: bool = False) -> str:
 def _record_ocr(in_dir: Path) -> Iterator[dict[str, str]]:
     """Zapisuje zrodlo kazdego wczytanego PDF-a (`doc.ocr_used`): rel (posix) -> 'skan' | 'tekst'.
 
-    Trace z `pipeline.write_outputs` nie zawiera `ocr_used`, wiec bramka zbiera go sama z `ingest.load`
-    (to, co pipeline faktycznie wczytal). `score_dirs` uzywa tej mapy zamiast czytania trace.
+    Trace z `pipeline.write_outputs` zawiera `ocr_used` (zrodlo kazdego dokumentu); ten wrapper zostaje
+    jako fallback dla traces bez tego pola (starsze wyniki). Zbiera zrodlo z `ingest.load`, czyli
+    z tego, co pipeline faktycznie wczytal. `score_dirs` uzywa tej mapy zamiast czytania trace.
     """
     real = ingest.load
     seen: dict[str, str] = {}
