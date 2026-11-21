@@ -26,3 +26,4 @@ ingest:
     enabled: true
     engine: rapidocr
     min_chars_per_page: 30
+    cache_dir: output/.cache/ocr                # cache wynikow OCR po hashu pliku (gitignored); decyzja E2-T5
