@@ -46,6 +46,8 @@ def write_outputs(pdf: Path, input_dir: Path, output_dir: Path, cls: Classificat
     target.parent.mkdir(parents=True, exist_ok=True)
     if res is not None:
         target.write_text(_dump(res.data), encoding="utf-8")
+    elif app_cfg.get("unknown_output", "empty_object") == "empty_object":
+        target.write_text("{}", encoding="utf-8")
     elif app_cfg.get("unknown_output") == "empty_file":
         target.write_text("", encoding="utf-8")
     else:

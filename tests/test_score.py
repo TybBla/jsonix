@@ -36,10 +36,36 @@ def test_wrong_value_is_fp_not_fn():
 
 
 def test_fuzzy_name_match():
-    c = score_pair({"nazwa": "STRABAG Sp. z o.o."}, {"nazwa": "STRABAG sp. z o.o."})
+    p = {"Odwolujacy": [{"nazwa": "STRABAG Sp. z o.o."}]}
+    g = {"Odwolujacy": [{"nazwa": "STRABAG sp. z o.o."}]}
+    c = score_pair(p, g)
     assert c.tp == 1 and c.fp == 0
     c = score_pair({"nip": "STRABAG Sp. z o.o."}, {"nip": "STRABAG sp. z o.o."})
     assert c.tp == 0 and c.fp == 1  # exact field: case-sensitive
+
+
+def test_fuzzy_only_on_uzp_long_string_fields():
+    # wg UZP (Discord 13:26): nazwa pełnomocnika (firma), tytuł przelewu,
+    # nazwa Odwołującego/Zamawiającego, tytuł zamówienia
+    fuzzy_ok = [
+        ({"Zamawiajacy": [{"nazwa": "Gmina Miasto Łódź"}]}, {"Zamawiajacy": [{"nazwa": "Gmina Miasto Lódź"}]}),
+        ({"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka Sp. z o.o."}}]},
+         {"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka sp. z o.o."}}]}),
+        ({"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT."}}, {"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT"}}),
+        ({"przelew_bankowy": {"tytul": "WPIS OD ODW. ZP.1.2025"}}, {"przelew_bankowy": {"tytul": "WPIS OD ODW ZP.1.2025"}}),
+    ]
+    for p, g in fuzzy_ok:
+        assert score_pair(p, g).tp == 1, p
+    # pola dokładne mimo podobnej nazwy klucza
+    exact = [
+        ({"mocodawca": [{"data": {"nazwa": "FAMBUD Sp. z o.o."}}]}, {"mocodawca": [{"data": {"nazwa": "FAMBUD sp. z o.o."}}]}),
+        ({"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalskiego"}]}, {"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalski"}]}),
+        ({"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi/wyjaśnienia do SWZ"}},
+         {"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi i wyjaśnienia do SWZ"}}),
+    ]
+    for p, g in exact:
+        c = score_pair(p, g)
+        assert c.tp == 0 and c.fp == 1, p
 
 
 def test_whitespace_normalized_and_numbers():
@@ -99,17 +125,21 @@ def test_score_dirs(tmp_path):
     _w(gt / "p1" / "extra.pdf", {})            # negative, no pred
     _w(gt / "negatywne" / "neg1.pdf", {})      # negative, pred wrong
     _w(gt / "negatywne" / "neg2.pdf", {})      # negative, empty pred file
+    _w(gt / "negatywne" / "neg3.pdf", {})      # negative, pred {} (UZP: pusty JSON)
+    _w(gt / "negatywne" / "neg4.pdf", {})      # negative, misclassified -> schema of nulls
     _w(pr / "p1" / "odwolanie.json", {"a": "x", "b": None})
     _w(pr / "p1" / "potwierdzenie_przelewu.json", {"kwota": 10})
     # pelnomocnictwo missing entirely
     _w(pr / "negatywne" / "neg1.json", {"a": "junk"})
     _w(pr / "negatywne" / "neg2.json", None)
+    _w(pr / "negatywne" / "neg3.json", {})
+    _w(pr / "negatywne" / "neg4.json", {"przelew_bankowy": {"kwota": None}})
     rep = score_dirs(pr, gt)
     assert rep.by_type["odwolanie"].tp == 1 and rep.by_type["odwolanie"].tn == 1
     assert rep.by_type["przelew"].tp == 1
     assert rep.by_type["pelnomocnictwo"].fn == 1
     assert rep.by_type["negative"].fp == 1
-    assert rep.neg_total == 3 and rep.neg_correct == 2
+    assert rep.neg_total == 5 and rep.neg_correct == 3
     assert rep.total.tp == 2 and rep.total.fn == 1 and rep.total.fp == 1
-    assert len(rep.docs) == 6
+    assert len(rep.docs) == 8
     json.dumps(rep.to_dict())

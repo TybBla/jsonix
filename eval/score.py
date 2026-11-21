@@ -20,7 +20,13 @@ GT_NAME_FOR_PDF: dict = {"potwierdzenie_przelewu": "przelew"}
 
 @dataclass
 class ScoreConfig:
-    fuzzy_keys: frozenset = frozenset({"nazwa", "tytul", "czynnosc_opis", "imie_nazwisko"})
+    # Pola "dlugi string" (prog podobienstwa) wg UZP, Discord 2026-11-21 13:26.
+    fuzzy_paths: frozenset = frozenset({
+        "Odwolujacy[].nazwa", "Zamawiajacy[].nazwa", "Odwolujacy[].pelnomocnik.nazwa",
+        "ZamowieniePubliczne.tytul", "przelew_bankowy.tytul",
+    })
+    # Klucze traktowane rozmyto tylko przy PAROWANIU elementow list (nie przy ocenie).
+    fuzzy_keys: frozenset = frozenset({"nazwa", "tytul", "imie_nazwisko"})
     threshold: float = 0.8
     lenient_types: bool = False      # "123" == 123
     casefold_exact: bool = False     # pola dokladne: ignoruj wielkosc liter
@@ -88,7 +94,7 @@ def _lenient_str(v: Any) -> Any:
     return v
 
 
-def _values_equal(p: Any, g: Any, key: str, cfg: ScoreConfig) -> bool:
+def _values_equal(p: Any, g: Any, fuzzy: bool, cfg: ScoreConfig) -> bool:
     """p, g: znormalizowane, niepuste."""
     if cfg.lenient_types and (_is_num(p) != _is_num(g)):
         p, g = _lenient_str(p), _lenient_str(g)
@@ -97,13 +103,13 @@ def _values_equal(p: Any, g: Any, key: str, cfg: ScoreConfig) -> bool:
     if isinstance(p, bool) or isinstance(g, bool):
         return type(p) is type(g) and p == g
     if isinstance(p, str) and isinstance(g, str):
-        if key in cfg.fuzzy_keys:
+        if fuzzy:
             return fuzz.ratio(p.casefold(), g.casefold()) / 100.0 >= cfg.threshold
         return p.casefold() == g.casefold() if cfg.casefold_exact else p == g
     return p == g
 
 
-def _leaf_counts(p: Any, g: Any, key: str, cfg: ScoreConfig) -> Counts:
+def _leaf_counts(p: Any, g: Any, path: str, cfg: ScoreConfig) -> Counts:
     p, g = _norm(p), _norm(g)
     if p is None and g is None:
         return Counts(tn=1)
@@ -111,11 +117,7 @@ def _leaf_counts(p: Any, g: Any, key: str, cfg: ScoreConfig) -> Counts:
         return Counts(fp=1)
     if p is None:
         return Counts(fn=1)
-    return Counts(tp=1) if _values_equal(p, g, key, cfg) else Counts(fp=1)
-
-
-def _key_of(path: str) -> str:
-    return path.rsplit(".", 1)[-1].replace("[]", "")
+    return Counts(tp=1) if _values_equal(p, g, path in cfg.fuzzy_paths, cfg) else Counts(fp=1)
 
 
 def _add(acc: Counts, path: str, c: Counts) -> None:
@@ -151,7 +153,7 @@ def _compare(p: Any, g: Any, path: str, cfg: ScoreConfig, acc: Counts) -> None:
     if isinstance(p, dict) or isinstance(g, dict):
         if (p_struct and not isinstance(p, dict)) or (g_struct and not isinstance(g, dict)) \
                 or (p is not None and not p_struct) or (g is not None and not g_struct):
-            _add(acc, path, _leaf_counts(_flat(p), _flat(g), _key_of(path), cfg))
+            _add(acc, path, _leaf_counts(_flat(p), _flat(g), path, cfg))
             return
         pd = p or {}
         gd = g or {}
@@ -160,13 +162,13 @@ def _compare(p: Any, g: Any, path: str, cfg: ScoreConfig, acc: Counts) -> None:
         return
     if isinstance(p, list) or isinstance(g, list):
         if (p is not None and not isinstance(p, list)) or (g is not None and not isinstance(g, list)):
-            _add(acc, path, _leaf_counts(_flat(p), _flat(g), _key_of(path), cfg))
+            _add(acc, path, _leaf_counts(_flat(p), _flat(g), path, cfg))
             return
         _compare_lists(p or [], g or [], path + "[]", cfg, acc)
         return
     if path == "" and p is None and g is None:
         return  # dwa brakujace dokumenty - nic do policzenia
-    _add(acc, path, _leaf_counts(p, g, _key_of(path), cfg))
+    _add(acc, path, _leaf_counts(p, g, path, cfg))
 
 
 def _leaves(v: Any, path: str = "") -> dict:
@@ -198,7 +200,7 @@ def _elem_sim(a: Any, b: Any, cfg: ScoreConfig) -> float:
         key = k.rsplit(".", 1)[-1].split("[")[0]
         if key in cfg.fuzzy_keys and isinstance(x, str) and isinstance(y, str):
             total += fuzz.ratio(x.casefold(), y.casefold()) / 100.0
-        elif _values_equal(x, y, key, cfg):
+        elif _values_equal(x, y, False, cfg):
             total += 1.0
     return total / len(keys)
 
@@ -288,9 +290,6 @@ def load_json(p: Path) -> Any:
         return None
 
 
-def _has_values(v: Any) -> bool:
-    return any(_norm(x) is not None for x in _leaves(v).values())
-
 
 def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = ScoreConfig()) -> Report:
     pred_root, gt_root = Path(pred_root), Path(gt_root)
@@ -306,7 +305,8 @@ def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = ScoreConfig())
         res = DocResult((rel_dir / pdf.name).as_posix(), dtype, counts, pred is None, negative)
         if negative:
             rep.neg_total += 1
-            res.neg_correct = pred is None or not _has_values(pred)
+            # poprawne odrzucenie = brak pliku, pusty plik albo {} (nie: szablon z nullami)
+            res.neg_correct = pred is None or pred == {}
             rep.neg_correct += int(res.neg_correct)
         rep.docs.append(res)
         rep.total = rep.total + counts
