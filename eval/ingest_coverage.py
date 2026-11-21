@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from eval.score import GT_NAME_FOR_PDF
-from odw2json.config_loader import ROOT_DIR
+from eval.score import SOURCE_SCAN, SOURCE_TEXT, gt_path_for_pdf, has_text_layer, infer_doc_type
+from odw2json.config_loader import ROOT_DIR, load_registry
 from odw2json.splits import load_splits
 
 LITERAL_KEYS = frozenset(
@@ -176,6 +176,9 @@ def coverage_for_doc(text: str, gt: dict, doc_type: str) -> Coverage:
 class Report:
     total: Coverage = field(default_factory=Coverage)
     by_type: dict[str, Coverage] = field(default_factory=dict)
+    by_source: dict[str, Coverage] = field(default_factory=dict)  # 'tekst' / 'skan'
+    by_type_source: dict[str, Coverage] = field(default_factory=dict)  # 'typ/zrodlo'
+    docs_by_source: dict[str, int] = field(default_factory=dict)
     docs: int = 0
     load_errors: list[tuple[str, str]] = field(default_factory=list)
     foreign_backend: list[tuple[str, str]] = field(default_factory=list)  # (doc, backend inny niz zadany)
@@ -188,6 +191,9 @@ class Report:
         return {
             "global": self.total.to_dict(),
             "by_type": {k: v.to_dict() for k, v in sorted(self.by_type.items())},
+            "by_source": {k: v.to_dict() for k, v in sorted(self.by_source.items())},
+            "by_type_source": {k: v.to_dict() for k, v in sorted(self.by_type_source.items())},
+            "docs_by_source": dict(sorted(self.docs_by_source.items())),
             "by_field": {k: v.to_dict() for k, v in sorted(self.by_field.items())},
             "missing": [{"field": p, "value": v} for p, v in self.total.missing],
             "docs": self.docs,
@@ -218,30 +224,50 @@ def _cases(split: str) -> list[str]:
     return sorted(splits[split])
 
 
-def run_coverage(split: str = "all", backend: str | None = None, train_dir: Path = TRAIN_DIR) -> Report:
+def run_coverage(
+    split: str = "all",
+    backend: str | None = None,
+    train_dir: Path = TRAIN_DIR,
+    cases: list[str] | None = None,
+) -> Report:
+    """Pokrycie wartosci GT w tekscie z ingestu.
+
+    GT dla `X.pdf`: `X.json` obok niego, inaczej `GT_NAME_FOR_PDF`; typ dokumentu z kluczy GT (fallback:
+    nazwa pliku GT). Zrodlo: 'skan', gdy `doc.ocr_used`, albo gdy PDF nie ma warstwy tekstowej
+    (< 30 znakow w surowej ekstrakcji; dotyczy tez bledu wczytania i nieudanego OCR); inaczej 'tekst'.
+    `cases` nadpisuje liste spraw splitu (testy).
+    """
     loader = _make_loader(backend)
+    registry = load_registry()
     rep = Report()
-    for case in _cases(split):
+    for case in cases if cases is not None else _cases(split):
         for pdf in sorted((train_dir / case).glob("*.pdf")):
-            gt_stem = GT_NAME_FOR_PDF.get(pdf.stem, pdf.stem)
-            gt_path = train_dir / case / f"{gt_stem}.json"
-            if not gt_path.exists():
+            gt_path = gt_path_for_pdf(pdf)
+            if gt_path is None:
                 continue
             gt = json.loads(gt_path.read_text(encoding="utf-8-sig"))
+            gt_type = infer_doc_type(gt, registry) or gt_path.stem
             rel = f"{case}/{pdf.name}"
+            ocr_used = False
             try:
                 doc = loader(pdf)
                 text = doc.text
+                ocr_used = bool(doc.ocr_used)
                 if backend is not None and doc.backend != backend:
                     rep.foreign_backend.append((rel, doc.backend))
             except Exception as e:  # noqa: BLE001 - narzedzie pomiarowe, jedziemy dalej
                 rep.load_errors.append((rel, f"{type(e).__name__}: {e}"))
                 text = ""
+            source = SOURCE_SCAN if ocr_used or not has_text_layer(pdf) else SOURCE_TEXT
             rep.docs += 1
-            cov = coverage_for_doc(text, gt, gt_stem)
+            cov = coverage_for_doc(text, gt, gt_type)
             cov.missing = [(f"{rel}: {p}", v) for p, v in cov.missing]
             rep.total = rep.total + cov
-            rep.by_type[gt_stem] = rep.by_type.get(gt_stem, Coverage()) + cov
+            rep.by_type[gt_type] = rep.by_type.get(gt_type, Coverage()) + cov
+            rep.by_source[source] = rep.by_source.get(source, Coverage()) + cov
+            key = f"{gt_type}/{source}"
+            rep.by_type_source[key] = rep.by_type_source.get(key, Coverage()) + cov
+            rep.docs_by_source[source] = rep.docs_by_source.get(source, 0) + 1
     return rep
 
 
@@ -261,6 +287,11 @@ def format_report(rep: Report, show_missing: int = 20) -> str:
     out += ["== WG TYPU DOKUMENTU ==", _hdr(16)]
     for k in sorted(rep.by_type):
         out.append(_row(k, rep.by_type[k], 16))
+    out += ["", "== WG ZRODLA (tekst / skan) ==", _hdr(24)]
+    for k in sorted(rep.by_source):
+        out.append(_row(f"{k} ({rep.docs_by_source.get(k, 0)} dok.)", rep.by_source[k], 24))
+    for k in sorted(rep.by_type_source):
+        out.append(_row(k, rep.by_type_source[k], 24))
     out += ["", "== POLA (od najgorszego) =="]
     fields = sorted(
         rep.by_field.items(),

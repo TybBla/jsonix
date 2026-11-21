@@ -15,8 +15,12 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-# pdf stem -> GT stem (domyslnie identycznosc)
+# pdf stem -> GT stem (domyslnie identycznosc); uzywane tylko, gdy obok X.pdf nie ma X.json
 GT_NAME_FOR_PDF: dict = {"potwierdzenie_przelewu": "przelew"}
+
+SOURCE_TEXT = "tekst"
+SOURCE_SCAN = "skan"
+MIN_TEXT_LAYER_CHARS = 30  # PDF z mniejsza liczba znakow w surowej ekstrakcji uznajemy za skan
 
 
 @dataclass
@@ -257,6 +261,64 @@ def score_pair(pred: dict | None, gt: dict | None, cfg: ScoreConfig = _DEFAULT_C
     return acc
 
 
+# ------------------------------------------- GT, typ dokumentu i zrodlo (E2b)
+
+
+def gt_path_for_pdf(pdf: Path, cfg: ScoreConfig | None = None) -> Path | None:
+    """Istniejacy plik GT dla `X.pdf`: `X.json` obok PDF-a, w przeciwnym razie `GT_NAME_FOR_PDF[X].json`.
+
+    None = brak GT (dokument negatywny).
+    """
+    names = (cfg or _DEFAULT_CFG).gt_name_for_pdf
+    pdf = Path(pdf)
+    for stem in (pdf.stem, names.get(pdf.stem, pdf.stem)):
+        cand = pdf.with_name(f"{stem}.json")
+        if cand.is_file():
+            return cand
+    return None
+
+
+def infer_doc_type(gt: Any, registry: dict) -> str | None:
+    """Typ dokumentu, ktorego szablon ma najwiecej kluczy wspolnych z kluczami najwyzszego poziomu GT.
+
+    None, gdy GT nie jest obiektem, nie ma wspolnych kluczy z zadnym szablonem albo wynik jest remisowy.
+    """
+    if not isinstance(gt, dict) or not gt:
+        return None
+    keys = set(gt)
+    scores = {name: len(keys & set(cfg.template())) for name, cfg in registry.items()}
+    best = max(scores.values(), default=0)
+    winners = [name for name, n in scores.items() if n == best]
+    return winners[0] if best > 0 and len(winners) == 1 else None
+
+
+def has_text_layer(pdf: Path, min_chars: int = MIN_TEXT_LAYER_CHARS) -> bool:
+    """Czy PDF ma warstwe tekstowa (surowa ekstrakcja, bez OCR): >= `min_chars` znakow na calosc.
+
+    Nieczytelny plik uznajemy za tekstowy (nie jest skanem, tylko bledem do zglaszania gdzie indziej).
+    """
+    from odw2json.ingest import backends
+
+    try:
+        pages = backends.BACKENDS["pypdfium2"](Path(pdf))
+    except Exception:  # noqa: BLE001 - heurystyka pomiarowa
+        return True
+    return sum(len(p.strip()) for p in pages) >= min_chars
+
+
+def doc_source(pred_root: Path, rel_pdf: str) -> str:
+    """'skan', gdy trace `<pred_root>/.trace/<rel>.trace.json` ma `ocr_used` = true; inaczej 'tekst'.
+
+    Brak lub uszkodzony trace daje 'tekst'.
+    """
+    trace = Path(pred_root) / ".trace" / Path(rel_pdf).with_suffix(".json").with_suffix(".trace.json")
+    try:
+        data = json.loads(trace.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return SOURCE_TEXT
+    return SOURCE_SCAN if isinstance(data, dict) and data.get("ocr_used") is True else SOURCE_TEXT
+
+
 # ---------------------------------------------------------------- katalogi
 
 
@@ -268,11 +330,13 @@ class DocResult:
     pred_missing: bool
     negative: bool
     neg_correct: bool = False
+    source: str = SOURCE_TEXT
 
     def to_dict(self) -> dict:
         return {
             "doc": self.rel,
             "type": self.doc_type,
+            "source": self.source,
             "pred_missing": self.pred_missing,
             **self.counts.to_dict(),
         }
@@ -283,6 +347,9 @@ class Report:
     docs: list = field(default_factory=list)
     total: Counts = field(default_factory=Counts)
     by_type: dict = field(default_factory=dict)
+    by_source: dict = field(default_factory=dict)  # zrodlo -> Counts (z negatywami, sumuje sie do total)
+    by_type_source: dict = field(default_factory=dict)  # "typ/zrodlo" -> Counts (bez negatywow)
+    docs_by_source: dict = field(default_factory=dict)
     neg_total: int = 0
     neg_correct: int = 0
 
@@ -294,6 +361,9 @@ class Report:
         return {
             "total": self.total.to_dict(),
             "by_type": {k: v.to_dict() for k, v in self.by_type.items()},
+            "by_source": {k: v.to_dict() for k, v in sorted(self.by_source.items())},
+            "by_type_source": {k: v.to_dict() for k, v in sorted(self.by_type_source.items())},
+            "docs_by_source": dict(sorted(self.docs_by_source.items())),
             "fields": {k: v.to_dict() for k, v in sorted(self.fields.items())},
             "negatives": {
                 "total": self.neg_total,
@@ -318,18 +388,36 @@ def load_json(p: Path) -> Any:
         return None
 
 
-def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = _DEFAULT_CFG) -> Report:
+def score_dirs(
+    pred_root: Path,
+    gt_root: Path,
+    cfg: ScoreConfig = _DEFAULT_CFG,
+    registry: dict | None = None,
+    sources: dict | None = None,
+) -> Report:
+    """Ocenia wszystkie `*.pdf` z `gt_root` (takze w podkatalogach, np. `skany/odwolania/0001/`).
+
+    GT dla `X.pdf` to `X.json` obok niego, a gdy go brak - `cfg.gt_name_for_pdf`. Typ dokumentu to typ
+    z `registry` (domyslnie `load_registry()`), ktorego szablon pasuje do kluczy GT; gdy zaden nie pasuje,
+    nazwa pliku GT. `sources`: rel (posix) -> 'tekst'|'skan' nadpisuje odczyt z trace.
+    """
     pred_root, gt_root = Path(pred_root), Path(gt_root)
+    if registry is None:
+        from odw2json.config_loader import load_registry
+
+        registry = load_registry()
     rep = Report()
     for pdf in sorted(gt_root.rglob("*.pdf")):
         rel_dir = pdf.parent.relative_to(gt_root)
-        gt_stem = cfg.gt_name_for_pdf.get(pdf.stem, pdf.stem)
-        gt = load_json(gt_root / rel_dir / f"{gt_stem}.json")
+        rel = (rel_dir / pdf.name).as_posix()
+        gt_path = gt_path_for_pdf(pdf, cfg)
+        gt = load_json(gt_path) if gt_path else None
         pred = load_json(pred_root / rel_dir / f"{pdf.stem}.json")
         negative = gt is None
         counts = score_pair(pred, gt, cfg)
-        dtype = "negative" if negative else gt_stem
-        res = DocResult((rel_dir / pdf.name).as_posix(), dtype, counts, pred is None, negative)
+        source = (sources or {}).get(rel) or doc_source(pred_root, rel)
+        dtype = "negative" if negative else (infer_doc_type(gt, registry) or gt_path.stem)
+        res = DocResult(rel, dtype, counts, pred is None, negative, source=source)
         if negative:
             rep.neg_total += 1
             # poprawne odrzucenie = brak pliku, pusty plik albo {} (nie: szablon z nullami)
@@ -338,6 +426,11 @@ def score_dirs(pred_root: Path, gt_root: Path, cfg: ScoreConfig = _DEFAULT_CFG) 
         rep.docs.append(res)
         rep.total = rep.total + counts
         rep.by_type[dtype] = rep.by_type.get(dtype, Counts()) + counts
+        rep.by_source[source] = rep.by_source.get(source, Counts()) + counts
+        rep.docs_by_source[source] = rep.docs_by_source.get(source, 0) + 1
+        if not negative:
+            key = f"{dtype}/{source}"
+            rep.by_type_source[key] = rep.by_type_source.get(key, Counts()) + counts
     return rep
 
 
@@ -361,6 +454,10 @@ def format_report(rep: Report, worst: int = 10) -> str:
     L += ["== WG TYPU DOKUMENTU ==", _hdr(16)]
     for k in sorted(rep.by_type):
         L.append(_row(k, rep.by_type[k], 16))
+    if len(rep.by_source) > 1 or SOURCE_SCAN in rep.by_source:
+        L += ["", "== WG ZRODLA (tekst / skan) ==", _hdr(16)]
+        for k in sorted(rep.by_source):
+            L.append(_row(f"{k} ({rep.docs_by_source.get(k, 0)} dok.)", rep.by_source[k], 16))
     if rep.neg_total:
         L.append(
             f"negatywy: poprawnie odrzucone {rep.neg_correct}/{rep.neg_total} "

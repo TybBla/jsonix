@@ -1,7 +1,8 @@
 """Bramka regresji F1: uruchamia pipeline na splicie, liczy metryki i porownuje z baseline.
 
 Uzycie:
-    python -m eval.gate [--split dev|holdout|all] [--update-baseline] [--tolerance 0.0] [--json PATH]
+    python -m eval.gate [--split dev|holdout|all] [--source tekst|skan|all] [--update-baseline]
+                        [--tolerance 0.0] [--json PATH]
 
 Kody wyjscia: 0 = ok, 1 = regresja albo awaria (blad schematu / wyjatek pipeline),
 2 = blad uzycia albo brak sekcji w baseline (bez --update-baseline).
@@ -16,13 +17,24 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from eval.score import GT_NAME_FOR_PDF, Report, score_dirs
-from odw2json import pipeline
+from eval.score import (
+    SOURCE_SCAN,
+    SOURCE_TEXT,
+    Report,
+    gt_path_for_pdf,
+    has_text_layer,
+    infer_doc_type,
+    load_json,
+    score_dirs,
+)
+from odw2json import ingest, pipeline
 from odw2json.config_loader import ROOT_DIR, DocTypeConfig, load_app_config, load_registry
 from odw2json.logging_setup import new_run_id
 from odw2json.schema import is_unknown_output, validate_output
@@ -32,6 +44,8 @@ BASELINE_PATH = Path(__file__).resolve().parent / "baseline.json"
 TRAIN_DIR = ROOT_DIR / "data" / "train"
 GATE_DIR = ROOT_DIR / "output" / ".gate"
 SPLITS = ("dev", "holdout")
+SOURCES = ("all", SOURCE_TEXT, SOURCE_SCAN)  # filtr przebiegu: wszystko / tylko tekstowe / tylko skany
+SCAN_CASE_PREFIX = "skany/"
 EPS = 1e-9
 _GLOBAL_ROWS = {
     "f1",
@@ -63,6 +77,7 @@ class Row:
 @dataclass
 class GateResult:
     split: str
+    source: str = "all"
     exit_code: int = 0
     metrics: dict = field(default_factory=dict)
     regressions: list[str] = field(default_factory=list)
@@ -73,9 +88,16 @@ class GateResult:
     details: dict = field(default_factory=dict)
     parts: list[GateResult] = field(default_factory=list)  # tylko dla split="all"
 
+    @property
+    def section(self) -> str:
+        """Klucz sekcji baseline: `dev` albo `dev@tekst` / `dev@skan`."""
+        return section_key(self.split, self.source)
+
     def to_dict(self) -> dict:
         return {
             "split": self.split,
+            "source": self.source,
+            "section": self.section,
             "exit_code": self.exit_code,
             "metrics": self.metrics,
             "regressions": self.regressions,
@@ -83,6 +105,28 @@ class GateResult:
             "rows": [vars(r) for r in self.rows],
             **self.details,
         }
+
+
+def section_key(split: str, source: str = "all") -> str:
+    """Sekcja baseline: sam split dla `all`, inaczej `split@zrodlo` (np. `dev@tekst`)."""
+    return split if source == "all" else f"{split}@{source}"
+
+
+def _check_source(source: str) -> None:
+    if source not in SOURCES:
+        raise ValueError(f"nieznane zrodlo {source!r} (dozwolone: {', '.join(SOURCES)})")
+
+
+def _is_scan_case(case: str) -> bool:
+    return case.replace("\\", "/").startswith(SCAN_CASE_PREFIX)
+
+
+def filter_cases(cases: list[str], source: str) -> list[str]:
+    """Sprawy wg zrodla: `skan` = tylko `skany/...`, `tekst` = reszta, `all` = bez zmian."""
+    _check_source(source)
+    if source == "all":
+        return list(cases)
+    return [c for c in cases if _is_scan_case(c) == (source == SOURCE_SCAN)]
 
 
 # ----------------------------------------------------------- baseline I/O
@@ -140,8 +184,15 @@ def _prepare(
     cases: list[str],
     neg_dirs: list[str],
     negatives: list[str] | None,
+    source: str = "all",
 ) -> tuple[Path, Path]:
-    """Buduje work/in (PDF-y) i work/gt (GT JSON + puste atrapy PDF, bo score_dirs iteruje po PDF)."""
+    """Buduje work/in (PDF-y) i work/gt (GT JSON + puste atrapy PDF, bo score_dirs iteruje po PDF).
+
+    `source` (tekst|skan|all) odfiltrowuje sprawy (`filter_cases`) i negatywy (warstwa tekstu w surowej
+    ekstrakcji, bez OCR) PRZED uruchomieniem pipeline'u. Sprawy moga lezec w podkatalogach
+    (`skany/odwolania/0001`); sciezki wzgledne sa zachowane.
+    """
+    _check_source(source)
     in_dir, gt_dir = work / "in", work / "gt"
     in_dir.mkdir(parents=True)
     gt_dir.mkdir(parents=True)
@@ -154,9 +205,10 @@ def _prepare(
         placeholder.write_bytes(b"")
 
     for case in cases:
-        src = train_dir / case
-        if not src.is_dir():
+        if not (train_dir / case).is_dir():
             raise ValueError(f"brak sprawy {case!r} w {train_dir}")
+    for case in filter_cases(cases, source):
+        src = train_dir / case
         for f in sorted(src.rglob("*")):
             if not f.is_file():
                 continue
@@ -171,8 +223,9 @@ def _prepare(
     for d in neg_dirs:
         for pdf in sorted((train_dir / d).glob("*.pdf")):
             if negatives is None or pdf.name in negatives:
-                add_pdf(pdf)
                 found.add(pdf.name)
+                if source == "all" or has_text_layer(pdf) == (source == SOURCE_TEXT):
+                    add_pdf(pdf)
     missing = sorted(set(negatives or []) - found)
     if missing:
         raise ValueError(f"brak negatywow: {missing}")
@@ -230,8 +283,8 @@ def _inspect_outputs(
     for pdf in sorted(gt_dir.rglob("*.pdf")):
         rel_dir = pdf.parent.relative_to(gt_dir)
         rel = (rel_dir / pdf.name).as_posix()
-        gt_stem = GT_NAME_FOR_PDF.get(pdf.stem, pdf.stem)
-        positive = (gt_dir / rel_dir / f"{gt_stem}.json").is_file()
+        gt_path = gt_path_for_pdf(pdf)  # X.json obok PDF-a, inaczej GT_NAME_FOR_PDF
+        positive = gt_path is not None
         raw_path = out_dir / rel_dir / f"{pdf.stem}.json"
         if not positive:
             ok, is_schema, why = _negative_ok(raw_path, unknown_output)
@@ -253,19 +306,26 @@ def _inspect_outputs(
             schema_n += 1
             schema_msgs.append(f"{rel}: niepoprawny JSON wyniku: {e}")
             continue
-        cfg = registry.get(gt_stem)
+        # oczekiwany typ = typ, ktorego szablon pasuje do kluczy GT (nie nazwa pliku); fallback: nazwa GT
+        expected = infer_doc_type(load_json(gt_path), registry) or gt_path.stem
+        cfg = registry.get(expected)
         if not isinstance(data, dict) or is_unknown_output(data):
-            cls_err(rel, f"oczekiwano {gt_stem}, wynik pusty/niepoprawny")
+            cls_err(rel, f"oczekiwano {expected}, wynik pusty/niepoprawny")
             continue
         if cfg is None:
             continue
         if not set(data) & set(cfg.template()):
-            cls_err(rel, f"oczekiwano {gt_stem}, klucze {sorted(data)} to inny typ")
+            cls_err(rel, f"oczekiwano {expected}, klucze {sorted(data)} to inny typ")
             continue  # zly typ to blad klasyfikacji, nie schematu
         errs = validate_output(data, cfg)
         schema_n += len(errs)
         schema_msgs.extend(f"{rel}: {e}" for e in errs)
     return schema_n, cls_n, schema_msgs, cls_msgs, sorted(cls_files)
+
+
+def _source_metrics(c: Any, docs: int) -> dict:
+    d = c.to_dict()
+    return {k: d[k] for k in ("f1", "precision", "recall", "tp", "fp", "fn", "tn")} | {"docs": docs}
 
 
 def build_metrics(
@@ -282,6 +342,10 @@ def build_metrics(
         "recall": t.recall,
         "f1_by_type": {k: v.f1 for k, v in sorted(rep.by_type.items()) if k != "negative"},
         "f1_by_field": {k: v.f1 for k, v in sorted(rep.fields.items())},
+        "by_source": {
+            k: _source_metrics(v, rep.docs_by_source.get(k, 0)) for k, v in sorted(rep.by_source.items())
+        },
+        "f1_by_type_source": {k: v.f1 for k, v in sorted(rep.by_type_source.items())},
         "neg_correct": rep.neg_correct,
         "neg_total": rep.neg_total,
         "schema_errors": schema_errors,
@@ -340,6 +404,13 @@ def compare_metrics(base: dict, cur: dict, tolerance: float) -> tuple[list[Row],
         b_map, c_map = base.get(group) or {}, cur.get(group) or {}
         for k in sorted(set(b_map) | set(c_map)):
             higher(f"{group}[{k}]", b_map.get(k), c_map.get(k))
+    # podzial wg zrodla (E2b): f1 per zrodlo i per typ/zrodlo; klucze spoza baseline to "new"
+    b_src, c_src = base.get("by_source") or {}, cur.get("by_source") or {}
+    for k in sorted(set(b_src) | set(c_src)):
+        higher(f"by_source[{k}].f1", (b_src.get(k) or {}).get("f1"), (c_src.get(k) or {}).get("f1"))
+    b_map, c_map = base.get("f1_by_type_source") or {}, cur.get("f1_by_type_source") or {}
+    for k in sorted(set(b_map) | set(c_map)):
+        higher(f"f1_by_type_source[{k}]", b_map.get(k), c_map.get(k))
 
     for key in ("schema_errors", "pipeline_errors", "classification_errors"):
         b, c = base.get(key, 0), cur.get(key, 0)
@@ -377,7 +448,11 @@ def format_table(rows: list[Row], show_all: bool = False) -> str:
     shown = [
         r
         for r in rows
-        if show_all or r.name in _GLOBAL_ROWS or r.arrow != "=" or r.flag in ("new", "gone", "REGRESSION")
+        if show_all
+        or r.name in _GLOBAL_ROWS
+        or r.name.startswith("by_source[")
+        or r.arrow != "="
+        or r.flag in ("new", "gone", "REGRESSION")
     ]
     hidden = len(rows) - len(shown)
     w = max([len("metric")] + [len(r.name) for r in shown])
@@ -399,6 +474,32 @@ def format_table(rows: list[Row], show_all: bool = False) -> str:
 # ---------------------------------------------------------------------- bramka
 
 
+@contextmanager
+def _record_ocr(in_dir: Path) -> Iterator[dict[str, str]]:
+    """Zapisuje zrodlo kazdego wczytanego PDF-a (`doc.ocr_used`): rel (posix) -> 'skan' | 'tekst'.
+
+    Trace z `pipeline.write_outputs` nie zawiera `ocr_used`, wiec bramka zbiera go sama z `ingest.load`
+    (to, co pipeline faktycznie wczytal). `score_dirs` uzywa tej mapy zamiast czytania trace.
+    """
+    real = ingest.load
+    seen: dict[str, str] = {}
+
+    def recording(path, *args, **kwargs):
+        doc = real(path, *args, **kwargs)
+        try:
+            rel = Path(path).relative_to(in_dir).as_posix()
+        except ValueError:
+            return doc
+        seen[rel] = SOURCE_SCAN if doc.ocr_used else SOURCE_TEXT
+        return doc
+
+    ingest.load = recording
+    try:
+        yield seen
+    finally:
+        ingest.load = real
+
+
 def run_gate(
     split: str,
     cases: list[str] | None = None,
@@ -408,25 +509,30 @@ def run_gate(
     train_dir: Path = TRAIN_DIR,
     negatives: list[str] | None = None,
     gate_dir: Path | None = None,
+    source: str = "all",
 ) -> GateResult:
     """Uruchamia bramke dla splitu ('dev', 'holdout' albo 'all').
 
     cases: nadpisuje liste spraw splitu (szybkie testy); negatives: nazwy PDF-ow z katalogu negatywow
     (domyslnie wszystkie); gate_dir: gdzie zapisac wynik (domyslnie output/.gate).
+    source: 'tekst' | 'skan' | 'all' - ktore sprawy i negatywy wchodza do przebiegu (filtr PRZED pipeline'em,
+    bez OCR); dla source != 'all' sekcja baseline nazywa sie `<split>@<source>` (np. `dev@tekst`).
     """
+    _check_source(source)
     if split == "all":
         if cases is not None:
             raise ValueError("--split all nie laczy sie z lista spraw")
         parts = [
-            run_gate(s, None, baseline_path, update, tolerance, train_dir, negatives, gate_dir)
+            run_gate(s, None, baseline_path, update, tolerance, train_dir, negatives, gate_dir, source)
             for s in SPLITS
         ]
         codes = [p.exit_code for p in parts]
         return GateResult(
             split="all",
+            source=source,
             exit_code=1 if 1 in codes else (2 if 2 in codes else 0),
-            metrics={p.split: p.metrics for p in parts},
-            regressions=[f"[{p.split}] {r}" for p in parts for r in p.regressions],
+            metrics={p.section: p.metrics for p in parts},
+            regressions=[f"[{p.section}] {r}" for p in parts for r in p.regressions],
             report="\n\n".join(p.report for p in parts),
             updated=any(p.updated for p in parts),
             parts=parts,
@@ -435,17 +541,19 @@ def run_gate(
         raise ValueError(f"nieznany split {split!r} (dozwolone: dev, holdout, all)")
 
     splits = load_splits()
-    case_list = list(cases) if cases is not None else splits[split]
+    case_list = filter_cases(cases if cases is not None else splits[split], source)
+    section = section_key(split, source)
     registry = load_registry()
     app_cfg = load_app_config()
     run_id = f"gate-{split}-{new_run_id()}"
 
     with tempfile.TemporaryDirectory(prefix=f"odw2json-gate-{split}-", ignore_cleanup_errors=True) as tmp:
         work = Path(tmp)
-        in_dir, gt_dir = _prepare(work, Path(train_dir), case_list, splits["negatives"], negatives)
+        in_dir, gt_dir = _prepare(work, Path(train_dir), case_list, splits["negatives"], negatives, source)
         out_dir = work / "out"
-        run_report = pipeline.run(in_dir, out_dir, app_cfg=app_cfg, registry=registry, run_id=run_id)
-        rep = score_dirs(out_dir, gt_dir)
+        with _record_ocr(in_dir) as sources:
+            run_report = pipeline.run(in_dir, out_dir, app_cfg=app_cfg, registry=registry, run_id=run_id)
+        rep = score_dirs(out_dir, gt_dir, registry=registry, sources=sources)
         schema_n, cls_n, schema_msgs, cls_msgs, cls_files = _inspect_outputs(
             out_dir, gt_dir, registry, app_cfg.get("unknown_output", "empty_object")
         )
@@ -455,7 +563,7 @@ def run_gate(
     metrics["updated"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     metrics["commit"] = _git_commit()
 
-    res = GateResult(split=split, metrics=metrics)
+    res = GateResult(split=split, source=source, metrics=metrics)
     res.details = {
         "cases": case_list,
         "run_id": run_id,
@@ -466,9 +574,9 @@ def run_gate(
     }
 
     sections = load_baseline(baseline_path)
-    base = sections.get(split)
+    base = sections.get(section)
     res.baseline = base
-    lines = [f"== gate[{split}] =="]
+    lines = [f"== gate[{section}] =="]
     broken = []
     if schema_n:
         broken.append(f"schema_errors: {schema_n} (musi byc 0)")
@@ -487,13 +595,13 @@ def run_gate(
                 lines += ["Roznice wzgledem poprzedniego baseline:", format_table(res.rows)]
             else:
                 lines.append("Nowa sekcja baseline (brak poprzedniej).")
-            sections[split] = metrics
+            sections[section] = metrics
             save_baseline(baseline_path, sections)
             res.updated = True
-            lines.append(f"Zapisano baseline[{split}] -> {baseline_path}")
+            lines.append(f"Zapisano baseline[{section}] -> {baseline_path}")
     elif not base:
         res.exit_code = 2
-        lines.append(f"Brak sekcji '{split}' w {baseline_path}. Uruchom z --update-baseline.")
+        lines.append(f"Brak sekcji '{section}' w {baseline_path}. Uruchom z --update-baseline.")
     else:
         res.rows, res.regressions = compare_metrics(base, metrics, tolerance)
         res.exit_code = 1 if res.regressions else 0
@@ -510,7 +618,7 @@ def run_gate(
 
     out_gate = Path(gate_dir) if gate_dir is not None else GATE_DIR
     out_gate.mkdir(parents=True, exist_ok=True)
-    (out_gate / f"{split}.json").write_text(
+    (out_gate / f"{section}.json").write_text(
         json.dumps(res.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return res
@@ -528,6 +636,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Bramka regresji F1 (baseline per split)")
     ap.add_argument("--split", choices=[*SPLITS, "all"], default="dev")
     ap.add_argument(
+        "--source",
+        choices=SOURCES,
+        default="all",
+        help="tekst = sprawy z warstwa tekstu, skan = skany (sekcja baseline <split>@<source>), all = oba",
+    )
+    ap.add_argument(
         "--update-baseline", action="store_true", help="nadpisz sekcje baseline biezacym wynikiem"
     )
     ap.add_argument("--tolerance", type=float, default=0.0, help="dopuszczalny spadek metryk (domyslnie 0)")
@@ -535,14 +649,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline", type=Path, default=BASELINE_PATH, help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
     try:
-        res = run_gate(a.split, baseline_path=a.baseline, update=a.update_baseline, tolerance=a.tolerance)
+        res = run_gate(
+            a.split,
+            baseline_path=a.baseline,
+            update=a.update_baseline,
+            tolerance=a.tolerance,
+            source=a.source,
+        )
     except ValueError as e:
         print(f"blad: {e}", file=sys.stderr)
         return 2
     print(res.report)
     if a.json:
         parts = res.parts or [res]
-        payload = {p.split: p.to_dict() for p in parts}
+        payload = {p.section: p.to_dict() for p in parts}
         a.json.parent.mkdir(parents=True, exist_ok=True)
         a.json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return res.exit_code
