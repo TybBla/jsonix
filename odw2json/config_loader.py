@@ -83,7 +83,9 @@ class ClassifyConfig(BaseModel):
     ``patterns`` - regexy z wagami; ``required_any`` - lista wpisów: fraza, ``re:<regex>`` albo grupa
     ``{all_of: [...]}`` (wszystkie wpisy grupy naraz; wpis ``@title`` = trafił tytuł); bez trafienia
     któregokolwiek wpisu typ odpada; ``min_score`` - minimalny wynik; ``min_margin`` - minimalna
-    przewaga nad drugim typem.
+    przewaga nad drugim typem; ``ignore_foreign`` - frazy z ``foreign_titles`` (config/classify.yaml),
+    za które ten typ nie jest karany (fraza pokrywająca się z własnym ``title`` jest zwalniana
+    automatycznie).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -101,6 +103,7 @@ class ClassifyConfig(BaseModel):
     min_margin: float = Field(0.0, ge=0)
     header_chars: int = Field(600, gt=0)
     weights: ClassifyWeights = Field(default_factory=ClassifyWeights)
+    ignore_foreign: list[str] = Field(default_factory=list)
 
     @field_validator("required_any")
     @classmethod
@@ -112,10 +115,12 @@ class ClassifyConfig(BaseModel):
 
 
 class ForeignTitles(BaseModel):
-    """Nagłówki dokumentów obcych (wyrok, faktura...): kara dla WSZYSTKICH typów.
+    """Nagłówki dokumentów obcych (wyrok, faktura...): kara liczona dla każdego typu osobno.
 
     Fraza liczy się, gdy któraś z linii w pierwszych ``header_chars`` znakach **zaczyna się** od niej
-    (granica słowa). Kara ``weight`` (ujemna) jest naliczana raz, niezależnie od liczby trafień.
+    (granica słowa). Kara ``weight`` (ujemna) jest naliczana raz na typ, niezależnie od liczby trafień.
+    Typ nie jest karany za frazę pokrywającą się z jego ``title`` (jedna zaczyna drugą) ani za frazy
+    z jego ``ignore_foreign``.
     """
 
     model_config = ConfigDict(extra="forbid")

@@ -428,7 +428,8 @@ def test_foreign_header_blocks_otherwise_matching_documents():
     assert _shipped("WYROK\nODWOLANIE\n" + prose) is None
     plain = classify.classify(_doc("ODWOLANIE\n" + prose), _registry()).scores["odwolanie"]
     sygn = classify.classify(_doc("Sygn. akt KIO 1/25\nODWOLANIE\n" + prose), _registry())
-    assert sygn.scores["odwolanie"] == plain - 10  # kara jest miekka: silne odwolanie nadal przechodzi
+    assert sygn.scores["odwolanie"] == plain  # sygnatura sprawy nie jest naglowkiem obcym (review E3)
+    assert sygn.doc_type == "odwolanie"
 
 
 # -------------------------------------------- foreign_titles (E3-T3)
@@ -486,8 +487,9 @@ def test_foreign_titles_ignore_diacritics_and_collapse_spaced_letters():
 def test_classify_without_settings_uses_shipped_global_file():
     shipped = load_classify_settings()
     assert shipped.foreign_titles.weight < 0
-    for phrase in ("wyrok", "postanowienie", "faktura", "sygn. akt", "wezwanie", "umowa"):
+    for phrase in ("wyrok", "postanowienie", "faktura", "wezwanie", "umowa", "odpowiedz na odwolanie"):
         assert phrase in shipped.foreign_titles.phrases
+    assert "sygn. akt" not in shipped.foreign_titles.phrases
     c = classify.classify(_doc("WYROK\nalfa"), _reg(strong=["alfa"], min_score=1))
     assert c.scores["t"] == 2.0 + shipped.foreign_titles.weight
 
@@ -578,3 +580,124 @@ def test_odwolanie_without_title_or_label_recognized_by_filing_act():
 
 def test_letter_mentioning_odwolanie_without_filing_act_is_unknown():
     assert classify.classify(_doc(_PISMO_DO_ZAMAWIAJACEGO), _registry()).doc_type is None
+
+
+# ------------------------------------ poprawki po review E3
+
+
+def test_foreign_penalty_spares_type_with_matching_own_title():
+    """Fraza obca pokrywajaca sie z wlasnym tytulem typu (jedna zaczyna druga) nie karze tego typu."""
+    settings = _foreign(["wyrok", "postanowienie"])
+    reg = {
+        "wyrok_kio": DocTypeConfig(
+            id="wyrok_kio",
+            output_template="schemas/odwolanie.json",
+            classify={"title": ["wyrok krajowej izby"], "strong": ["alfa"], "min_score": 1},
+        ),
+        "inny": DocTypeConfig(
+            id="inny", output_template="schemas/odwolanie.json", classify={"strong": ["alfa"], "min_score": 1}
+        ),
+    }
+    c = classify.classify(_doc("Wyrok\nalfa"), reg, settings)
+    assert c.scores["inny"] == 2.0 - 10  # pozostale typy nadal karane
+    assert c.scores["wyrok_kio"] == 2.0  # "wyrok krajowej izby" zaczyna sie od "wyrok" -> bez kary
+    c = classify.classify(_doc("Postanowienie\nalfa"), reg, settings)
+    assert c.scores["wyrok_kio"] == 2.0 - 10  # inna fraza obca nadal karze
+
+
+def test_ignore_foreign_opt_out_per_type():
+    settings = _foreign(["wyrok", "faktura"])
+    reg = _reg(strong=["alfa"], min_score=1, ignore_foreign=["Faktura"])
+    assert classify.classify(_doc("FAKTURA\nalfa"), reg, settings).scores["t"] == 2.0
+    assert classify.classify(_doc("WYROK\nalfa"), reg, settings).scores["t"] == 2.0 - 10
+
+
+def test_ignore_foreign_must_be_list_of_strings():
+    with pytest.raises(ValidationError):
+        ClassifyConfig(ignore_foreign="wyrok")
+
+
+_WYROK_KIO = """Sygn. akt KIO 1234/26
+
+WYROK
+z dnia 3 marca 2026 r.
+
+Krajowa Izba Odwoławcza - w składzie:
+Przewodniczący: Jan Przykładowy
+
+po rozpoznaniu na rozprawie odwołania wniesionego przez wykonawcę Alfa sp. z o.o. (Odwołujący)
+w postępowaniu prowadzonym przez Gminę Przykładowo (Zamawiający)
+
+orzeka:
+1. Oddala odwołanie.
+2. Kosztami postępowania obciąża Odwołującego.
+
+Uzasadnienie
+Odwołujący podniósł zarzut nr 1 naruszenia art. 226 ustawy Prawo zamówień publicznych.
+Izba nie uwzględniła zarzutu. Na wyrok przysługuje skarga do Sądu Okręgowego w Warszawie.
+"""
+
+
+def test_in_memory_wyrok_type_wins_over_shipped_types():
+    """Nowy typ "wyrok_kio" (title: wyrok) nie jest karany za wlasny naglowek; pozostale typy - tak."""
+    reg = dict(_registry())
+    reg["wyrok_kio"] = DocTypeConfig(
+        id="wyrok_kio",
+        output_template="schemas/odwolanie.json",
+        classify={
+            "title": ["wyrok"],
+            "title_mode": "line",
+            "required_any": ["@title"],
+            "strong": ["orzeka", "skarga do sadu okregowego", "krajowa izba odwolawcza"],
+            "min_score": 6,
+        },
+    )
+    c = classify.classify(_doc(_WYROK_KIO), reg)
+    assert c.doc_type == "wyrok_kio", c.scores
+    assert not any("foreign title" in e for e in c.evidence)
+    penalty = load_classify_settings().foreign_titles.weight
+    plain = classify.classify(_doc(_WYROK_KIO.replace("WYROK\n", "TEKST\n")), reg).scores
+    for k in _registry():
+        assert c.scores[k] == plain[k] + penalty, k  # pozostale typy karane za "wyrok"
+    assert classify.classify(_doc(_WYROK_KIO), _registry()).doc_type is None
+
+
+def test_global_settings_follow_registry_config_dir(tmp_path):
+    """Ustawienia globalne czytane z katalogu konfiguracji rejestru (nie zawsze z config/)."""
+    (tmp_path / "doctypes").mkdir()
+    (tmp_path / "doctypes" / "t.yaml").write_text(
+        "id: t\noutput_template: schemas/x.json\nclassify:\n  strong: [alfa]\n  min_score: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "classify.yaml").write_text(
+        "foreign_titles:\n  weight: -3\n  phrases: [raport]\n", encoding="utf-8"
+    )
+    reg = load_registry(tmp_path)
+    assert classify.classify(_doc("RAPORT\nalfa"), reg).scores["t"] == 2.0 - 3
+    assert classify.classify(_doc("WYROK\nalfa"), reg).scores["t"] == 2.0  # config/classify.yaml nie dziala
+    assert classify.classify(_doc("WYROK\nalfa"), _reg(strong=["alfa"], min_score=1)).scores["t"] < 2.0
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Niniejszym składam odwołanie od czynności Zamawiającego.",
+        "Wykonawca wnosi odwołanie od czynności odrzucenia oferty.",
+        "Wnosimy niniejsze odwołanie wobec czynności Zamawiającego.",
+    ],
+)
+def test_odwolanie_act_of_filing_variants(line):
+    prose = "Pismo wykonawcy\nZamawiajacy narusza przepisy. Krajowa Izba Odwolawcza. Zarzut naruszenia.\n"
+    prose += "Prawo zamowien publicznych. Odwolujacy wskazuje.\n"
+    assert _shipped(prose) is None
+    assert _shipped(prose + line + "\n") == "odwolanie"
+
+
+def test_zamawiajacy_letter_mentioning_filed_appeal_is_unknown():
+    text = (
+        "Gmina Przykładowo\nInformacja dla wykonawców\n"
+        "Zamawiający informuje, że w postępowaniu odwołanie zostało wniesione do Prezesa Krajowej Izby "
+        "Odwoławczej w dniu 3 marca 2026 r. Zamawiający przekazuje kopię odwołania wykonawcom.\n"
+        "Odwołujący zarzuca naruszenie ustawy Prawo zamówień publicznych.\n"
+    )
+    assert _shipped(text) is None

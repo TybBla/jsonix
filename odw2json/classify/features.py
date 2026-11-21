@@ -44,6 +44,7 @@ class Prepared:
         self.full = fold(text)
         self._headers: dict[int, str] = {}
         self._lines: dict[int, list[str]] = {}
+        self._foreign: tuple[ClassifySettings, list[str]] | None = None
 
     def header(self, n: int) -> str:
         """Nagłówek: pierwsze ``n`` znaków, rozstrzelone litery zwinięte, następnie ``fold``."""
@@ -58,6 +59,12 @@ class Prepared:
             stripped = (_EDGE_JUNK.sub("", line) for line in lines)
             self._lines[n] = [line for line in stripped if line]
         return self._lines[n]
+
+    def foreign_hits(self, settings: ClassifySettings) -> list[str]:
+        """Frazy ``foreign_titles`` trafione w nagłówku (liczone raz na dokument, filtrowane per typ)."""
+        if self._foreign is None or self._foreign[0] is not settings:
+            self._foreign = (settings, _foreign_hits(self, settings))
+        return self._foreign[1]
 
 
 def _flags() -> int:
@@ -114,6 +121,18 @@ def _foreign_hits(prepared: Prepared, settings: ClassifySettings) -> list[str]:
     return hits
 
 
+def _exempt_from_foreign(phrase: str, cfg: ClassifyConfig) -> bool:
+    """Typ nie jest karany za fraze obca z ``ignore_foreign`` ani pokrywajaca sie z wlasnym ``title``.
+
+    Pokrycie = po normalizacji fraza obca zaczyna tytul albo tytul zaczyna fraze obca (np. typ z
+    ``title: [wyrok]`` nie jest karany za naglowek ``wyrok``).
+    """
+    f = fold(phrase).strip()
+    if any(fold(p).strip() == f for p in cfg.ignore_foreign):
+        return True
+    return any(t.startswith(f) or f.startswith(t) for t in (fold(p).strip() for p in cfg.title) if t)
+
+
 def _required_ok(item: str | RequiredGroup, text: str, title_hit: bool) -> bool:
     entries = item.all_of if isinstance(item, RequiredGroup) else [item]
     return all(title_hit if e == TITLE_TOKEN else _required_hit(e, text) for e in entries)
@@ -151,8 +170,8 @@ def evaluate(prepared: Prepared, cfg: ClassifyConfig, settings: ClassifySettings
             add(pat.weight, f"pattern: {pat.regex!r}")
 
     if settings is not None:
-        foreign = _foreign_hits(prepared, settings)
-        if foreign:  # kara raz, niezależnie od liczby trafień
+        foreign = [p for p in prepared.foreign_hits(settings) if not _exempt_from_foreign(p, cfg)]
+        if foreign:  # kara raz na typ, niezależnie od liczby trafień
             add(settings.foreign_titles.weight, "foreign title: " + ", ".join(repr(p) for p in foreign))
 
     if cfg.required_any and not any(_required_ok(item, text, bool(title_hits)) for item in cfg.required_any):

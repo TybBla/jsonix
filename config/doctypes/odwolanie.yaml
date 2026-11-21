@@ -16,14 +16,14 @@ classify:
   # Odwolanie ma tytul jako osobna linie albo strukture "Odwolujacy:" / "Zarzut nr N" - same slowa domenowe
   # (pismo do zamawiajacego, wyrok KIO) nie wystarcza.
   # Prawdziwe odwolanie moze nie miec etykiety "Odwolujacy:" ani osobnej linii tytulu - wtedy wystarcza akt
-  # wniesienia ("wnosze odwolanie") albo ponumerowane zarzuty ("Zarzut 1.", "Zarzut nr 1"). Cyfry rzymskie pominieto celowo ("zarzut i ..." to spojnik).
+  # wniesienia ("wnosze/skladam odwolanie") albo ponumerowane zarzuty ("Zarzut 1.", "Zarzut nr 1"). Cyfry rzymskie pominieto celowo ("zarzut i ..." to spojnik).
   required_any:
     - "@title"
     - "odwolujacy:"
     - 're:zarzut\s*(nr\s*)?\d+'
-    - "wnosze odwolanie"
-    - "wnosimy odwolanie"
-    - "niniejszym wnosze odwolanie"
+    # akt wniesienia: "wnosze/wnosimy/wnosi/wnosza (niniejsze) odwolanie", "skladam/skladamy/sklada odwolanie";
+    # "odwolanie zostalo wniesione" (pismo zamawiajacego o cudzym odwolaniu) celowo nie pasuje.
+    - 're:(wnosz[eay]|wnosimy|wnosi|sklad(am|amy|a))\s+(niniejsze\s+)?odwolanie'
   min_score: 8.0   # pojedyncze slowa domenowe (np. w wyroku KIO) nie wystarcza
   min_margin: 2.0
 # Sektor B: opis pol (metoda, normalizacja, zrodla). Format wolny do czasu ustalenia przez B.

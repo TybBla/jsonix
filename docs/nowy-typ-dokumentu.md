@@ -40,6 +40,7 @@ a literówka w nazwie pola lub niepoprawny regex kończy się czytelnym błędem
 | `min_score` | `3.0` | minimalny wynik zwycięzcy; poniżej dokument jest nieznany |
 | `min_margin` | `0.0` | minimalna przewaga nad drugim typem; poniżej dokument jest nieznany |
 | `weights` | `strong: 2, weak: 1, negative: -3, title: 4` | wagi cech (można nadpisać wybrane klucze) |
+| `ignore_foreign` | `[]` | frazy z globalnego `foreign_titles` (`config/classify.yaml`), za które **ten typ** nie jest karany (porównanie po normalizacji, cała fraza). Frazy pokrywające się z własnym `title` są zwalniane automatycznie - patrz niżej |
 
 Wynik klasyfikacji (`Classification`) zawiera `scores` (punkty każdego typu), `confidence` w [0, 1]
 (`margines * nasycenie`, wzór w docstringu `odw2json/classify/__init__.py`) oraz `evidence` — listę trafionych
@@ -71,21 +72,43 @@ classify:
   min_margin: 2.0
 ```
 
-### Globalne `config/classify.yaml` — nagłówki dokumentów obcych
+### Globalne `config/classify.yaml` — nagłówki dokumentów obcych (`foreign_titles`)
+
+`foreign_titles` **nie** jest polem `classify:` typu — to osobny, globalny plik `config/classify.yaml`
+(czytany z katalogu konfiguracji rejestru; brak pliku = brak kar):
 
 ```yaml
 foreign_titles:
-  weight: -10          # kara dla WSZYSTKICH typów (raz), musi być <= 0
+  weight: -10          # kara (raz na typ), musi być <= 0
   header_chars: 600    # tylko te pierwsze znaki
-  phrases: [wyrok, postanowienie, sygn. akt, ogloszenie o, zawiadomienie, faktura, wezwanie, specyfikacja, umowa, protokol]
+  phrases: [wyrok, postanowienie, ogloszenie o, zawiadomienie, faktura, wezwanie, specyfikacja, umowa, protokol,
+            informacja z otwarcia ofert, odpowiedz na odwolanie, zgloszenie przystapienia,
+            przystapienie do postepowania odwolawczego, stanowisko zamawiajacego, pismo procesowe]
 ```
 
 Fraza liczy się, gdy któraś **linia** nagłówka **zaczyna się** od niej (granica słowa; małe litery, bez polskich
-znaków, rozstrzelone litery zwinięte). Dzięki temu wyrok KIO, faktura czy wezwanie, które zawierają mnóstwo słów
-domenowych („odwołanie”, „przelew”, „zarzut”), nie są mylone z typami z puli. Nowy typ nie wymaga zmian tego
-pliku; dopisz fraze tylko wtedy, gdy nowy rodzaj dokumentu obcego wpada do któregoś typu. Brak pliku = brak kar.
-Kara jest miękka (−10): bardzo bogaty w cechy dokument nadal może przejść, dlatego frazy dobieraj ostrożnie.
-Sprawdź na `dev`, że żaden pozytyw nie zaczyna linii nagłówka od dodawanej frazy.
+znaków, rozstrzelone litery zwinięte). Dzięki temu wyrok KIO, faktura, wezwanie czy odpowiedź na odwołanie, które
+zawierają mnóstwo słów domenowych („odwołanie”, „przelew”, „zarzut”), nie są mylone z typami z puli.
+Sygnatury sprawy (`Sygn. akt KIO …`) celowo nie ma na liście — stoi też na odwołaniach i załącznikach.
+
+Kara jest liczona **dla każdego typu osobno**:
+- **Automatyczne zwolnienie własnego tytułu** — typ nie jest karany za frazę, która po normalizacji zaczyna któryś
+  z jego `title` albo którą jego `title` zaczyna (np. nowy typ `wyrok_kio` z `title: [wyrok]` nie jest karany za
+  nagłówek „WYROK”; pozostałe typy nadal są). Dodając typ dla dokumentu z listy, nie trzeba więc ruszać tego pliku.
+- **`ignore_foreign`** — jawne zwolnienie typu z wybranych fraz, gdy tytuł się z nimi nie pokrywa
+  (np. typ „nota korygująca” z nagłówkiem zaczynającym się od „Faktura”: `ignore_foreign: [faktura]`).
+
+Dopisz frazę tylko wtedy, gdy nowy rodzaj dokumentu obcego wpada do któregoś typu. Kara jest miękka (−10): bardzo
+bogaty w cechy dokument nadal może przejść, dlatego frazy dobieraj ostrożnie. Sprawdź na `dev`, że żaden pozytyw
+nie zaczyna linii nagłówka od dodawanej frazy.
+
+### Regexy w YAML a ReDoS
+
+Regexy (`patterns`, wpisy `re:` w `required_any`) są wykonywane modułem `re` na całym tekście dokumentu. Pliki
+`config/` to **konfiguracja zaufana** (repozytorium, przegląd w PR) — nie wolno ładować regexów od użytkownika ani
+z dokumentów. Mimo to unikaj wzorców podatnych na katastrofalne nawroty (ReDoS): **zagnieżdżonych kwantyfikatorów**
+(`(a+)+`, `(\w*\s?)*`), alternatyw o wspólnych prefiksach pod kwantyfikatorem (`(a|ab)*`) i nieograniczonych `.*`
+między dwiema grupami powtórzeń. Zamiast `.*` używaj ograniczeń (`.{0,800}`, `[^0-9]{0,40}`), jak w `przelew.yaml`.
 
 Wskazówki: wyniki ogólnych słów trzymaj nisko (`weak`), a typ opieraj na tytule i wzorcach strukturalnych;
 dokumenty spoza puli (ogłoszenia BZP/TED, wyroki KIO, broszury) mają dawać `None`, więc ustaw `min_score`
