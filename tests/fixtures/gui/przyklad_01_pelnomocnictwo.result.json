@@ -1,0 +1,89 @@
+{
+  "file": "pelnomocnictwo.pdf",
+  "classification": {
+    "doc_type": "pelnomocnictwo",
+    "confidence": 0.6,
+    "method": "keywords"
+  },
+  "data": {
+    "mocodawca": [
+      {
+        "data": {
+          "imie_nazwisko": null,
+          "krs": "9999405188",
+          "nazwa": "Belmoria Rozwiązania S.A.",
+          "nip": "9999284065",
+          "typ": "osoba_prawna"
+        },
+        "podpisujacy": [
+          {
+            "imie_nazwisko": "Oliwia Kaczmarek"
+          }
+        ]
+      }
+    ],
+    "pelnomocnicy": [
+      {
+        "imie_nazwisko": "Aleksandra Marciniak",
+        "pesel": null
+      },
+      {
+        "imie_nazwisko": "Jolanta Zajkowski",
+        "pesel": null
+      }
+    ]
+  },
+  "trace": [
+    {
+      "path": "mocodawca[0].data.krs",
+      "value": "9999405188",
+      "method": "regex",
+      "source_snippet": "Mocodawcą jest Belmoria Rozwiązania S.A., ul. Zaczarowana 78, 90-803 Łódź, KRS 9999405188, NIP 9999284065, REGON",
+      "page": 0
+    },
+    {
+      "path": "mocodawca[0].data.nazwa",
+      "value": "Belmoria Rozwiązania S.A.",
+      "method": "regex",
+      "source_snippet": "Mocodawcą jest Belmoria Rozwiązania S.A., ul. Zaczarowana 78, 90-803 Łódź, KRS 9999405188, NIP 9999284065, REGON",
+      "page": 0
+    },
+    {
+      "path": "mocodawca[0].data.nip",
+      "value": "9999284065",
+      "method": "regex",
+      "source_snippet": "Mocodawcą jest Belmoria Rozwiązania S.A., ul. Zaczarowana 78, 90-803 Łódź, KRS 9999405188, NIP 9999284065, REGON",
+      "page": 0
+    },
+    {
+      "path": "mocodawca[0].data.typ",
+      "value": "osoba_prawna",
+      "method": "derived",
+      "source_snippet": null,
+      "page": null
+    },
+    {
+      "path": "mocodawca[0].podpisujacy[0].imie_nazwisko",
+      "value": "Oliwia Kaczmarek",
+      "method": "regex",
+      "source_snippet": "Oliwia Kaczmarek",
+      "page": 0
+    },
+    {
+      "path": "pelnomocnicy[0].imie_nazwisko",
+      "value": "Aleksandra Marciniak",
+      "method": "regex",
+      "source_snippet": "Mocodawca ustanawiam pełnomocnikiem r. pr. Aleksandra Marciniak (nr wpisu na listę: WA 93198), r. pr. Jolanta",
+      "page": 0
+    },
+    {
+      "path": "pelnomocnicy[1].imie_nazwisko",
+      "value": "Jolanta Zajkowski",
+      "method": "regex",
+      "source_snippet": "r. pr. Jolanta Zajkowski",
+      "page": 0
+    }
+  ],
+  "warnings": [],
+  "pages": 1
+}

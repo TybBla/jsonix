@@ -1,0 +1,64 @@
+{
+  "file": "potwierdzenie_przelewu.pdf",
+  "classification": {
+    "doc_type": "przelew",
+    "confidence": 0.75,
+    "method": "keywords"
+  },
+  "data": {
+    "przelew_bankowy": {
+      "data_operacji": "2026-03-21",
+      "kwota": 200.0,
+      "na_rachunek": "68438223049992295262834736",
+      "numer_transakcji": "CEN2604016344389",
+      "tytul": "opłata skarbowa od pełnomocnictwa dla Aleksandra Marciniak i Jolanta Zajkowski w postępowaniu przed KIO w przetargu ZS.791.2026 CEN2604016344389",
+      "z_rachunku": "05470680287581539721455024"
+    }
+  },
+  "trace": [
+    {
+      "path": "przelew_bankowy.data_operacji",
+      "value": "2026-03-21",
+      "method": "regex",
+      "source_snippet": "2026-03-21",
+      "page": 0
+    },
+    {
+      "path": "przelew_bankowy.kwota",
+      "value": 200.0,
+      "method": "regex",
+      "source_snippet": "200,00 PLN",
+      "page": 0
+    },
+    {
+      "path": "przelew_bankowy.na_rachunek",
+      "value": "68438223049992295262834736",
+      "method": "regex",
+      "source_snippet": "PL68438223049992295262834736",
+      "page": 0
+    },
+    {
+      "path": "przelew_bankowy.numer_transakcji",
+      "value": "CEN2604016344389",
+      "method": "regex",
+      "source_snippet": "opłata skarbowa od pełnomocnictwa dla Aleksandra Marciniak i Jolanta Zajkowski w postępowaniu przed KIO w przetargu ZS.791.2026 CEN2604016344389",
+      "page": 0
+    },
+    {
+      "path": "przelew_bankowy.tytul",
+      "value": "opłata skarbowa od pełnomocnictwa dla Aleksandra Marciniak i Jolanta Zajkowski w postępowaniu przed KIO w przetargu ZS.791.2026 CEN2604016344389",
+      "method": "regex",
+      "source_snippet": "opłata skarbowa od pełnomocnictwa dla Aleksandra Marciniak i Jolanta Zajkowski w postępowaniu przed KIO w przetargu ZS.791.2026 CEN2604016344389",
+      "page": 0
+    },
+    {
+      "path": "przelew_bankowy.z_rachunku",
+      "value": "05470680287581539721455024",
+      "method": "regex",
+      "source_snippet": "PL05470680287581539721455024",
+      "page": 0
+    }
+  ],
+  "warnings": [],
+  "pages": 1
+}
