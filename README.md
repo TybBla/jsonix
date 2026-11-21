@@ -54,6 +54,8 @@ python -m eval.score --pred output --gt data/train
 ```
 F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
 
+**Raport jakości do zgłoszenia** (F1 dev/holdout × tekst/skan, per typ i pole, czas na dokument): `python scripts/quality_report.py` → `docs/raport-jakosci.md` (`--source tekst` = szybko, bez OCR).
+
 | Wersja | Klasyfikacja (train) | F1 (train) |
 |---|---|---|
 | szkielet (stuby) | 190/194 | 0.000 (negatywy 14/14) |
