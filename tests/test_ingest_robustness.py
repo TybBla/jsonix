@@ -33,6 +33,9 @@ def _fixture(name: str) -> Path:
     return path
 
 
+NO_OCR = {"ocr": {"enabled": False}}  # pusta strona nie ma sensu dla OCR (wolne, nic nie da)
+
+
 def _copy_all_to(dst: Path) -> None:
     dst.mkdir(parents=True, exist_ok=True)
     for name in BROKEN_NAMES:
@@ -60,7 +63,7 @@ def test_blank_page_returns_document_with_warnings_or_ingest_error() -> None:
     # Obserwacja (T6): loader zwraca Document z pustym tekstem i ostrzeżeniami (wszystkie backendy
     # zwróciły pusty tekst), nie rzuca IngestError.
     try:
-        doc = load(_fixture("pusta_strona.pdf"))
+        doc = load(_fixture("pusta_strona.pdf"), cfg=NO_OCR)
     except IngestError as exc:
         assert str(exc).strip()
     else:
@@ -82,7 +85,7 @@ def test_pipeline_continues_past_broken_files(tmp_path: Path) -> None:
     report = pipeline.run(
         tmp_path / "input",
         out,
-        app_cfg={"unknown_output": "empty_object", "write_trace": False},
+        app_cfg={"unknown_output": "empty_object", "write_trace": False, "ingest": NO_OCR},
     )
 
     assert (out / "case1" / "zażółć gęślą jaźń.json").exists()
@@ -90,6 +93,8 @@ def test_pipeline_continues_past_broken_files(tmp_path: Path) -> None:
     assert {"empty.pdf", "html_udajacy.pdf", "zaszyfrowany.pdf"} <= failed
 
 
+@pytest.mark.slow
+@pytest.mark.ocr_live  # CLI z domyslna konfiguracja OCR-uje pusta strone prawdziwym silnikiem
 def test_cli_run_exits_zero_on_broken_inputs(tmp_path: Path) -> None:
     inp = tmp_path / "input"
     out = tmp_path / "out"

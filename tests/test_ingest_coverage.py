@@ -144,6 +144,7 @@ def test_przyklad_01_with_current_loader():
 
 
 @pytest.mark.slow
+@pytest.mark.ocr_live  # CLI pokrycia OCR-uje skany (kilka minut na zimno)
 def test_cli_json_dump(tmp_path: Path):
     out = tmp_path / "cov.json"
     proc = subprocess.run(

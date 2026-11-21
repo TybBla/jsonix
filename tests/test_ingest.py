@@ -156,7 +156,7 @@ def test_cleaning_that_removes_page_break_is_rejected(odwolanie, monkeypatch):
     monkeypatch.setitem(clean.CLEAN_STEPS, "zjedz_f", lambda t: t.replace("\f", ""))
     monkeypatch.setitem(backends.BACKENDS, "pypdf", _fake_backend(["a", "b"]))
     with pytest.raises(RuntimeError, match="liczb"):
-        ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": ["zjedz_f"]})
+        ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": ["zjedz_f"], "ocr": {"enabled": False}})
 
 
 def test_fix_pdfium_text_removes_soft_hyphen_marker_and_normalizes_newlines():

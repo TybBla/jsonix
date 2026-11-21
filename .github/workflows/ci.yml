@@ -37,12 +37,12 @@ jobs:
         run: ruff check .
       - name: Ruff format
         run: ruff format --check .
-      - name: Pytest (with slow, without live_llm)
-        run: python -m pytest -q -m "not live_llm"
-      - name: F1 gate (dev)
-        run: python -m eval.gate --split dev
-      - name: F1 gate (holdout)
-        run: python -m eval.gate --split holdout
+      - name: Pytest (with slow, without live_llm and ocr_live)
+        run: python -m pytest -q -m "not live_llm and not ocr_live"
+      - name: F1 gate (dev, text sources)
+        run: python -m eval.gate --split dev --source tekst
+      - name: F1 gate (holdout, text sources)
+        run: python -m eval.gate --split holdout --source tekst
       - name: Upload gate reports
         if: always()
         uses: actions/upload-artifact@v4

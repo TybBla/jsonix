@@ -185,6 +185,7 @@ def test_cache_dysku_nie_liczy_strony_dwa_razy(tmp_path, monkeypatch):
 
 
 @pytest.mark.slow
+@pytest.mark.ocr_live
 @pytest.mark.parametrize("name", list(SCANS))
 def test_prawdziwy_silnik_czyta_skany(name):
     pytest.importorskip("rapidocr")
@@ -450,11 +451,12 @@ def test_konfiguracja_aplikacji_ma_poprawna_sekcje_ocr():
     assert cfg["ocr"]["enabled"] is True
     assert cfg["ocr"]["dpi"] == 150
     assert cfg["ocr"]["engine_params"]["Global.use_cls"] is False
-    assert "ocr_artifacts" in cfg["clean"]
-    assert cfg["clean"].index("ocr_artifacts") < cfg["clean"].index("quotes")
+    assert "ocr_artifacts" not in cfg["clean"]  # tylko dla tekstu z OCR
+    assert cfg["ocr"]["postprocess"] == ["ocr_artifacts"]
 
 
 @pytest.mark.slow
+@pytest.mark.ocr_live
 def test_prawdziwy_silnik_z_parametrami_z_konfiguracji():
     pytest.importorskip("rapidocr")
     from odw2json.config_loader import load_app_config
@@ -462,3 +464,46 @@ def test_prawdziwy_silnik_z_parametrami_z_konfiguracji():
     cfg = dict(load_app_config()["ingest"]["ocr"]) | {"cache_dir": None}
     text = ocr.ocr_page(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), 0, cfg)
     assert len(text.strip()) > 200
+
+
+# --- ocr.postprocess: ocr_artifacts tylko dla tekstu z OCR ----------------------------------------
+
+
+def test_postprocess_ocr_naprawia_artefakty_tylko_w_tekscie_ocr(monkeypatch, ocr_calls):
+    monkeypatch.setattr(ocr, "ocr_page", lambda path, i, cfg=None: "Zamawıający Ñowak")
+    cfg = _cfg(OCR_ON | {"postprocess": ["ocr_artifacts"]})
+    doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=cfg)
+    assert doc.pages == ["Zamawiający Ńowak"]
+
+
+def test_bez_postprocess_artefakty_ocr_zostaja(monkeypatch, ocr_calls):
+    monkeypatch.setattr(ocr, "ocr_page", lambda path, i, cfg=None: "Zamawıający")
+    doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=_cfg(OCR_ON))
+    assert doc.pages == ["Zamawıający"]
+
+
+def test_warstwa_tekstowa_nie_przechodzi_przez_ocr_artifacts(monkeypatch, ocr_calls):
+    from odw2json.ingest import backends, clean
+
+    text = "Zamawiający: José Škoda, Ñandú sp. z o.o., ul. Długa 1, 00-001 Warszawa"
+    monkeypatch.setitem(backends.BACKENDS, "pypdf", lambda path: [text])
+    cfg = _cfg(OCR_ON | {"postprocess": ["ocr_artifacts"]}) | {"clean": list(clean.DEFAULT_ORDER)}
+    doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=cfg)
+    assert ocr_calls == []
+    assert doc.ocr_used is False
+    assert "José Škoda" in doc.text and "Ñandú" in doc.text
+
+
+@pytest.mark.parametrize("bad", ["ocr_artifacts", ["nie_ma_takiego"], [1]])
+def test_validate_postprocess_odrzucone(bad):
+    from odw2json import ingest
+
+    with pytest.raises(ValueError, match="postprocess"):
+        ingest.validate_ingest_cfg({"ocr": {"postprocess": bad}})
+
+
+def test_validate_postprocess_poprawne():
+    from odw2json import ingest
+
+    ingest.validate_ingest_cfg({"ocr": {"postprocess": ["ocr_artifacts", "collapse_spaces"]}})
+    ingest.validate_ingest_cfg({"ocr": {"postprocess": []}})

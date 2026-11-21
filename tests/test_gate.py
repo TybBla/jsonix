@@ -233,9 +233,9 @@ def _patch_unknown_writer(monkeypatch, content: str | None):
     """Podmienia write_outputs: dla dokumentow nieznanych zapisuje `content` (None = brak pliku)."""
     real = pipeline_mod.write_outputs
 
-    def fake(pdf, input_dir, output_dir, cls, res, app_cfg, run_id=None):
+    def fake(pdf, input_dir, output_dir, cls, res, app_cfg, run_id=None, **kw):
         if res is not None:
-            return real(pdf, input_dir, output_dir, cls, res, app_cfg, run_id)
+            return real(pdf, input_dir, output_dir, cls, res, app_cfg, run_id, **kw)
         if content is not None:
             target = output_dir / pdf.relative_to(input_dir).with_suffix(".json")
             target.parent.mkdir(parents=True, exist_ok=True)

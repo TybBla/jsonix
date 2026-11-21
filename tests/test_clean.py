@@ -48,7 +48,8 @@ def samples() -> list[str]:
 def test_registry_names():
     assert set(CLEAN_STEPS) == EXPECTED
     # DEFAULT_ORDER bez "dashes" (decyzja orkiestratora, docs/decyzje/E2-backend-pdf.md)
-    assert set(DEFAULT_ORDER) == EXPECTED - {"dashes"}
+    # ... i bez "ocr_artifacts" (tylko dla tekstu z OCR: ingest.ocr.postprocess)
+    assert set(DEFAULT_ORDER) == EXPECTED - {"dashes", "ocr_artifacts"}
     assert len(DEFAULT_ORDER) == len(set(DEFAULT_ORDER))
 
 
@@ -102,8 +103,9 @@ def test_ocr_artifacts_does_not_touch_text_layer_corpus(samples):
         assert CLEAN_STEPS["ocr_artifacts"](s) == s
 
 
-def test_ocr_artifacts_before_quotes_in_default_order():
-    assert DEFAULT_ORDER.index("ocr_artifacts") < DEFAULT_ORDER.index("quotes")
+def test_ocr_artifacts_not_in_default_order():
+    assert "ocr_artifacts" not in DEFAULT_ORDER
+    assert clean_text("José Škoda", DEFAULT_ORDER) == "José Škoda"
 
 
 def test_quotes():

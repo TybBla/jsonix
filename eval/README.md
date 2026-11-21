@@ -65,7 +65,9 @@ uruchomieniem pipeline'u (OCR nie jest uruchamiany do filtrowania):
 Dla `--source tekst|skan` sekcja baseline nazywa sie `<split>@<source>` (`dev@tekst`, `dev@skan`,
 `holdout@tekst`...), a wynik trafia do `output/.gate/<split>@<source>.json`; `--source all` uzywa sekcji
 `dev` / `holdout`. Dzieki temu CI moze bramkowac sam tekst (`--split dev --source tekst`) niezaleznie od
-pelnej bramki. Brak sekcji = kod 2 (jak zawsze).
+pelnej bramki. CI (`.github/workflows/ci.yml`) uruchamia bramke z `--source tekst` (dev i holdout);
+bramka skanow (`--source skan`, wymaga OCR, ok. 4-5 min na zimno) jest uruchamiana lokalnie.
+Brak sekcji = kod 2 (jak zawsze).
 
 Kody wyjscia:
 - `0` - brak regresji,

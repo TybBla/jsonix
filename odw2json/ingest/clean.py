@@ -220,8 +220,8 @@ DEFAULT_ORDER: list[str] = [
     "unicode_nfc",
     "nbsp_to_space",
     "ligatures",
-    "ocr_artifacts",
     "quotes",
+    # "ocr_artifacts" pominiete: stosowany tylko do tekstu z OCR (config: ingest.ocr.postprocess).
     # "dashes" pominiete: UZP GT zachowuje "–" w tytulach; krok dostepny dla innych typow dokumentow.
     "strip_page_artifacts",
     "dehyphenate",
