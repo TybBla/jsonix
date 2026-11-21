@@ -22,7 +22,7 @@ Pliki: `odw2json/ingest/`, `odw2json/classify/`, sekcje `classify:` w `config/do
 ## B — `feat/b-extraction`
 Pliki: `odw2json/extract/`, `odw2json/normalize/` (nowy), `odw2json/llm.py`, `config/doctypes/*.yaml` (`fields:`, `llm:`), `config/prompts/`, `config/lookups/`.
 1. Format sekcji `fields:` w YAML (metoda: regex/llm/derived, typ, normalizator, walidator) + loader.
-2. Regexy + normalizacja + walidacja sum kontrolnych: KRS, NIP, REGON, PESEL, IBAN (26 cyfr, bez PL), kwota (float), daty (słownie i liczbowo → ISO), BZP (`YYYY/BZP########`), TED (`NNNNNN-YYYY`).
+2. Regexy + normalizacja + walidacja **formatu** (długość/cyfry) KRS, NIP, REGON, PESEL, IBAN — BEZ odrzucania po sumie kontrolnej (dane demo UZP mają celowo błędne sumy PESEL, a ok. 40% NIP-ów w train też nie przechodzi) (26 cyfr, bez PL), kwota (float), daty (słownie i liczbowo → ISO), BZP (`YYYY/BZP########`), TED (`NNNNNN-YYYY`).
 3. LLM dla pól semantycznych: nazwy podmiotów, osoby (mianownik!), tytuł zamówienia, `czynnosc_powod_id` (tylko pierwszy zarzut), role (pełnomocnik, prowadzący postępowanie). Prompt z opisów pól w `data/oczekiwane-json/`.
 4. Merge regex/LLM, walidacja → `null` przy niepewności (FP = FN w F1; null przy braku w GT = TN). Wynik dokładnie wg szablonu, trace dla każdego pola.
 5. Hold-out: ~15 spraw nie używać w promptach/few-shot; raportuj F1 osobno na hold-out.
