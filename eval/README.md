@@ -13,7 +13,8 @@ PDF-y bez GT (np. `negatywne/`) to negatywy: poprawny wynik to brak pliku JSON (
 Zasady:
 - TP: wartosc jest u nas i zgadza sie z GT; TN: null/brak po obu stronach;
   FP: wartosc tylko u nas albo rozna od GT; FN: brak u nas, jest w GT.
-- Dlugie pola (`nazwa`, `tytul`, `czynnosc_opis`, `imie_nazwisko`): podobienstwo >= 0.8 (rapidfuzz ratio, bez wielkosci liter).
+- Dlugie pola wg UZP (Discord 21.11, 13:26): `Odwolujacy[].nazwa`, `Zamawiajacy[].nazwa`, `Odwolujacy[].pelnomocnik.nazwa`, `ZamowieniePubliczne.tytul`, `przelew_bankowy.tytul` — podobienstwo >= 0.8 (rapidfuzz ratio, bez wielkosci liter). Pozostale pola (w tym imiona, `mocodawca[].data.nazwa`, `czynnosc_opis`) — dokladnie.
+- Listy dopasowywane po tresci (potwierdzone przez UZP).
 - Pozostale pola: rowno po usunieciu nadmiarowych spacji, z uwzglednieniem wielkosci liter;
   liczby porownywane numerycznie (`10000 == 10000.0`); `"123"` != `123` (flaga `--lenient-types` to wylacza).
 - Listy obiektow: elementy parowane zachlannie wg podobienstwa tresci (kolejnosc nie ma znaczenia);

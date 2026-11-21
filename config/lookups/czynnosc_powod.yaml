@@ -10,4 +10,4 @@
 9: Decyzja o unieważnieniu postępowania
 10: Zaniechanie unieważnienia postępowania
 11: Opis przedmiotu zamówienia (OPZ)
-# 12: ??? - do potwierdzenia z UZP
+12: Projektowane postanowienia umowy  # słownik UZP (oczekiwane-json/czynnosc_powod_id_dict.md); brak w danych treningowych

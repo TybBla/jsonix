@@ -20,4 +20,4 @@ def test_lookup_czynnosc_powod():
 
 
 def test_app_config_unknown_output():
-    assert load_app_config()["unknown_output"] in {"none", "empty_file"}
+    assert load_app_config()["unknown_output"] in {"none", "empty_file", "empty_object"}

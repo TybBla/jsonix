@@ -12,7 +12,7 @@ start.bat                 # = python -m odw2json run input output
 
 - Wejście: `input/<sprawa>/<plik>.pdf` (lub PDF-y luzem w `input/`).
 - Wyjście: `output/<sprawa>/<plik>.json` — nazwa jak plik wejściowy.
-- Dokument nieznany: zgodnie z `config/app.yaml: unknown_output` (`none` = brak pliku, `empty_file` = pusty `.json`).
+- Dokument nieznany: plik `<nazwa>.json` z zawartością `{}` (wg UZP); przełącznik `config/app.yaml: unknown_output` (`empty_object` | `empty_file` | `none`).
 - Ścieżka ekstrakcji (skąd pochodzi każda wartość): `output/.trace/`.
 
 Inne komendy:

@@ -9,8 +9,8 @@ Zasady wspólne:
 
 ## A — `feat/a-ingest-classify`
 Pliki: `odw2json/ingest/`, `odw2json/classify/`, sekcje `classify:` w `config/doctypes/*.yaml`.
-1. Napraw 4 błędy bazowej klasyfikacji (stan na starcie: 190/194):
-   - `negatywne/2025_S 112-383751.pdf` → wykryty jako przelew (ma być nieznany)
+1. Napraw 5 błędów bazowej klasyfikacji (stan na starcie: 191/196). **Klasyfikuj po treści, nie po nazwie pliku** (README UZP):
+   - `negatywne/2025_S 112-383751.pdf` i `przyklad_04/2025_S 112-383751.pdf` (ogłoszenie TED) → przelew (ma być nieznany)
    - `negatywne/Broszura_JPK_FA(2).pdf` → przelew (ma być nieznany)
    - `przyklad_02/pelnomocnictwo.pdf` → odwołanie
    - `przyklad_32/pelnomocnictwo.pdf` → nieznany
@@ -41,3 +41,12 @@ Pliki: `odw2json/cli.py`, `odw2json/api/`, `web/`, `Dockerfile`, `docker-compose
 - Fallback: **Bielik-11B-v3.0** (CloudFerro Sherlock, Apache 2.0, polski) — JSON mode niepotwierdzony, wymuszać promptem + walidacją.
 - Do sprawdzenia na starcie: `models.list` na endpoincie UE zawiera wybrany model; nazwa modelu w `.env`.
 - Qwen/DeepSeek odrzucone decyzją zespołu.
+
+## Ustalenia z UZP (Discord, 2026-11-21)
+- Dane testowe: syntetyczne, oparte na realnych sprawach; brak skanów bez warstwy tekstowej. JSON ściśle wg formatu.
+- Dokument spoza 3 typów → **pusty JSON (`{}`) z nazwą oryginalnego pliku** (`config/app.yaml: unknown_output: empty_object`).
+- `czynnosc_powod_id` 1–12, słownik: `data/oczekiwane-json/czynnosc_powod_id_dict.md`; 12 = „Projektowane postanowienia umowy” (brak w danych treningowych).
+  Uwaga: dla 6 słownik UZP ma „Odpowiedzi/wyjaśnienia do SWZ”, a GT treningowe „Odpowiedzi i wyjaśnienia do SWZ” — trzymamy wersję z GT.
+- „Długie stringi” (próg 80%): nazwa firmy pełnomocnika, tytuł przelewu, nazwa Odwołującego/Zamawiającego, tytuł zamówienia. **Wszystko inne (imiona, KRS, daty, `czynnosc_opis`, nazwa mocodawcy) musi się zgadzać dokładnie.**
+- Listy dopasowywane po treści.
+- Maszyna oceniająca ma internet, brak limitu czasu.
