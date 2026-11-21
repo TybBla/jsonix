@@ -102,6 +102,7 @@ class Ctx:
     start: int
     end: int
     field_type: str = "str"
+    config_dir: Any = None  # katalog config/ typu (lookupy ekstraktorów, np. phrase_lookup)
 
     def search(self, pattern: str, case: bool = False) -> re.Match | None:
         return value_pattern(pattern, case).search(self.text, self.start, self.end)
@@ -185,10 +186,10 @@ def parse_extractor_entry(entry: Any) -> tuple[str, dict]:
     raw = entry[name]
     opts = dict(raw) if isinstance(raw, dict) else {d.primary: raw}
     opts.update({k: v for k, v in entry.items() if k != name})
-    bad = sorted(set(opts) - d.options)
+    bad = sorted(set(opts) - d.options - {WITHIN})
     if bad:
         raise ValueError(
-            f"ekstraktor {name!r}: nieznane opcje {bad} (dozwolone: {', '.join(sorted(d.options))})"
+            f"ekstraktor {name!r}: nieznane opcje {bad} (dozwolone: {', '.join(sorted(d.options))}, {WITHIN})"
         )
     for key in ("pattern", "value"):
         if isinstance(opts.get(key), str):
@@ -199,7 +200,21 @@ def parse_extractor_entry(entry: Any) -> tuple[str, dict]:
     for key in ("labels", "phrases", "header", "stop"):
         for p in _as_list(opts.get(key)):
             check_phrase(p)
+    for i, w in enumerate(_as_list(opts.get(WITHIN))):
+        if not isinstance(w, dict) or not w or set(w) - _WITHIN_KEYS:
+            raise ValueError(
+                f"ekstraktor {name!r}: {WITHIN}[{i}] musi być mapą z kluczami "
+                f"{sorted(_WITHIN_KEYS)}, jest {w!r}"
+            )
+        for key in ("after", "before"):
+            for p in _as_list(w.get(key)):
+                check_phrase(p)
     return name, opts
+
+
+# Opcja wspólna wszystkich ekstraktorów: okno (albo lista okien zawężanych po kolei) w zakresie pola.
+WITHIN = "within"
+_WITHIN_KEYS = frozenset({"after", "before", "max_chars"})
 
 
 def check_phrase(p: Any) -> None:
@@ -405,6 +420,87 @@ def ex_if_match(ctx: Ctx, opts: dict) -> Iterator[Hit]:
             return
 
 
+@register_extractor("flag", primary="phrases", options=("value",))
+def ex_flag(ctx: Ctx, opts: dict) -> Iterator[Hit]:
+    """Wartość ``value`` (domyślnie 1), gdy w zakresie występuje któraś z fraz (np. „reprezentowany przez”).
+
+    Typowo z ``- const: 0`` jako drugim wpisem (brak frazy = 0)."""
+    value = opts.get("value", 1)
+    for ph in _as_list(opts.get("phrases")):
+        m = phrase_pattern(ph).search(ctx.folded, ctx.start, ctx.end)
+        if m:
+            yield Hit(value, m.start(), m.end())
+            return
+
+
+def _window(ctx: Ctx, opts: dict) -> tuple[int, int] | None:
+    """Okno w zakresie ``ctx``: od końca najwcześniejszej frazy ``after`` do ``before`` / ``max_chars``.
+
+    Brak frazy ``after`` = brak okna (``None``); brak ``before`` = do końca zakresu.
+    """
+    start, end = ctx.start, ctx.end
+    if opts.get("after"):
+        ms = [m for p in _as_list(opts["after"]) if (m := phrase_pattern(p).search(ctx.folded, start, end))]
+        if not ms:
+            return None
+        start = min(ms, key=lambda m: m.start()).end()
+    if opts.get("before"):
+        ms = [m for p in _as_list(opts["before"]) if (m := phrase_pattern(p).search(ctx.folded, start, end))]
+        if ms:
+            end = min(m.start() for m in ms)
+    if opts.get("max_chars"):
+        end = min(end, start + int(opts["max_chars"]))
+    return (start, end) if start < end else None
+
+
+def _within(ctx: Ctx, spec: Any) -> Ctx | None:
+    """Opcja ``within`` ekstraktora: okno (mapa) albo lista okien zawężanych kolejno; ``None`` = brak okna."""
+    cur = ctx
+    for w in _as_list(spec):
+        win = _window(cur, w)
+        if win is None:
+            return None
+        cur = Ctx(ctx.doc, ctx.text, ctx.folded, win[0], win[1], ctx.field_type, ctx.config_dir)
+    return cur
+
+
+@register_extractor("phrase_lookup", primary="lookup")
+def ex_phrase_lookup(ctx: Ctx, opts: dict) -> Iterator[Hit]:
+    """Klasyfikacja fragmentu słownikiem fraz z ``config/lookups/<lookup>.yaml``.
+
+    Słownik to lista ``{id: <wartość>, phrases: [...]}``; **kolejność wpisów = priorytet** (pierwszy
+    wpis, którego fraza występuje w zakresie, wygrywa - niezależnie od pozycji frazy). Zakres zawęża się
+    wspólną opcją ``within`` (kilka wpisów może szukać w różnych miejscach, np. zdanie o czynności,
+    a potem pierwszy zarzut).
+    """
+    for entry in _phrase_table(opts["lookup"], ctx.config_dir):
+        for p in entry[1]:
+            m = p.search(ctx.folded, ctx.start, ctx.end)
+            if m:
+                yield Hit(entry[0], m.start(), m.end())
+                return
+
+
+_PHRASE_TABLES: dict[tuple[str, str], list[tuple[Any, list[re.Pattern]]]] = {}
+
+
+def _phrase_table(name: str, config_dir: Any) -> list[tuple[Any, list[re.Pattern]]]:
+    key = (name, str(config_dir))
+    if key not in _PHRASE_TABLES:
+        raw = load_lookup(name, config_dir) if config_dir is not None else load_lookup(name)
+        if not isinstance(raw, list):
+            raise ValueError(f"lookup {name!r}: phrase_lookup wymaga listy wpisów {{id, phrases}}")
+        table = []
+        for i, e in enumerate(raw):
+            if not isinstance(e, dict) or "id" not in e or not e.get("phrases"):
+                raise ValueError(f"lookup {name!r}[{i}]: wpis musi mieć 'id' i niepuste 'phrases'")
+            for p in _as_list(e["phrases"]):
+                check_phrase(p)
+            table.append((e["id"], [phrase_pattern(p) for p in _as_list(e["phrases"])]))
+        _PHRASE_TABLES[key] = table
+    return _PHRASE_TABLES[key]
+
+
 # ============================================================== normalizatory lokalne
 # Minimalne wersje za interfejsem ``fn(value: str) -> Any | None``; jeśli istnieje moduł
 # ``odw2json.extract.normalize`` (T2) / ``odw2json.extract.names`` (T3), ich funkcje je nadpisują.
@@ -518,6 +614,16 @@ def n_upper(value: str) -> str | None:
 @register_normalizer("lower")
 def n_lower(value: str) -> str | None:
     return str(value).lower() or None
+
+
+_OCR_DIGIT_TOKEN = re.compile(r"(?<![A-Za-z])[0-9oO]*[0-9][0-9oO]*(?![A-Za-z])|(?<![A-Za-z])[oO]+(?=[0-9])")
+
+
+@register_normalizer("ocr_digits")
+def n_ocr_digits(value: str) -> str | None:
+    """OCR: litera ``o``/``O`` w ciągu cyfr -> ``0`` (``2026/BZP o0692455`` -> ``2026/BZP 00692455``)."""
+    s = str(value)
+    return _OCR_DIGIT_TOKEN.sub(lambda m: m.group(0).replace("o", "0").replace("O", "0"), s) or None
 
 
 def _load_external_normalizers() -> None:
@@ -664,11 +770,14 @@ def extract_field(ctx: Ctx, path: str, spec: FieldSpec) -> FieldResult | None:
     region = _scope(ctx, spec.scope)
     if region is None:
         return None
-    sub = Ctx(ctx.doc, ctx.text, ctx.folded, region[0], region[1], spec.type)
+    sub = Ctx(ctx.doc, ctx.text, ctx.folded, region[0], region[1], spec.type, ctx.config_dir)
     chain = spec.normalize if spec.normalize is not None else list(TYPES[spec.type].normalize)
     for entry in spec.extract:
         name, opts = parse_extractor_entry(entry)
-        for hit in EXTRACTORS[name].fn(sub, opts):
+        local = _within(sub, opts[WITHIN]) if WITHIN in opts else sub
+        if local is None:
+            continue
+        for hit in EXTRACTORS[name].fn(local, opts):
             value = _normalize(hit.value, chain)
             if value is None or not _valid(value, spec.validate_):
                 continue
@@ -741,7 +850,7 @@ def _fill(
     ``concrete`` - ten sam prefiks z konkretnymi indeksami (``Odwolujacy[0].``) do trace;
     ``index`` - indeks ``obj`` w liście nadrzędnej (dla ``groups``).
     """
-    local = Ctx(ctx.doc, ctx.text, ctx.folded, region[0], region[1])
+    local = Ctx(ctx.doc, ctx.text, ctx.folded, region[0], region[1], config_dir=ctx.config_dir)
     lists: list[str] = []
     derived: list[tuple[str, Any]] = []
     for path, spec in cfg.fields.items():
@@ -815,7 +924,7 @@ def extract(doc: Document, cfg: DocTypeConfig) -> ExtractionResult:
     """Wynik DOKŁADNIE w kształcie szablonu ``cfg.template()``; pola bez wyniku = ``null``."""
     data = cfg.template()
     text = doc.text or ""
-    ctx = Ctx(doc, text, fold(text), 0, len(text))
+    ctx = Ctx(doc, text, fold(text), 0, len(text), config_dir=cfg.config_dir)
     trace: list[FieldResult] = []
     _fill(data, "", "", (0, len(text)), ctx, cfg, trace)
     return ExtractionResult(doc_type=cfg.id, data=data, trace=trace)
