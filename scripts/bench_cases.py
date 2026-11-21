@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import os
 import platform
 import statistics
@@ -110,7 +111,9 @@ def summarize(docs: list[dict], cases: list[Path]) -> dict:
 def parallel_wall(pdfs: list[str], workers: int) -> float:
     with tempfile.TemporaryDirectory(prefix="jsonix-bench-par-") as cache:
         t0 = time.perf_counter()
-        with ProcessPoolExecutor(max_workers=workers) as ex:
+        # spawn: świeże procesy bez pamięci OCR z pomiaru sekwencyjnego (fork na Linuksie by ją dziedziczył)
+        ctx = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as ex:
             list(ex.map(time_document, pdfs, [cache] * len(pdfs)))
         return time.perf_counter() - t0
 
