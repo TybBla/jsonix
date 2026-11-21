@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jsonix — prezentacja finałowa</title>
+<style>
+  /* Prezentacja offline: otwórz w przeglądarce. Strzałki / spacja / PageUp-PageDown — slajdy, F — pełny ekran,
+     Ctrl+P — PDF (jeden slajd na stronę, poziomo). Kolory i font wg Design System Gov.pl jak w GUI. */
+  @font-face { font-family: "Open Sans"; font-weight: 400; src: url("../web/static/vendor/fonts/open-sans-latin-ext-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Open Sans"; font-weight: 600; src: url("../web/static/vendor/fonts/open-sans-latin-ext-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Open Sans"; font-weight: 700; src: url("../web/static/vendor/fonts/open-sans-latin-ext-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Open Sans"; font-weight: 400; src: url("../web/static/vendor/fonts/open-sans-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF; }
+  @font-face { font-family: "Open Sans"; font-weight: 700; src: url("../web/static/vendor/fonts/open-sans-latin-700-normal.woff2") format("woff2"); unicode-range: U+0000-00FF; }
+  :root { --blue: #0052a5; --navy: #00468d; --ink: #1b1b1b; --muted: #656565; --line: #dadada; --soft: #f1f1f1;
+          --yellow: #eba828; --green: #3f5f1b; --red: #a7162d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #2b2b2b; font-family: "Open Sans", Arial, sans-serif; color: var(--ink); }
+  .deck { height: 100%; display: grid; place-items: center; }
+  .slide { display: none; width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; background: #fff;
+           padding: 4.2% 5.5%; position: relative; overflow: hidden; font-size: min(1.9vw, 3.4vh); line-height: 1.4; }
+  .slide.is-current { display: flex; flex-direction: column; }
+  .slide::before { content: ""; position: absolute; inset: 0 0 auto 0; height: .45em; background: var(--blue); }
+  .slide footer { position: absolute; left: 5.5%; right: 5.5%; bottom: 3%; display: flex; justify-content: space-between;
+                  font-size: .6em; color: var(--muted); }
+  h1 { font-size: 2.6em; margin: 0 0 .3em; line-height: 1.1; }
+  h2 { font-size: 1.7em; margin: 0 0 .6em; color: var(--blue); line-height: 1.15; }
+  p { margin: 0 0 .6em; }
+  ul { margin: 0; padding-left: 1.1em; } li { margin: 0 0 .45em; }
+  strong { font-weight: 700; }
+  .lead { font-size: 1.2em; color: var(--muted); max-width: 32em; }
+  .brand { display: inline-flex; align-items: center; gap: .5em; font-weight: 700; color: var(--blue); font-size: 1.1em; margin-bottom: 1.2em; }
+  .brand b { display: inline-grid; place-items: center; width: 1.9em; height: 1.9em; background: var(--blue); color: #fff; border-radius: 4px; }
+  .cols { display: grid; grid-template-columns: 1fr 1.25fr; gap: 4%; align-items: start; flex: 1; min-height: 0; }
+  .cols.even { grid-template-columns: 1fr 1fr; }
+  .shot { width: 100%; border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 .3em 1em rgba(0,0,0,.12); }
+  .flow { display: flex; align-items: stretch; gap: .6em; margin: .6em 0 1.2em; }
+  .flow div { flex: 1; border: 2px solid var(--blue); border-radius: 6px; padding: .6em .7em; font-size: .85em; }
+  .flow div b { display: block; color: var(--blue); }
+  .flow span { align-self: center; color: var(--blue); font-weight: 700; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3%; margin: .4em 0 1em; }
+  .kpi { border-left: .3em solid var(--blue); background: var(--soft); padding: .6em .8em; }
+  .kpi b { display: block; font-size: 2em; color: var(--blue); line-height: 1.1; }
+  .todo { color: var(--red); font-weight: 600; }
+  code, pre { font-family: Consolas, "Courier New", monospace; font-size: .8em; }
+  pre { background: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: .7em .9em; margin: 0; overflow: hidden; }
+  .tag { display: inline-block; border: 1px solid currentColor; border-radius: 4px; padding: 0 .4em; font-size: .8em; font-weight: 600; }
+  .ok { color: var(--green); } .muted { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: .78em; }
+  th, td { text-align: left; padding: .3em .5em; border-bottom: 1px solid var(--line); }
+  th { border-bottom: 2px solid var(--ink); }
+  .hint { position: fixed; right: 1em; bottom: .6em; color: #bbb; font-size: 12px; }
+  @media print {
+    @page { size: 297mm 167mm; margin: 0; }
+    html, body { background: #fff; height: auto; }
+    .deck { display: block; }
+    .slide { display: flex !important; flex-direction: column; width: 297mm; height: 167mm; aspect-ratio: auto;
+             font-size: 13pt; page-break-after: always; break-after: page; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="deck" aria-label="Prezentacja jsonix">
+
+<section class="slide is-current" aria-label="Slajd 1">
+  <div class="brand"><b>{ }</b> jsonix</div>
+  <h1>Dokumenty sprawy KIO → dane JSON</h1>
+  <p class="lead">Rozpoznajemy odwołanie, pełnomocnictwo i potwierdzenie przelewu z treści dokumentu, wyodrębniamy dane zgodnie ze schematem UZP i pokazujemy, skąd pochodzi każda wartość.</p>
+  <p class="muted">HackNation 2026 · zadanie Urzędu Zamówień Publicznych „Odwołania2json”</p>
+  <footer><span>jsonix</span><span>1</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 2">
+  <h2>Problem</h2>
+  <div class="cols even">
+    <ul>
+      <li>Do każdej sprawy odwoławczej spływa komplet PDF-ów: <strong>odwołanie, pełnomocnictwo, potwierdzenie przelewu</strong> i pisma, które nie są żadnym z nich.</li>
+      <li>Dane (strony, NIP, KRS, numery postępowań, kwoty, daty, pełnomocnicy) przepisuje się ręcznie.</li>
+      <li>Dokumenty mają różne układy, a część to <strong>skany bez warstwy tekstowej</strong>.</li>
+    </ul>
+    <ul>
+      <li>Wynik musi być ściśle zgodny ze schematem: kolejność kluczy, <code>null</code>, gdy dokument czegoś nie podaje, <strong>imiona w mianowniku</strong>.</li>
+      <li>Dokument spoza typów → plik <code>.json</code> z <code>{}</code>.</li>
+      <li>Urzędnik musi móc <strong>sprawdzić</strong> wynik, a nie tylko mu uwierzyć.</li>
+    </ul>
+  </div>
+  <footer><span>jsonix</span><span>2</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 3">
+  <h2>Jak działa</h2>
+  <div class="flow">
+    <div><b>Wczytanie</b>tekst z PDF, czyszczenie, OCR skanów (CPU, offline)</div><span>→</span>
+    <div><b>Klasyfikacja</b>punktacja cech z YAML, typ albo „nieznany”</div><span>→</span>
+    <div><b>Ekstrakcja</b>pola i listy z YAML, normalizacja, walidacja</div><span>→</span>
+    <div><b>JSON + trace</b>wynik wg schematu UZP i źródło każdej wartości</div>
+  </div>
+  <ul>
+    <li><strong>Ten sam potok</strong> dla CLI (<code>start.bat</code>), API, GUI i Dockera, więc wszędzie identyczne dane.</li>
+    <li>Wszystko, co zależy od typu dokumentu, jest w <strong>konfiguracji</strong> (<code>config/doctypes/*.yaml</code>), a nie w kodzie.</li>
+    <li>Działa na laptopie i7 / 16 GB <strong>bez GPU i bez sieci</strong>.</li>
+  </ul>
+  <footer><span>jsonix · docs/architektura.md</span><span>3</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 4">
+  <h2>Jakość: F1 wg reguł UZP</h2>
+  <div class="kpis">
+    <div class="kpi"><b class="todo">⟨F1 dev⟩</b>zbiór roboczy</div>
+    <div class="kpi"><b class="todo">⟨F1 holdout⟩</b>zbiór kontrolny (bez strojenia)</div>
+    <div class="kpi"><b class="todo">⟨F1 skany⟩</b>dokumenty z OCR</div>
+  </div>
+  <ul>
+    <li>Klasyfikacja: <span class="todo">⟨100% dev/holdout⟩</span>, dokumenty spoza typów rozpoznane <span class="todo">⟨12/12⟩</span>.</li>
+    <li>F1 liczone dokładnie wg reguł organizatora (<code>eval/score.py</code>): długie teksty z progiem 80%, reszta dokładnie, listy po treści.</li>
+    <li>Bramka regresji w CI: każda zmiana, która obniża F1, jest zatrzymywana. Raport: <code>python scripts/quality_report.py</code>.</li>
+  </ul>
+  <footer><span>jsonix · uzupełnij liczby z docs/raport-jakosci.md po scaleniu E4</span><span>4</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 5">
+  <h2>Transparentność: każda wartość ma źródło</h2>
+  <div class="cols">
+    <ul>
+      <li>Pole obok dokumentu: <strong>najechanie</strong> podświetla fragment, <strong>kliknięcie</strong> przewija do niego. Działa też w drugą stronę.</li>
+      <li><strong>„Dlaczego ten typ?”</strong>: zdania po polsku z cechami, które zdecydowały o typie.</li>
+      <li>Trace w CLI: metoda i fragment tekstu dla każdego pola (<code>output/.trace/</code>).</li>
+      <li>Brak źródła = jawny komunikat, a nie udawane podświetlenie.</li>
+    </ul>
+    <img class="shot" src="img/gui-hover-pole.jpg" alt="GUI: najechanie na pole NIP podświetla fragment w dokumencie">
+  </div>
+  <footer><span>jsonix</span><span>5</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 6">
+  <h2>Bez LLM, z wyboru</h2>
+  <div class="cols even">
+    <ul>
+      <li>Reguły z konfiguracji osiągają <span class="todo">⟨F1⟩</span> bez kosztów i bez wysyłania danych poza komputer.</li>
+      <li><strong>20/20 pkt</strong> za rozmiar modelu (bez LLM = maksimum wg UZP).</li>
+      <li>Brak ryzyka zmyślania wartości: gdy dokument czegoś nie podaje, wynik to <code>null</code>.</li>
+    </ul>
+    <ul>
+      <li>Warstwa LLM jest gotowa jako <strong>opcja</strong> (<code>config/llm.yaml</code>): klient zgodny z OpenAI, temperatura 0, kasety odpowiedzi w testach.</li>
+      <li>Tylko model open source <strong>≤ 8B</strong> od dostawcy z serwerami w UE i polityką prywatności (wymóg UZP).</li>
+    </ul>
+  </div>
+  <footer><span>jsonix · docs/kryteria-uzp.md</span><span>6</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 7">
+  <h2>Nowy typ dokumentu bez kodu</h2>
+  <div class="cols">
+    <ul>
+      <li>Nowy typ = <code>config/doctypes/&lt;typ&gt;.yaml</code> + szablon <code>config/schemas/&lt;typ&gt;.json</code>.</li>
+      <li>Nowe pole = wpis w YAML: gdzie szukać, czym, jak znormalizować i sprawdzić.</li>
+      <li>W Dockerze <code>config/</code> jest montowany, więc nie trzeba przebudowywać obrazu.</li>
+      <li class="todo">⟨Demo 4. typu dodanego samą konfiguracją (E10)⟩</li>
+    </ul>
+<pre>id: pelnomocnictwo
+title: Pełnomocnictwo
+output_template: schemas/pelnomocnictwo.json
+classify:
+  title: ["pelnomocnictwo"]
+  strong: ["pelnomocnictw", "udzielam", "mocodawc"]
+  negative: ["kwota przelewu", "zarzut nr"]
+  min_score: 5.0
+fields:
+  mocodawca[].data.krs:
+    extract:
+      - label: [krs]
+        value: '(?&lt;!\d)\d{10}(?!\d)'
+    normalize: [krs]</pre>
+  </div>
+  <footer><span>jsonix · docs/nowy-typ-dokumentu.md</span><span>7</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 8">
+  <h2>GUI dla urzędnika</h2>
+  <div class="cols">
+    <ul>
+      <li>Wiele plików naraz, postęp „N z M”, błędy przy pliku.</li>
+      <li>PDF obok danych, edycja z <strong>„Przywróć wartość z dokumentu”</strong>, pobranie JSON albo ZIP.</li>
+      <li>Design System Gov.pl, pełna obsługa klawiaturą, wysoki kontrast, deklaracja dostępności.</li>
+      <li>Działa offline: PDF.js i fonty są w repozytorium.</li>
+    </ul>
+    <img class="shot" src="img/gui-zaznaczenie-podpis.jpg" alt="GUI: zaznaczone imię i nazwisko podpisującego pełnomocnictwo z podświetleniem w dokumencie">
+  </div>
+  <footer><span>jsonix · docs/gui.md</span><span>8</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 9">
+  <h2>Gotowe do uruchomienia u jury</h2>
+  <div class="cols even">
+    <ul>
+      <li><code>start.bat</code> sam przygotowuje środowisko (Python 3.13/3.14, <code>.venv</code>, zależności).</li>
+      <li><code>docker compose up</code>: healthcheck, <code>.env</code> opcjonalny.</li>
+      <li>Przypięte wersje zależności, więc nowe wydanie biblioteki niczego nie zepsuje.</li>
+    </ul>
+    <ul>
+      <li>CI: testy, bramka F1 (dev i holdout), smoke na Windows i Linux, <code>docker build</code>.</li>
+      <li>Smoke Docker: wynik w kontenerze = wynik CLI, także dla skanu z OCR.</li>
+      <li>Czas na dokument na CPU: <span class="todo">⟨z raportu jakości⟩</span>.</li>
+    </ul>
+  </div>
+  <footer><span>jsonix · README</span><span>9</span></footer>
+</section>
+
+<section class="slide" aria-label="Slajd 10">
+  <h2>Zespół i rozwiązania zewnętrzne</h2>
+  <p class="muted">Zgodnie z §4 regulaminu: komponenty open source użyte w rozwiązaniu (pełna lista z licencjami: <code>docs/zgloszenie.md</code>).</p>
+  <table>
+    <tr><th>Komponent</th><th>Do czego</th><th>Licencja</th></tr>
+    <tr><td>pypdfium2, pypdf, pdfplumber</td><td>tekst z PDF</td><td>BSD-3 / Apache-2.0, BSD-3, MIT</td></tr>
+    <tr><td>RapidOCR, onnxruntime, OpenCV</td><td>OCR skanów na CPU</td><td>Apache-2.0, MIT, Apache-2.0</td></tr>
+    <tr><td>FastAPI, uvicorn</td><td>API i serwer</td><td>MIT, BSD-3</td></tr>
+    <tr><td>PyYAML, pydantic, rapidfuzz</td><td>konfiguracja, dane, podobieństwo tekstu</td><td>MIT</td></tr>
+    <tr><td>PDF.js, Open Sans</td><td>podgląd PDF, font GUI</td><td>Apache-2.0, SIL OFL 1.1</td></tr>
+  </table>
+  <p style="margin-top:1em" class="todo">⟨Skład zespołu⟩</p>
+  <footer><span>jsonix</span><span>10</span></footer>
+</section>
+
+</main>
+<p class="hint">← → slajdy · F pełny ekran · Ctrl+P PDF</p>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("is-current", k === i));
+    history.replaceState(null, "", "#" + (i + 1));
+  }
+  document.addEventListener("keydown", (e) => {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key.toLowerCase() === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  });
+  document.addEventListener("click", (e) => { if (e.target.closest(".slide")) show(i + (e.clientX > innerWidth / 3 ? 1 : -1)); });
+  show(i);
+</script>
+</body>
+</html>
