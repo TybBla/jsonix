@@ -76,7 +76,7 @@ def wait_for_server(base: str, proc: subprocess.Popen, timeout: float = 60) -> N
 
 def smoke(base: str) -> None:
     status, _, body = http(f"{base}/")
-    check(status == 200 and b"Odwo" in body, "GET / nie zwraca strony GUI")
+    check(status == 200 and b"jsonix" in body, "GET / nie zwraca strony GUI")
     status, headers, _ = http(f"{base}/static/vendor/pdfjs/pdf.min.mjs")
     check(
         status == 200 and "javascript" in headers.get("content-type", ""),
