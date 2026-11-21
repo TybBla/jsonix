@@ -8,16 +8,16 @@ llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
 
 # Ingest PDF (sektor A). Backendy wybierane tu, bez zmian kodu.
 ingest:
-  backend: pypdf                                # pypdf | pdfplumber | pypdfium2
-  fallback_backends: [pypdfium2, pdfplumber]    # kolejno, gdy backend rzuci wyjatek lub zwroci pusty tekst
+  # Decyzja orkiestratora: docs/decyzje/E2-backend-pdf.md
+  backend: pypdfium2                            # pypdf | pdfplumber | pypdfium2
+  fallback_backends: [pypdf, pdfplumber]        # kolejno, gdy backend rzuci wyjatek lub zwroci pusty tekst
   # Kroki czyszczenia (odw2json/ingest/clean.py), uruchamiane w tej kolejnosci na calym dokumencie.
-  # Lista = clean.DEFAULT_ORDER wypisana jawnie; usuniecie/zmiana kolejnosci nie wymaga zmian kodu.
+  # Lista = clean.DEFAULT_ORDER wypisana jawnie (bez "dashes", patrz docs/decyzje/E2-backend-pdf.md).
   clean:
     - unicode_nfc
     - nbsp_to_space
     - ligatures
     - quotes
-    - dashes
     - strip_page_artifacts
     - dehyphenate
     - join_wrapped_lines

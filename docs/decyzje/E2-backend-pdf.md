@@ -126,3 +126,28 @@ rowna, koszt +9 s na 196 PDF) i `pypdfium2` jako pierwszym fallbacku.
 - **Binarne wheel pypdfium2** zawieraja natywna biblioteke PDFium; pip dziala na Windows i Linux, lecz zmienia sie
   rozmiar instalacji i trzeba przypiac wersje w `requirements.txt`.
 - **Skany bez warstwy tekstowej** (3 negatywy) daja pusty tekst u wszystkich backendow; obsluga w T5 (OCR).
+
+## Decyzja orkiestratora (2026-11-21)
+
+Zatwierdzone i wdrozone w `config/app.yaml`:
+
+- `ingest.backend: pypdfium2`
+- `ingest.fallback_backends: [pypdf, pdfplumber]`
+- czyszczenie wlaczone, kolejnosc `clean.DEFAULT_ORDER` bez kroku `dashes` (krok `dashes` pozostaje w `CLEAN_STEPS`).
+  Uzasadnienie: `dashes` zamienial pauzy `–` w tytulach na `-`, a GT zachowuje `–` (obs. 6).
+
+Bramka (`python -m eval.gate --split all`), zakonczona exit 0, bez regresji, baseline nie zmieniany:
+
+```
+f1=0.0000 neg=12/15 schema=0 klasyfikacja=5 pipeline=0 -> exit 0
+f1=0.0000 neg=11/13 schema=0 klasyfikacja=2 pipeline=0 -> exit 0
+```
+
+Uwaga: f1 wynosi 0.0000 zarowno w baseline, jak i w biezacym wyniku, wiec bramka potwierdza brak regresji,
+ale nie mierzy jakosci ekstrakcji pol. Pokrycie:
+
+`python -m eval.ingest_coverage --split all`: razem 1460/1460, 100.0% (exact), 100.0% (+fuzzy).
+
+Zmiany w testach (tylko dopasowanie do nowej konfiguracji, asercje nieosłabione):
+- `tests/test_clean.py::test_registry_names`: `DEFAULT_ORDER` == rejestr bez `dashes`, plus unikalnosc krokow.
+- `tests/test_ingest.py`: domyslny backend to `pypdfium2` (wczesniej `pypdf`).
