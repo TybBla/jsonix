@@ -8,8 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Zależności osobno, żeby zmiana kodu nie przebudowywała warstwy pip.
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY requirements.txt requirements-lock.txt ./
+RUN pip install -r requirements.txt -c requirements-lock.txt
 
 COPY . .
 RUN mkdir -p input output

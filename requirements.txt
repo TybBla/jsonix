@@ -14,5 +14,7 @@ pytest>=8.0
 httpx>=0.27            # testy API (TestClient)
 # OCR dla skanow (obowiazkowy od E2b; licencje: rapidocr Apache-2.0, onnxruntime MIT).
 # Modele PP-OCRv6 sa w wheelu rapidocr (~27 MB), nic nie jest pobierane w czasie dzialania.
-rapidocr>=3.10
-onnxruntime>=1.20
+# Paczki onnxruntime/pyclipper sa dla Pythona 3.13-3.14; na nowszym instalacja przechodzi bez OCR
+# (aplikacja dziala, skany bez warstwy tekstowej dostaja ostrzezenie). Zob. README, sekcja Instalacja.
+rapidocr>=3.10; python_version < "3.15"
+onnxruntime>=1.20; python_version < "3.15"
