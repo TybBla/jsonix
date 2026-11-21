@@ -50,3 +50,5 @@ Pliki: `odw2json/cli.py`, `odw2json/api/`, `web/`, `Dockerfile`, `docker-compose
 - „Długie stringi” (próg 80%): nazwa firmy pełnomocnika, tytuł przelewu, nazwa Odwołującego/Zamawiającego, tytuł zamówienia. **Wszystko inne (imiona, KRS, daty, `czynnosc_opis`, nazwa mocodawcy) musi się zgadzać dokładnie.**
 - Listy dopasowywane po treści.
 - Maszyna oceniająca ma internet, brak limitu czasu.
+- Bez LLM = maksimum punktów za moc modelu. Kod 6 = „Odpowiedzi/wyjaśnienia do SWZ” (ze skośnikiem). Pusty JSON = plik z `{}`.
+- **Hosting LLM tylko przez firmę z Polityką Prywatności określającą zakres i miejsce przetwarzania danych; hosting przez osobę prywatną (własny komputer/serwer) wykluczony.**

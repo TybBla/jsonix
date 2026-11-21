@@ -208,6 +208,7 @@ Workflow: `main` chroniony, tylko przez PR; gałęzie `feat/a-ingest-classify`, 
 ## 11. Ryzyka i otwarte kwestie
 
 1. **LLM „Qwen z abonamentu za 7 €” — największe ryzyko formalne.** Regulamin wymaga API świadczonego przez firmę z serwerów w UE/EOG, a klucz trafia do organizatora. Trzeba ustalić: który dostawca, gdzie są serwery, czy API jest OpenAI-kompatybilne, jakie limity zapytań (test na ≥10 sprawach × 3–4 dokumenty) i czy wolno udostępnić klucz osobie trzeciej. Jeśli coś nie pasuje → plan B: Scaleway / OVHcloud / Mistral (UE, OpenAI-kompatybilne). Architektura na to pozwala — zmiana to 3 linie w `.env`.
+   **Aktualizacja (UZP, 2026-11-21):** Qwen odrzucony decyzją zespołu; rekomendacja Mistral (endpoint UE). Hosting przez osobę prywatną wykluczony — tylko firma z Polityką Prywatności określającą zakres i miejsce przetwarzania danych.
 2. Pusty plik vs brak pliku dla dokumentu nieznanego → zapytać UZP; przełącznik w konfiguracji.
 3. `czynnosc_powod_id = 12` — brak w danych; zapytać UZP o kanoniczny opis, dopisać do `lookups`.
 4. Dokładna miara 80% i dopasowanie list w ocenie → zapytać na stoisku UZP; parametry w `eval/score.py`.
