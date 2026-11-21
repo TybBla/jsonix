@@ -86,14 +86,25 @@ fields:
     derived: {lookup: czynnosc_powod, from: OdwolanieKIO.czynnosc_powod_id}
 
   # ---- Odwolujacy (blok "Odwolujacy:"; konsorcjum -> Lider; CEIDG -> nazwa firmy)
+  # Nazwa konczy sie przed adresem/dopiskiem w tej samej linii (", ul.", " ul.", "reprezentowan", KRS/NIP/REGON,
+  # kod pocztowy) - wzorzec wartosci &name_line (wartosc = pierwsza linia po etykiecie).
   Odwolujacy[].nazwa:
     type: company
     extract:
-      - section_line: {header: 're:^[ \t]*(?:\d+[).][ \t]*)?lider\s+konsorcjum[ \t]*:?[ \t]*$', n: 1}
-      - regex: '^[ \t]*1[).][ \t]*(?P<v>[^\n(]{3,}?)[ \t]*\([ \t]*lider'
-      - section_line: {header: 're:pod\s+firma\s*:?[ \t]*$', n: 1}
       - label:
-          labels: ['re:^[ \t]*odwolujac[a-z]*[ \t]*:']
+          labels: ['re:^[ \t]*(?:\d+[).][ \t]*)?lider\s+konsorcjum[ \t]*:?[ \t]*$']
+          value: &name_line '[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*'
+          max_chars: 300
+      - regex: '^[ \t]*1[).][ \t]*(?P<v>[^\n(]{3,}?)[ \t]*\([ \t]*lider'
+      - label:
+          labels: ['re:pod\s+firma\s*:?[ \t]*$']
+          value: *name_line
+          max_chars: 300
+      # etykieta strony + synonimy: "Wykonawca wnoszacy odwolanie:", "Wykonawca (Odwolujacy):", "Odwolujacy sie:"
+      - label:
+          labels: ['re:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?|wykonawca[ \t]+(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\)))[ \t]*:']
+          value: *name_line
+          max_chars: 300
     normalize: [ws, ocr_fix]
     validate: {regex: '^(?!(?i:konsorcjum|wykonawc))', min_len: 3}
   Odwolujacy[].krs:
@@ -120,14 +131,22 @@ fields:
       # pierwszy z wymienionych pelnomocnikow; tytuly (r. pr., adw., radca prawny) pomija wzorzec (wielka litera)
       - label:
           labels: ['re:reprezentowan[a-z]*\s+przez(?:\W+pelnomocnik[a-z]*)?', 're:pelnomocni(?:k|cy)[a-z]*\s*:']
-          value: '(?<![A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?'
+          # slowo = "Nowak" albo WERSALIKI ("NOWAK"; bez tytulow pisanych wersalikami), opcjonalnie czlon po mysliniku
+          value: '(?<![A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|(?!(?:ADWOKAT|RADCA|RADCZYNI|PRAWNY|PRAWNA|PRAWNIK|PEŁNOMOCNIK|MECENAS|PAN|PANI)\b)[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?'
           case: true
           max_chars: 80
+    # wersaliki ("Jan NOWAK") -> "Jan Nowak" robi normalizator name (odw2json/extract/names.py)
+    normalize: [ws, name]
   Odwolujacy[].pelnomocnik.nazwa:
     type: company
     extract:
-      # nazwa podmiotu = poczatek adresu do korespondencji (do przecinka), o ile to nie sam adres
-      - label: {labels: ['re:adres\s+do\s+korespondenc[a-z]*'], value: '[^,:\s][^,\n]{2,}', max_chars: 200}
+      # nazwa podmiotu = poczatek adresu do korespondencji: do przecinka albo do " ul."; zawiniecie nazwy
+      # ("Kancelaria Adwokacka Spolka z" + "ograniczona odpowiedzialnoscia, ul. ...") laczy nastepna linie,
+      # dopoki nie zaczyna sie od adresu (ul./al./pl./os.), kodu/cyfr, tel./e-mail/KRS/NIP albo naglowka strony
+      - label:
+          labels: ['re:adres\s+do\s+korespondenc[a-z]*']
+          value: '[^,:\s](?:(?![ \t]+(?:ul|al|pl|os)\.\s)[^,\n]|\n(?![ \t]*(?:(?:ul|al|pl|os)\.|tel\b|e-?mail\b|krs\b|nip\b|regon\b|dotyczy|zamawiaj|odwo[lł]|instytucja|strona|podmiot|wykonawca|reprezentowan|\d|\S*@)))*'
+          max_chars: 250
       # OCR przestawil adres przed nazwe: fragment z "Kancelaria" w oknie adresu
       - regex: {pattern: '(?P<v>[^,\n]*\bKancelari[^,\n]*)'}
         within: {after: 're:adres\s+do\s+korespondenc[a-z]*', max_chars: 250}
@@ -146,17 +165,16 @@ fields:
   Zamawiajacy[].nazwa:
     type: company
     extract:
+      # nazwa = pierwsza linia po etykiecie (do przecinka / " ul." / kodu pocztowego / KRS / NIP) + ewentualnie
+      # jedna zawinieta linia (nie adres, nie linia z cyfra/@ ani tel./KRS/NIP/e-mail)
       - label:
-          labels: ['re:^[ \t]*(?:\d+[).][ \t]*)?zamawiajac[a-z]*[^:\n]{0,80}:']
-          multiline: true
-          max_lines: 2
-          stop: &party_stop ['re:^[ \t]*(?:ul|al|pl|os)\.', 're:^[^\n]*\d', krs, nip, regon, e-mail, email, tel,
-                             adres, siedziba, 're:^[ \t]*-', 'reprezentowan']
+          labels: ['re:^[ \t]*(?:\d+[).][ \t]*)?(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*[^:\n]{0,80}:']
+          value: &zam_name '[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*(?:\n[ \t]*(?!(?:ul|al|pl|os)\.|krs\b|nip\b|regon\b|e-?mail\b|tel\b|adres\b|siedziba\b|-|reprezentowan|\d|\S*@)[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*)?'
+          max_chars: 300
       - label:
-          labels: ['re:^[ \t]*\d+\)[ \t]*(?!zamawiajac)']
-          multiline: true
-          max_lines: 2
-          stop: *party_stop
+          labels: ['re:^[ \t]*\d+\)[ \t]*(?![ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac)']
+          value: *zam_name
+          max_chars: 300
     normalize: [ws, ocr_fix]
     validate: {regex: '^(?!(?i:zamawiaj))', min_len: 3}
   Zamawiajacy[].krs:
@@ -177,7 +195,7 @@ fields:
     type: int
     extract:
       - flag:
-          phrases: ['re:^[ \t]*\d+[).][^\n]{0,80}(?:prowadzac|lider)', 're:^[ \t]*-?[ \t]*zamawiajac[a-z]*\s+(?:prowadzac|lider)']
+          phrases: ['re:^[ \t]*\d+[).][^\n]{0,80}(?:prowadzac|lider)', 're:^[ \t]*-?[ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*\s+(?:prowadzac|lider)']
           value: 1
       - flag: {phrases: ['re:^[ \t]*\d+\)'], value: 0}
 
@@ -220,15 +238,18 @@ fields:
       - regex: '(?<![\d/\-])\d{6}-20\d{2}(?!\d)'
     normalize: [ted]
 lists:
+  # Etykiety stron + synonimy (po foldzie): "Odwolujacy:" | "Odwolujacy sie:" | "Wykonawca wnoszacy odwolanie:" |
+  # "Wykonawca (Odwolujacy):"; "Zamawiajacy:" | "Instytucja/Strona/Podmiot zamawiajaca:" | "Zamawiajacy - nazwa:".
+  # Koniec bloku jednej strony = poczatek bloku drugiej (w dowolnej kolejnosci) albo "dotyczy"/tytul/uczestnicy.
   Odwolujacy:
     split:
-      start: 're:^[ \t]*odwolujac[a-z]*[ \t]*(?::|\()'
-      end: 're:^[ \t]*(?:zamawiajac[a-z]*[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ 	]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
+      start: 're:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?[ \t]*(?::|\()|wykonawca[ \t]+(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\))[ \t]*(?::|\())'
+      end: 're:^[ \t]*(?:(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*(?:[ \t]+[-–—][^:\n]{0,40})?[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ \t]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
     max_items: 1    # wg schematu UZP: konsorcjum -> tylko Lider
   Zamawiajacy:
     split:
-      start: 're:^[ \t]*zamawiajac[a-z]*[ \t]*(?::|\()'
-      end: 're:^[ \t]*(?:odwolujac[a-z]*[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ 	]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
+      start: 're:^[ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*(?:[ \t]+[-–—][^:\n]{0,40})?[ \t]*(?::|\()'
+      end: 're:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?[ \t]*(?::|\()|wykonawca[ \t]+(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\))[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ \t]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
       item_sep: 're:^[ \t]*\d+\)[ \t]*\S'
     max_items: 10
 llm:
