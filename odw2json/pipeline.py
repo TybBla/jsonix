@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from odw2json import classify, extract, ingest
 from odw2json.config_loader import DocTypeConfig, load_app_config, load_registry
 from odw2json.contracts import Classification, ExtractionResult
+from odw2json.logging_setup import new_run_id
 
 log = logging.getLogger("odw2json")
 
@@ -26,6 +29,8 @@ class RunReport:
     unknown: int = 0
     by_type: dict[str, int] = field(default_factory=dict)
     errors: list[FileError] = field(default_factory=list)
+    run_id: str = ""
+    total_ms: int = 0
 
 
 def process_file(
@@ -49,6 +54,7 @@ def write_outputs(
     cls: Classification,
     res: ExtractionResult | None,
     app_cfg: dict,
+    run_id: str | None = None,
 ) -> Path | None:
     rel = pdf.relative_to(input_dir).with_suffix(".json")
     target = output_dir / rel
@@ -67,6 +73,7 @@ def write_outputs(
         tr.write_text(
             _dump(
                 {
+                    "run_id": run_id,
                     "source": str(pdf),
                     "classification": asdict(cls),
                     "trace": [asdict(f) for f in res.trace] if res else [],
@@ -82,22 +89,64 @@ def run(
     output_dir: Path,
     app_cfg: dict | None = None,
     registry: dict[str, DocTypeConfig] | None = None,
+    run_id: str | None = None,
 ) -> RunReport:
     """Przetwarza wszystkie PDF-y z input_dir (case'y w podfolderach lub luzem)."""
     app_cfg = app_cfg if app_cfg is not None else load_app_config()
     registry = registry or load_registry()
-    report = RunReport()
+    run_id = run_id or new_run_id()
+    report = RunReport(run_id=run_id)
+    started = datetime.now(UTC)
+    t_run = time.perf_counter()
     pdfs = sorted(p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
     for pdf in pdfs:
+        t0 = time.perf_counter()
+        rel = str(pdf.relative_to(input_dir))
         try:
             cls, res = process_file(pdf, registry)
-            write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg)
+            write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg, run_id)
             report.processed += 1
             key = cls.doc_type or "nieznany"
             report.by_type[key] = report.by_type.get(key, 0) + 1
             report.unknown += cls.doc_type is None
-            log.info("%s -> %s (%.2f)", pdf.relative_to(input_dir), key, cls.confidence)
+            log.info(
+                "%s -> %s (%.2f)",
+                rel,
+                key,
+                cls.confidence,
+                extra={
+                    "event": "file_processed",
+                    "file": rel,
+                    "doc_type": cls.doc_type,
+                    "ms": round((time.perf_counter() - t0) * 1000),
+                },
+            )
         except Exception as e:  # jeden zły plik nie przerywa batcha
-            log.error("%s: %s", pdf, e)
-            report.errors.append(FileError(pdf, f"{type(e).__name__}: {e}"))
+            msg = f"{type(e).__name__}: {e}"
+            log.error(
+                "%s: %s",
+                pdf,
+                e,
+                extra={
+                    "event": "file_error",
+                    "file": rel,
+                    "doc_type": None,
+                    "ms": round((time.perf_counter() - t0) * 1000),
+                },
+            )
+            report.errors.append(FileError(pdf, msg))
+    report.total_ms = round((time.perf_counter() - t_run) * 1000)
+    summary = {
+        "run_id": run_id,
+        "started": started.isoformat(),
+        "finished": datetime.now(UTC).isoformat(),
+        "total_ms": report.total_ms,
+        "processed": report.processed,
+        "by_type": report.by_type,
+        "unknown": report.unknown,
+        "errors": [{"file": str(e.path), "error": e.error} for e in report.errors],
+    }
+    logs = Path(output_dir) / ".logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / f"{run_id}.summary.json").write_text(_dump(summary), encoding="utf-8")
     return report
