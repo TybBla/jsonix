@@ -34,3 +34,10 @@ Pliki: `odw2json/cli.py`, `odw2json/api/`, `web/`, `Dockerfile`, `docker-compose
 3. Docker Compose + test na czystym Windowsie: `pip install -r requirements.txt` → `start.bat`.
 4. Dokumentacja wymagana do nagrody: architektura, konfiguracja typu, dodanie nowego typu (`docs/nowy-typ-dokumentu.md` — demo z prawdziwym nowym typem, np. „wyrok KIO”).
 5. Checklista zgłoszenia (tytuł, link, README, wyniki testów F1).
+
+## LLM (decyzja 2026-11-21)
+- Główny: **Mistral Ministral 3 8B** przez `https://api.eu.mistral.ai/v1` (Apache 2.0, firma z UE, inferencja w UE, ~0,17 $/1M tok.).
+- Test na 5 dokumentach: Ministral 3 **3B** vs 8B — bierzemy 3B, jeśli F1 nie spada (więcej punktów za rozmiar).
+- Fallback: **Bielik-11B-v3.0** (CloudFerro Sherlock, Apache 2.0, polski) — JSON mode niepotwierdzony, wymuszać promptem + walidacją.
+- Do sprawdzenia na starcie: `models.list` na endpoincie UE zawiera wybrany model; nazwa modelu w `.env`.
+- Qwen/DeepSeek odrzucone decyzją zespołu.
