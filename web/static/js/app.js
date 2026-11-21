@@ -390,6 +390,7 @@ function restart() {
 }
 
 export function backToResults() {
+  document.dispatchEvent(new CustomEvent("o2j:leave-review"));
   showScreen("results", "Wyniki klasyfikacji");
 }
 

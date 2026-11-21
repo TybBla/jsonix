@@ -262,7 +262,7 @@ html[data-contrast="high"] .tag-unknown { background: #000; color: #ff0; }
 .fields-panel h2, .doc-panel h2 { font-size: 1.25rem; }
 .doc-panel { position: sticky; top: .5rem; }
 .pdf-scroll {
-  height: calc(100vh - 7rem); min-height: 24rem; overflow: auto;
+  height: calc(100vh - 7rem); min-height: 24rem; overflow: auto; scrollbar-gutter: stable;
   background: var(--gray-3a); border: 1px solid var(--gray-3); border-radius: var(--radius);
   padding: 12px; scroll-behavior: smooth;
 }
@@ -294,7 +294,7 @@ html[data-contrast="high"] .field.is-selected { background: #000; border-color: 
 .hl-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .hl-box {
   position: absolute; pointer-events: auto; cursor: pointer;
-  border: 2px dashed rgba(0, 82, 165, .55); border-radius: 2px; background: rgba(0, 108, 215, .06);
+  border: 2px dashed var(--blue-dark); border-radius: 2px; background: rgba(0, 108, 215, .06);
 }
 .hl-box:hover { border-style: solid; border-color: var(--blue-dark); }
 .hl-box.is-active { border: 3px solid var(--black); background: rgba(235, 168, 40, .35); box-shadow: 0 0 0 2px var(--yellow); }

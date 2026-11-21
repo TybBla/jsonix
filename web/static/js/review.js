@@ -221,17 +221,36 @@ async function openReview(job, file) {
   showScreen("review", `Sprawdź dane: ${file.file}`);
 
   const status = $("#doc-status");
-  viewer = new PdfViewer(docBox, { onSelect: (path) => select(path, { scroll: false }) });
+  const mine = new PdfViewer(docBox, { onSelect: (path) => select(path, { scroll: false }) });
+  const cur = current;
+  viewer = mine;
+  let pages;
   try {
-    const pages = await viewer.open(pdfUrl(job.job_id, file.name));
-    const texts = viewer.pageTexts();
+    pages = await mine.open(pdfUrl(job.job_id, file.name));
+  } catch {
+    if (viewer !== mine) return; // otwarto inny dokument w międzyczasie
+    status.classList.remove("visually-hidden");
+    status.className = "doc-status notice notice-error";
+    status.replaceChildren(
+      el("span", { class: "icon icon-error", "aria-hidden": "true", text: "!" }),
+      el("span", { text: "Nie udało się wyświetlić podglądu dokumentu. Dane w polach są nadal dostępne." }),
+    );
+    for (const entry of cur.fields.values()) if (entry.state === "source") renderSource(entry, false);
+    return;
+  }
+  if (viewer !== mine) return;
+  {
+    const texts = mine.pageTexts();
     let found = 0;
     let missing = 0;
-    for (const entry of current.fields.values()) {
+    for (const entry of cur.fields.values()) {
       if (entry.state !== "source") continue;
-      const hit = locateInDocument(texts, entry.trace.page, entry.trace.source_snippet, entry.node.value);
+      // skan bez warstwy tekstowej: komunikat zamiast zgadywania miejsca na innej stronie
+      const hit = entry.ocr
+        ? null
+        : locateInDocument(texts, entry.trace.page, entry.trace.source_snippet, entry.node.value);
       if (hit) {
-        viewer.addHighlight(entry.node.path, entry.node.label, hit);
+        mine.addHighlight(entry.node.path, entry.node.label, hit);
         found += 1;
       } else {
         missing += 1;
@@ -243,16 +262,12 @@ async function openReview(job, file) {
       `Podświetlono źródło dla ${found} ${plural(found, "pola", "pól", "pól")}.` +
       (missing ? ` Nie znaleziono fragmentu dla ${missing} pól.` : "");
     status.classList.add("visually-hidden");
-  } catch {
-    status.classList.remove("visually-hidden");
-    status.className = "doc-status notice notice-error";
-    status.replaceChildren(
-      el("span", { class: "icon icon-error", "aria-hidden": "true", text: "!" }),
-      el("span", { text: "Nie udało się wyświetlić podglądu dokumentu. Dane w polach są nadal dostępne." }),
-    );
-    for (const entry of current.fields.values()) if (entry.state === "source") renderSource(entry, false);
   }
 }
 
 NARROW.addEventListener("change", () => viewer?.redraw());
+document.addEventListener("o2j:leave-review", () => {
+  viewer?.destroy();
+  viewer = null;
+});
 setReviewOpener(openReview);
