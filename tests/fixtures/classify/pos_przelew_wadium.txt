@@ -1,0 +1,22 @@
+Przykładowy Bank S.A.
+Potwierdzenie przelewu
+
+Data i godzina realizacji: 2025-03-24 09:12:45
+Numer transakcji: 2025032400123456
+
+Zleceniodawca:
+Alfa Budowa sp. z o.o.
+ul. Budowlana 3, 31-001 Kraków
+Rachunek nadawcy: 11 1111 2222 3333 4444 5555 6666
+
+Beneficjent:
+Gmina Przykładowo
+ul. Rynek 1, 00-001 Przykładowo
+Rachunek odbiorcy: 12 3456 7890 1234 5678 9012 3456
+
+Kwota: 30 000,00 PLN
+Tytuł przelewu: Wadium - ZP.271.4.2025 - Przebudowa drogi gminnej
+Data operacji: 2025-03-24
+Status: zrealizowany
+
+Potwierdzenie wygenerowano elektronicznie i nie wymaga podpisu.
