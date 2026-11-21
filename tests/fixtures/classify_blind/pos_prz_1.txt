@@ -1,0 +1,19 @@
+Alfa Bank Polska
+
+POTWIERDZENIE PRZELEWU KRAJOWEGO
+
+Data księgowania: 2026-09-04
+Data realizacji: 2026-09-04
+
+Zleceniodawca: Technomed Serwis sp. z o.o.
+Rachunek zleceniodawcy: 11 1020 4027 0000 1502 0011 2233
+Odbiorca: Urząd Zamówień Publicznych - Krajowa Izba Odwoławcza
+Rachunek odbiorcy: 22 1010 1010 0001 2233 4455 6677
+Kwota: 7 500,00 PLN
+Tytuł: Wpis od odwołania, sygn. postępowania SZ/PN/22/2026
+Status: Zrealizowany
+Numer operacji: 20260904/0044771
+Opłata za przelew: 0,00 PLN
+
+Dokument wygenerowany elektronicznie, nie wymaga podpisu.
+Infolinia: 800 000 111

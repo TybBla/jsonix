@@ -1,0 +1,27 @@
+Ogłoszenie o zamówieniu - roboty budowlane
+Biuletyn Zamówień Publicznych
+Numer ogłoszenia: 2025/BZP 00987654/01
+Data publikacji: 2025-03-03
+
+SEKCJA I - ZAMAWIAJĄCY
+Nazwa: Gmina Przykładowo
+Adres: ul. Rynek 1, 00-001 Przykładowo
+Adres strony internetowej: https://przykladowo.example.pl
+Kontakt: zamowienia@przykladowo.example.pl
+
+SEKCJA II - PRZEDMIOT ZAMÓWIENIA
+Tytuł: Przebudowa drogi gminnej nr 123456W
+Rodzaj zamówienia: roboty budowlane
+Tryb udzielenia zamówienia: tryb podstawowy bez negocjacji
+Wartość szacunkowa zamówienia: 2 450 000,00 PLN
+
+SEKCJA III - WADIUM I KRYTERIA OCENY
+Wykonawca jest zobowiązany do wniesienia wadium w wysokości 30 000,00 PLN.
+Wadium wnosi się przelewem na rachunek Zamawiającego nr 12 3456 7890 1234 5678 9012 3456.
+Kryteria oceny ofert: cena - 60%, okres gwarancji - 40%.
+
+SEKCJA IV - ŚRODKI OCHRONY PRAWNEJ
+Wykonawcom przysługuje odwołanie do Krajowej Izby Odwoławczej na zasadach określonych w dziale IX
+ustawy Prawo zamówień publicznych. Odwołujący może wnieść zarzut dotyczący treści ogłoszenia.
+Termin składania ofert: 2025-03-25 godz. 10:00
+Termin otwarcia ofert: 2025-03-25 godz. 10:15

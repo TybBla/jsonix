@@ -2,6 +2,20 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v0.3.0 — E3: klasyfikacja + E8+E9: aplikacja (2026-11-21)
+
+- Klasyfikacja sterowana YAML: tytuł jako linia nagłówka (z rozstrzelonymi literami), wzorce strukturalne, `required_any`, `min_score`/`min_margin`, pewność z marginesu, uzasadnienie (`evidence`) w trace.
+- Globalne `config/classify.yaml`: kara za nagłówki obcych dokumentów liczona per typ, z automatycznym zwolnieniem własnego tytułu (`ignore_foreign`) — nowy typ dodawany samą konfiguracją.
+- Testy odporności: syntetyczne dokumenty spoza puli, warianty OCR/tytułu, sygnatura sprawy w nagłówku, losowe nazwy plików; zestaw kontrolny 24 dokumentów.
+- Aplikacja (drugi członek zespołu): API z zadaniami w tle (upload wielu PDF, status, PDF/JSON/ZIP) i GUI bez kroku budowania (Gov.pl, PDF.js lokalnie): wgrywanie, wyniki klasyfikacji, PDF obok pól z podświetleniem źródła, edycja wartości, `start-gui.bat`, test dymny.
+
+| Bramka | przed | po |
+|---|---|---|
+| Błędy klasyfikacji dev / holdout | 5 / 2 | 0 / 0 |
+| Negatywy odrzucone (tekst) dev / holdout | 9/12 / 8/10 | 12/12 / 10/10 |
+| Syntetyczne negatywy | 1/9 | 9/9 |
+| Zestaw kontrolny | 18/24 | 24/24 |
+
 ## v0.2.1 — E2b: skany (2026-11-21)
 
 - 30 syntetycznych skanów UZP (bez warstwy tekstowej, z GT) w `data/train/skany/`; podział dev/holdout 23/7.

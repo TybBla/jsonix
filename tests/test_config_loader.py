@@ -21,3 +21,19 @@ def test_lookup_czynnosc_powod():
 
 def test_app_config_unknown_output():
     assert load_app_config()["unknown_output"] in {"none", "empty_file", "empty_object"}
+
+
+def test_classify_config_defaults_are_backward_compatible():
+    from odw2json.config_loader import ClassifyConfig
+
+    c = ClassifyConfig(strong=["a"])
+    assert c.title == [] and c.patterns == [] and c.required_any == []
+    assert (c.min_score, c.min_margin, c.header_chars) == (3.0, 0.0, 600)
+    assert (c.weights.strong, c.weights.weak, c.weights.negative, c.weights.title) == (2.0, 1.0, -3.0, 4.0)
+
+
+def test_shipped_classify_configs_load_with_new_fields():
+    reg = load_registry()
+    assert reg["przelew"].classify.required_any
+    assert reg["przelew"].classify.patterns
+    assert all(c.classify.title for c in reg.values())

@@ -1,0 +1,24 @@
+Bank Wielkopolski i Pomorza
+
+WYCIĄG Z RACHUNKU BANKOWEGO nr 09/2026
+
+Rachunek: PL 11 1020 4027 0000 1502 0011 2233
+Posiadacz: Technomed Serwis sp. z o.o.
+Okres: 2026-09-01 - 2026-09-30
+Waluta: PLN
+
+Saldo początkowe: 48 210,55
+
+Data | Opis operacji | Kwota | Saldo
+2026-09-01 | Przelew przychodzący - Medika-Pol S.A., FV 120/2026 | +12 300,00 | 60 510,55
+2026-09-02 | Opłata miesięczna za prowadzenie rachunku | -15,00 | 60 495,55
+2026-09-04 | Przelew wychodzący - UZP KIO, wpis od odwołania | -7 500,00 | 52 995,55
+2026-09-09 | Przelew wychodzący - ZUS | -9 870,12 | 43 125,43
+2026-09-15 | Przelew wychodzący - Kancelaria Lis, PF/112/2026 | -8 610,00 | 34 515,43
+2026-09-21 | Wpływ - zwrot kaucji | +3 000,00 | 37 515,43
+2026-09-28 | Przelew wychodzący - wynagrodzenia | -22 000,00 | 15 515,43
+
+Saldo końcowe: 15 515,43
+Suma uznań: 15 300,00. Suma obciążeń: 48 000,12.
+
+Wyciąg wygenerowany automatycznie.

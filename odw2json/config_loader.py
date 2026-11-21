@@ -4,22 +4,138 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT_DIR / "config"
+REGEX_PREFIX = "re:"  # prefiks wpisu required_any traktowanego jako regex
+TITLE_TOKEN = "@title"  # wpis grupy required_any: trafienie cechy ``title`` tego typu
+
+
+class ClassifyWeights(BaseModel):
+    """Wagi cech klasyfikatora (punkty za trafienie; ``negative`` zwykle ujemna)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    strong: float = 2.0
+    weak: float = 1.0
+    negative: float = -3.0
+    title: float = 4.0
+
+
+class PatternSpec(BaseModel):
+    """Cecha strukturalna: regex na tekście znormalizowanym (małe litery, bez polskich znaków)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    regex: str
+    weight: float = 1.0
+
+    @field_validator("regex")
+    @classmethod
+    def _valid_regex(cls, v: str) -> str:
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"niepoprawny regex {v!r}: {e}") from e
+        return v
+
+
+def _check_required_item(item: str) -> None:
+    if item.startswith(REGEX_PREFIX):
+        try:
+            re.compile(item[len(REGEX_PREFIX) :])
+        except re.error as e:
+            raise ValueError(f"niepoprawny regex w required_any {item!r}: {e}") from e
+
+
+class RequiredGroup(BaseModel):
+    """Grupa wymagań ``required_any``: spełniona, gdy trafią **wszystkie** wpisy ``all_of``.
+
+    Wpis to fraza, ``re:<regex>`` albo ``@title`` (trafiła cecha ``title`` tego typu).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    all_of: list[str] = Field(min_length=1)
+
+    @field_validator("all_of")
+    @classmethod
+    def _valid_items(cls, items: list[str]) -> list[str]:
+        for item in items:
+            _check_required_item(item)
+        return items
 
 
 class ClassifyConfig(BaseModel):
+    """Cechy rozpoznawania typu dokumentu (wszystko poza ``strong/weak/negative/min_score`` opcjonalne).
+
+    ``title`` - frazy szukane w nagłówku (pierwsze ``header_chars`` znaków, z zwijaniem rozstrzelonych liter);
+    ``title_mode`` - ``anywhere`` (domyślnie: fraza gdziekolwiek w nagłówku) albo ``line`` (fraza musi
+    być tytułem, czyli prawie całą krótką linią: linia <= ``title_line_max_chars`` znaków, a fraza
+    zajmuje >= ``title_line_min_cover`` jej długości);
+    ``patterns`` - regexy z wagami; ``required_any`` - lista wpisów: fraza, ``re:<regex>`` albo grupa
+    ``{all_of: [...]}`` (wszystkie wpisy grupy naraz; wpis ``@title`` = trafił tytuł); bez trafienia
+    któregokolwiek wpisu typ odpada; ``min_score`` - minimalny wynik; ``min_margin`` - minimalna
+    przewaga nad drugim typem; ``ignore_foreign`` - frazy z ``foreign_titles`` (config/classify.yaml),
+    za które ten typ nie jest karany (fraza pokrywająca się z własnym ``title`` jest zwalniana
+    automatycznie).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     strong: list[str] = Field(default_factory=list)
     weak: list[str] = Field(default_factory=list)
     negative: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+    title_mode: Literal["line", "anywhere"] = "anywhere"
+    title_line_max_chars: int = Field(60, gt=0)
+    title_line_min_cover: float = Field(0.6, gt=0, le=1)
+    patterns: list[PatternSpec] = Field(default_factory=list)
+    required_any: list[str | RequiredGroup] = Field(default_factory=list)
     min_score: float = 3.0
+    min_margin: float = Field(0.0, ge=0)
+    header_chars: int = Field(600, gt=0)
+    weights: ClassifyWeights = Field(default_factory=ClassifyWeights)
+    ignore_foreign: list[str] = Field(default_factory=list)
+
+    @field_validator("required_any")
+    @classmethod
+    def _valid_required(cls, items: list[str | RequiredGroup]) -> list[str | RequiredGroup]:
+        for item in items:
+            if isinstance(item, str):
+                _check_required_item(item)
+        return items
+
+
+class ForeignTitles(BaseModel):
+    """Nagłówki dokumentów obcych (wyrok, faktura...): kara liczona dla każdego typu osobno.
+
+    Fraza liczy się, gdy któraś z linii w pierwszych ``header_chars`` znakach **zaczyna się** od niej
+    (granica słowa). Kara ``weight`` (ujemna) jest naliczana raz na typ, niezależnie od liczby trafień.
+    Typ nie jest karany za frazę pokrywającą się z jego ``title`` (jedna zaczyna drugą) ani za frazy
+    z jego ``ignore_foreign``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    weight: float = Field(-10.0, le=0)
+    header_chars: int = Field(600, gt=0)
+    phrases: list[str] = Field(default_factory=list)
+
+
+class ClassifySettings(BaseModel):
+    """Ustawienia globalne klasyfikatora (config/classify.yaml)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    foreign_titles: ForeignTitles = Field(default_factory=ForeignTitles)
 
 
 class DocTypeConfig(BaseModel):
@@ -66,6 +182,12 @@ def load_lookup(name: str, config_dir: Path = CONFIG_DIR) -> dict:
 
 def load_app_config(config_dir: Path = CONFIG_DIR) -> dict:
     return _read_yaml(config_dir / "app.yaml")
+
+
+def load_classify_settings(config_dir: Path = CONFIG_DIR) -> ClassifySettings:
+    """Globalne ustawienia klasyfikatora (``config/classify.yaml``); brak pliku = bez ustawień."""
+    path = config_dir / "classify.yaml"
+    return ClassifySettings(**_read_yaml(path)) if path.exists() else ClassifySettings()
 
 
 def load_llm_config(config_dir: Path = CONFIG_DIR) -> dict:

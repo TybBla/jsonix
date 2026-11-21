@@ -2,11 +2,30 @@ id: odwolanie
 title: Odwołanie do Krajowej Izby Odwoławczej
 output_template: schemas/odwolanie.json
 classify:
-  # frazy szukane po normalizacji (male litery, bez polskich znakow)
+  # Frazy i regexy dzialaja na tekscie znormalizowanym (male litery, bez polskich znakow).
+  # Tytul "ODWOLANIE" stoi po blokach adresowych stron - stad dluzszy naglowek.
+  title: ["odwolanie"]
+  title_mode: line
+  header_chars: 1500
   strong: ["odwolanie", "odwolujacy", "zarzut", "krajowej izby odwolawczej"]
   weak: ["zamawiajacy", "prawo zamowien publicznych", "wnosze o"]
   negative: ["ogloszenie o zamowieniu", "wyrok", "postanowienie", "udzielam pelnomocnictwa", "kwota przelewu"]
-  min_score: 3.0
+  patterns:
+    - {regex: 'odwolujacy:', weight: 3}
+    - {regex: 'zarzut nr \d+', weight: 3}
+  # Odwolanie ma tytul jako osobna linie albo strukture "Odwolujacy:" / "Zarzut nr N" - same slowa domenowe
+  # (pismo do zamawiajacego, wyrok KIO) nie wystarcza.
+  # Prawdziwe odwolanie moze nie miec etykiety "Odwolujacy:" ani osobnej linii tytulu - wtedy wystarcza akt
+  # wniesienia ("wnosze/skladam odwolanie") albo ponumerowane zarzuty ("Zarzut 1.", "Zarzut nr 1"). Cyfry rzymskie pominieto celowo ("zarzut i ..." to spojnik).
+  required_any:
+    - "@title"
+    - "odwolujacy:"
+    - 're:zarzut\s*(nr\s*)?\d+'
+    # akt wniesienia: "wnosze/wnosimy/wnosi/wnosza (niniejsze) odwolanie", "skladam/skladamy/sklada odwolanie";
+    # "odwolanie zostalo wniesione" (pismo zamawiajacego o cudzym odwolaniu) celowo nie pasuje.
+    - 're:(wnosz[eay]|wnosimy|wnosi|sklad(am|amy|a))\s+(niniejsze\s+)?odwolanie'
+  min_score: 8.0   # pojedyncze slowa domenowe (np. w wyroku KIO) nie wystarcza
+  min_margin: 2.0
 # Sektor B: opis pol (metoda, normalizacja, zrodla). Format wolny do czasu ustalenia przez B.
 fields:
   OdwolanieKIO.czynnosc_opis:

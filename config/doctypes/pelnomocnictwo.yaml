@@ -2,10 +2,17 @@ id: pelnomocnictwo
 title: Pełnomocnictwo
 output_template: schemas/pelnomocnictwo.json
 classify:
+  # Frazy i regexy dzialaja na tekscie znormalizowanym (male litery, bez polskich znakow).
+  # Tytul w naglowku; rozstrzelone "P E L N O M O C N I C T W O" jest zwijane przed dopasowaniem.
+  title: ["pelnomocnictwo"]
+  title_mode: line
+  title_line_min_cover: 0.5   # "PELNOMOCNICTWO PROCESOWE" = 58% linii
+  header_chars: 600
   strong: ["pelnomocnictw", "udzielam", "udzielaja", "mocodawc"]
-  weak: ["do reprezentowania", "krajowej izby odwolawczej"]
+  weak: ["do reprezentowania", "krajowej izby odwolawczej", "ustanawiam", "upowazniam"]
   negative: ["kwota przelewu", "zarzut nr", "ogloszenie o zamowieniu"]
-  min_score: 3.0
+  min_score: 5.0
+  min_margin: 1.0
 fields: {}
 llm:
   prompt: prompts/pelnomocnictwo.md
