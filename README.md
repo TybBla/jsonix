@@ -6,7 +6,7 @@
 
 ```powershell
 pip install -r requirements.txt
-copy .env.example .env    # uzupełnij LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
+copy .env.example .env    # opcjonalnie: tylko z LLM (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY)
 start.bat                 # = python -m odw2json run input output
 ```
 
@@ -19,10 +19,24 @@ Inne komendy:
 ```powershell
 python -m odw2json doctypes      # lista skonfigurowanych typów dokumentów
 python -m odw2json serve         # API + GUI na http://127.0.0.1:8000
-docker compose up --build        # to samo w Dockerze
+docker compose up --build        # to samo w Dockerze (sekcja „Docker” niżej)
 ```
 
-**OCR (opcjonalny).** Skany bez warstwy tekstowej czyta OCR po `pip install -r requirements-ocr.txt` (~107 MB, modele w paczce, bez sieci w czasie działania). Obraz Dockera domyślnie go nie zawiera: skan dostaje wtedy ostrzeżenie, a pusty tekst jest traktowany jako dokument nieznany.
+**OCR.** Skany bez warstwy tekstowej czyta OCR (rapidocr + onnxruntime, w `requirements.txt`, modele w paczce, bez sieci w czasie działania). Paczki OCR są dostępne dla Pythona 3.13; ten sam OCR jest w obrazie Dockera.
+
+## Docker
+
+```powershell
+docker compose up --build                              # API + GUI: http://127.0.0.1:8000
+docker compose run --rm app python -m odw2json run     # wsad: input/ -> output/, bez GUI
+python scripts/smoke_docker.py                         # test: build, healthcheck, GUI/API, wsad = CLI
+```
+
+- Plik `.env` jest **opcjonalny**: bez niego działa domyślny tryb bez LLM.
+- Katalogi `input/`, `output/` i `config/` są montowane z repo, więc konfigurację typów dokumentów zmieniasz bez przebudowy obrazu (wystarczy restart).
+- Port zmienisz zmienną `JSONIX_PORT` (np. `$env:JSONIX_PORT=8080; docker compose up`). Serwer nasłuchuje tylko na `127.0.0.1`.
+- Kontener ma healthcheck (`/api/health`); `docker compose ps` pokazuje stan `healthy`.
+- `scripts/smoke_docker.py` uruchamia osobny projekt `jsonix-smoke`, sprawdza GUI/API, przetwarza w kontenerze `przyklad_01` i skan (OCR), porównuje JSON-y z CLI na hoście i sprząta po sobie (kod wyjścia 0/1, 2 = brak Dockera).
 
 ## GUI
 
