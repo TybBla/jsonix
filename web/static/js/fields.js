@@ -154,3 +154,24 @@ export function setByPath(data, path, value) {
   const last = parts[parts.length - 1];
   cur[/^\d+$/.test(last) ? Number(last) : last] = value;
 }
+
+/**
+ * Wartość wpisana przez użytkownika, z typem jak w oryginale:
+ * pusty tekst → null; liczba, gdy oryginał był liczbą i tekst da się odczytać („7 500,50” → 7500.5).
+ */
+export function parseEditedValue(text, original) {
+  const trimmed = String(text ?? "").trim();
+  if (!trimmed) return null;
+  if (typeof original === "number") {
+    const num = Number(trimmed.replace(/[\s ]/g, "").replace(",", "."));
+    if (Number.isFinite(num)) return num;
+  }
+  return trimmed;
+}
+
+/** Kopia data z naniesionymi edycjami (Map path → wartość); oryginał bez zmian. */
+export function applyEdits(data, edits) {
+  const copy = structuredClone(data);
+  for (const [path, value] of edits || []) setByPath(copy, path, value);
+  return copy;
+}

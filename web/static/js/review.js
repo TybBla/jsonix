@@ -1,9 +1,18 @@
 // Ekran „Sprawdź dane”: pola wyodrębnione z dokumentu obok podglądu PDF z podświetleniem źródła.
 
 import { backToResults, doctypeLabel, jsonUrl, pdfUrl, setReviewOpener } from "./app.js";
-import { buildTree, displayValue, leaves, ocrPages, shortSnippet, sourceState, traceIndex } from "./fields.js";
+import {
+  applyEdits,
+  buildTree,
+  displayValue,
+  ocrPages,
+  parseEditedValue,
+  shortSnippet,
+  sourceState,
+  traceIndex,
+} from "./fields.js";
 import { locateInDocument } from "./match.js";
-import { $, el, setStep, showScreen } from "./ui.js";
+import { $, announce, el, setStep, showScreen } from "./ui.js";
 import { PdfViewer } from "./viewer.js";
 
 const NARROW = window.matchMedia("(max-width: 63.99rem)");
@@ -17,6 +26,7 @@ function plural(n, one, few, many) {
 }
 
 let viewer = null;
+const EDITS = new Map(); // `${job_id}/${name}` → Map(path → wartość po edycji)
 let current = null; // {job, file, fields: Map(path -> {node, trace, state, button, source})}
 
 function fieldId(path) {
@@ -66,7 +76,8 @@ function renderSource(entry, located) {
 function renderField(node, index, ocr) {
   const trace = index.get(node.path) || null;
   const state = sourceState(node, trace);
-  const shown = displayValue(node.value);
+  const edited = current.edits.has(node.path);
+  const shown = displayValue(edited ? current.edits.get(node.path) : node.value);
   const id = fieldId(node.path);
   const source = el("p", { class: "field-source", id: `${id}-zrodlo` });
   const button = el(
@@ -84,6 +95,7 @@ function renderField(node, index, ocr) {
     ],
   );
   const entry = { node, trace, state, button, source, ocr: trace && ocr.has(trace.page) };
+  entry.controls = el("div", { class: "field-controls" });
   renderSource(entry);
   button.addEventListener("focus", () => select(node.path, { scroll: true, fromField: true }));
   button.addEventListener("click", () => {
@@ -95,7 +107,130 @@ function renderField(node, index, ocr) {
     }
   });
   current.fields.set(node.path, entry);
-  return el("li", { class: "field-item" }, [button, source]);
+  renderControls(entry);
+  return el("li", { class: "field-item" }, [button, source, entry.controls]);
+}
+
+// --- edycja wartości ---
+
+function editKey(job, file) {
+  return `${job.job_id}/${file.name}`;
+}
+
+function rawText(value) {
+  if (value === null || value === undefined) return "";
+  return typeof value === "number" ? String(value).replace(".", ",") : String(value);
+}
+
+function currentValue(entry) {
+  return current.edits.has(entry.node.path) ? current.edits.get(entry.node.path) : entry.node.value;
+}
+
+function refreshField(entry) {
+  const shown = displayValue(currentValue(entry));
+  entry.button.classList.toggle("is-empty", shown === null);
+  entry.button.classList.toggle("is-edited", current.edits.has(entry.node.path));
+  entry.button.querySelector(".field-value").textContent = shown ?? "Nie podano";
+  renderControls(entry);
+  updateDownloadInfo();
+}
+
+function renderControls(entry) {
+  const label = entry.node.label;
+  const edited = current.edits.has(entry.node.path);
+  const change = el(
+    "button",
+    { type: "button", class: "btn btn-tertiary btn-small edit-btn", onclick: () => openEditor(entry) },
+    ["Zmień", el("span", { class: "visually-hidden", text: ` pole ${label}` })],
+  );
+  const items = [change];
+  if (edited) {
+    items.unshift(
+      el("span", { class: "tag tag-edited" }, [el("span", { "aria-hidden": "true", text: "✎" }), " Zmieniono ręcznie"]),
+    );
+    items.push(
+      el(
+        "button",
+        {
+          type: "button",
+          class: "btn btn-tertiary btn-small",
+          onclick: () => {
+            current.edits.delete(entry.node.path);
+            refreshField(entry);
+            announce(`Przywrócono wartość z dokumentu w polu ${label}.`);
+            entry.controls.querySelector(".edit-btn")?.focus();
+          },
+        },
+        ["Przywróć wartość z dokumentu", el("span", { class: "visually-hidden", text: ` w polu ${label}` })],
+      ),
+    );
+  }
+  entry.controls.replaceChildren(...items);
+}
+
+function openEditor(entry) {
+  const id = `${fieldId(entry.node.path)}-edycja`;
+  const input = el("input", { class: "edit-input", type: "text", id, value: rawText(currentValue(entry)) });
+  const close = () => {
+    renderControls(entry);
+    entry.controls.querySelector(".edit-btn")?.focus();
+  };
+  const form = el("form", { class: "edit-form", novalidate: true }, [
+    el("label", { for: id, text: `Nowa wartość: ${entry.node.label}` }),
+    el("p", { class: "hint", id: `${id}-pomoc`, text: "Zostaw puste, jeśli w dokumencie nie ma tej informacji." }),
+    input,
+    el("div", { class: "actions" }, [
+      el("button", { type: "submit", class: "btn btn-secondary btn-small" }, "Zapisz"),
+      el("button", { type: "button", class: "btn btn-tertiary btn-small", onclick: close }, "Anuluj"),
+    ]),
+  ]);
+  input.setAttribute("aria-describedby", `${id}-pomoc`);
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      close();
+    }
+  });
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const value = parseEditedValue(input.value, entry.node.value);
+    const same = JSON.stringify(value) === JSON.stringify(entry.node.value ?? null);
+    if (same) current.edits.delete(entry.node.path);
+    else current.edits.set(entry.node.path, value);
+    refreshField(entry);
+    announce(
+      same
+        ? `Pole ${entry.node.label} ma wartość z dokumentu.`
+        : `Zapisano zmianę w polu ${entry.node.label}. Pobrany JSON będzie ją zawierał.`,
+    );
+    entry.controls.querySelector(".edit-btn")?.focus();
+  });
+  entry.controls.replaceChildren(form);
+  input.focus();
+  input.select();
+}
+
+function updateDownloadInfo() {
+  const info = $("#edits-info");
+  if (!info) return;
+  const n = current.edits.size;
+  info.hidden = n === 0;
+  info.textContent = n ? `Pobrany JSON będzie zawierał Twoje zmiany (${n}).` : "";
+}
+
+function downloadEdited(ev) {
+  setStep(4);
+  if (!current.edits.size) return; // bez zmian: plik prosto z serwera
+  ev.preventDefault();
+  const data = applyEdits(current.file.data, current.edits);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const name = current.file.file.replace(/\.pdf$/i, "") + ".json";
+  const a = el("a", { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function renderNode(node, depth, index, ocr) {
@@ -188,10 +323,11 @@ function buildScreen(job, file) {
           "data-screen": "review",
           href: jsonUrl(job.job_id, file.name),
           download: "",
-          onclick: () => setStep(4),
+          onclick: downloadEdited,
         },
         ["Pobierz JSON", el("span", { class: "muted-inline", text: " (plik .json)" })],
       ),
+      el("p", { class: "edits-info", id: "edits-info", role: "status", hidden: true }),
       el("button", { type: "button", class: "btn btn-tertiary", onclick: backToResults }, "Wróć do wyników"),
     ]),
   );
@@ -215,9 +351,12 @@ function buildScreen(job, file) {
 async function openReview(job, file) {
   viewer?.destroy();
   viewer = null;
-  current = { job, file, fields: new Map() };
+  const key = editKey(job, file);
+  if (!EDITS.has(key)) EDITS.set(key, new Map());
+  current = { job, file, fields: new Map(), edits: EDITS.get(key) };
   const docBox = buildScreen(job, file);
   setView("fields");
+  updateDownloadInfo();
   showScreen("review", `Sprawdź dane: ${file.file}`);
 
   const status = $("#doc-status");
