@@ -30,7 +30,7 @@ def test_each_backend_reads_polish_text(name, odwolanie):
 
 
 def test_load_sets_backend_and_offsets(odwolanie):
-    doc = ingest.load(odwolanie, cfg={})
+    doc = ingest.load(odwolanie, cfg={"backend": "pypdf"})
     assert isinstance(doc, Document)
     assert doc.backend == "pypdf"
     assert doc.text == "\n\f\n".join(doc.pages)
@@ -68,7 +68,7 @@ def test_default_config_backend_is_pypdfium2(odwolanie):
 
 def test_unknown_backend_raises_ingest_error(odwolanie):
     with pytest.raises(IngestError, match="nieznany"):
-        ingest.load(odwolanie, backend="nie_ma_takiego", cfg={})
+        ingest.load(odwolanie, backend="nie_ma_takiego", cfg={"fallback_backends": []})
 
 
 def test_fallback_when_first_backend_raises(odwolanie, monkeypatch):
@@ -105,7 +105,7 @@ def test_all_empty_text_on_nonempty_pdf_is_not_an_error_when_every_backend_empty
     # skan bez warstwy tekstowej: puste strony to nie błąd (OCR zrobi to w T5), tylko ostrzeżenie
     for name in ("pypdf", "pdfplumber", "pypdfium2"):
         monkeypatch.setitem(backends.BACKENDS, name, lambda path: ["", ""])
-    doc = ingest.load(odwolanie, cfg={"backend": "pypdf", "fallback_backends": ["pdfplumber"]})
+    doc = ingest.load(odwolanie, cfg={"backend": "pypdf", "fallback_backends": ["pdfplumber"], "ocr": {}})
     assert doc.pages == ["", ""]
     assert doc.warnings
 
@@ -316,3 +316,67 @@ def test_default_config_enables_full_cleaning_order():
     from odw2json.ingest.clean import DEFAULT_ORDER
 
     assert load_app_config()["ingest"]["clean"] == DEFAULT_ORDER
+
+
+# --- poprawki po review etapu E2 ---
+
+
+@pytest.mark.parametrize(
+    ("ocr_cfg", "fragment"),
+    [
+        ({"engine": "tesseract"}, "tesseract"),
+        ({"min_chars_per_page": 0}, "min_chars_per_page"),
+        ({"min_chars_per_page": "30"}, "min_chars_per_page"),
+        ({"min_chars_per_page": True}, "min_chars_per_page"),
+        ({"dpi": -5}, "dpi"),
+        ({"dpi": 1.5}, "dpi"),
+        ({"enabled": "tak"}, "enabled"),
+    ],
+)
+def test_validate_ingest_cfg_rejects_bad_ocr_section(ocr_cfg, fragment):
+    with pytest.raises(ValueError, match="konfiguracji ingest") as exc:
+        ingest.validate_ingest_cfg({"ocr": ocr_cfg})
+    assert fragment in str(exc.value)
+
+
+def test_validate_ingest_cfg_accepts_good_ocr_section():
+    ingest.validate_ingest_cfg(
+        {"ocr": {"enabled": True, "engine": "rapidocr", "min_chars_per_page": 30, "dpi": 200}}
+    )
+
+
+@pytest.mark.parametrize("bad", [{"engine": "tesseract"}, {"min_chars_per_page": -1}])
+def test_pipeline_run_fails_fast_on_bad_ocr_cfg(tmp_path, train_dir, monkeypatch, bad):
+    inp = tmp_path / "input"
+    inp.mkdir()
+    shutil.copy(train_dir / "przyklad_01" / "odwolanie.pdf", inp / "dobry.pdf")
+    calls = []
+    monkeypatch.setattr(pipeline, "process_file", lambda *a, **k: calls.append(a))
+    with pytest.raises(ValueError):
+        pipeline.run(inp, tmp_path / "output", app_cfg={"ingest": {"ocr": bad}, "write_trace": False})
+    assert calls == []
+
+
+def test_form_feed_in_backend_page_does_not_break_cleaning(odwolanie, monkeypatch):
+    monkeypatch.setitem(backends.BACKENDS, "ff", lambda p: ["Strona\fjeden tekst", "Strona dwa tekst"])
+    cfg = {"backend": "ff", "clean": ["collapse_spaces"], "ocr": {"enabled": False}}
+    doc = ingest.load(odwolanie, cfg=cfg)
+    assert len(doc.pages) == 2
+    assert "\f" not in doc.pages[0]
+    assert doc.pages[0] == "Strona\njeden tekst"
+
+
+def test_partial_cfg_takes_missing_keys_from_app_yaml(odwolanie):
+    from odw2json.config_loader import load_app_config
+
+    cfg_file = load_app_config()["ingest"]
+    off = {"enabled": False}
+    partial = ingest.load(odwolanie, cfg={"backend": "pypdf", "ocr": off})
+    explicit = ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": cfg_file["clean"], "ocr": off})
+    raw = ingest.load(odwolanie, cfg={"backend": "pypdf", "clean": [], "ocr": off})
+    assert partial.text == explicit.text
+    assert partial.text != raw.text  # czyszczenie z pliku zostało zastosowane
+
+
+def test_default_backend_constant_is_pypdfium2():
+    assert ingest.DEFAULT_BACKEND == "pypdfium2"

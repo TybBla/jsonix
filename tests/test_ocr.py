@@ -86,8 +86,10 @@ def test_ocr_wylaczony_w_konfiguracji_nic_nie_robi(ocr_calls):
     doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=_cfg(OCR_OFF))
     assert ocr_calls == []
     assert not any("OCR" in w for w in doc.warnings)
-    doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg={"backend": "pypdf", "clean": []})
-    assert ocr_calls == []
+    doc = load(
+        _scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg={"backend": "pypdf", "clean": [], "ocr": {}}
+    )
+    assert ocr_calls == []  # sekcja ocr podana jawnie (bez enabled) = OCR wyłączony
     assert doc.ocr_used is False
 
 
@@ -195,3 +197,139 @@ def test_prawdziwy_silnik_czyta_skany(name):
     # RapidOCR (PP-OCRv6 multi) obsługuje polskie znaki diakrytyczne
     assert len(POLISH & set(doc.text)) >= 4, sorted(POLISH & set(doc.text))
     assert "Warszawa" in doc.text or "Minister" in doc.text or "MINISTER" in doc.text
+
+
+# --- poprawki po review etapu E2 ---
+
+
+def test_stale_empty_text_warning_removed_when_ocr_recovers_all_pages(ocr_calls):
+    doc = load(_scan("1648041143_1647951357decyzja-ministrasportu-pzn.pdf"), cfg=_cfg(OCR_ON))
+    assert doc.ocr_used is True
+    assert not any("żaden backend nie wyciągnął tekstu" in w for w in doc.warnings)
+    assert "OCR strony 1" in doc.warnings
+
+
+def test_stale_warning_kept_when_ocr_recovers_nothing(monkeypatch, ocr_calls):
+    monkeypatch.setattr(ocr, "ocr_page", lambda path, i, cfg=None: "")
+    doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=_cfg(OCR_ON))
+    assert any("żaden backend nie wyciągnął tekstu" in w for w in doc.warnings)
+
+
+def test_resolve_cache_dir_relative_vs_absolute(tmp_path, monkeypatch):
+    from odw2json import config_loader
+
+    monkeypatch.setattr(config_loader, "ROOT_DIR", tmp_path / "root")
+    monkeypatch.chdir(tmp_path)
+    assert ocr.resolve_cache_dir("output/.cache/ocr") == tmp_path / "root" / "output" / ".cache" / "ocr"
+    absolute = tmp_path / "abs"
+    assert ocr.resolve_cache_dir(str(absolute)) == absolute
+
+
+def _fake_engine(monkeypatch, runs):
+    def fake_run(image, cfg):
+        runs.append(1)
+        return "z silnika"
+
+    monkeypatch.setitem(ocr.OCR_ENGINES, "fake", ocr.OcrEngine(available=lambda: True, run=fake_run))
+    monkeypatch.setattr(ocr, "render_page", lambda path, i, dpi=200: object())
+    ocr._MEMO.clear()
+    ocr._file_digest.cache_clear()
+
+
+def test_relative_cache_dir_resolved_against_root_not_cwd(tmp_path, monkeypatch):
+    from odw2json import config_loader
+
+    root = tmp_path / "root"
+    monkeypatch.setattr(config_loader, "ROOT_DIR", root)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    ocr.ocr_page(pdf, 0, {"engine": "fake", "cache_dir": "cache/ocr"})
+    assert list((root / "cache" / "ocr").glob("*.txt"))
+    assert not (elsewhere / "cache").exists()
+
+
+def test_cache_filename_has_version_and_package_version(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    monkeypatch.setattr(ocr, "_package_version", lambda: "9.9.9")
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    ocr.ocr_page(pdf, 0, {"engine": "fake", "cache_dir": str(tmp_path / "c")})
+    (f,) = (tmp_path / "c").glob("*.txt")
+    assert ocr.OCR_CACHE_VERSION == "1"
+    assert ".v1." in f.name and "9.9.9" in f.name
+
+
+def test_package_version_na_when_missing(monkeypatch):
+    import importlib.metadata as md
+
+    def boom(name):
+        raise md.PackageNotFoundError(name)
+
+    monkeypatch.setattr(md, "version", boom)
+    ocr._package_version.cache_clear()
+    try:
+        assert ocr._package_version() == "na"
+    finally:
+        ocr._package_version.cache_clear()
+
+
+@pytest.mark.parametrize("content", [b"", b"\xff\xfe\x00bad"])
+def test_corrupt_or_empty_cache_is_miss_and_overwritten(tmp_path, monkeypatch, content):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    cfg = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    ocr.ocr_page(pdf, 0, cfg)
+    (f,) = (tmp_path / "c").glob("*.txt")
+    f.write_bytes(content)
+    ocr._MEMO.clear()
+    assert ocr.ocr_page(pdf, 0, cfg) == "z silnika"
+    assert len(runs) == 2
+    assert f.read_text(encoding="utf-8") == "z silnika"
+    assert not list((tmp_path / "c").glob("*.tmp"))
+
+
+def test_cache_write_is_atomic_via_replace(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    replaced: list[tuple] = []
+    real = ocr.os.replace
+    monkeypatch.setattr(ocr.os, "replace", lambda a, b: (replaced.append((str(a), str(b))), real(a, b))[1])
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    ocr.ocr_page(pdf, 0, {"engine": "fake", "cache_dir": str(tmp_path / "c")})
+    assert len(replaced) == 1
+    assert replaced[0][0].endswith(".tmp") and replaced[0][1].endswith(".txt")
+
+
+def test_file_hashed_once_per_document(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    hashed: list[int] = []
+    real = ocr._hash_file
+    monkeypatch.setattr(ocr, "_hash_file", lambda p: (hashed.append(1), real(p))[1])
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    for i in range(4):
+        ocr.ocr_page(pdf, i, {"engine": "fake"})
+    assert len(hashed) == 1
+    pdf.write_bytes(b"%PDF-1.4 fake changed content")  # zmiana pliku = nowy hash
+    ocr.ocr_page(pdf, 0, {"engine": "fake"})
+    assert len(hashed) == 2
+
+
+def test_memo_is_bounded(tmp_path, monkeypatch):
+    runs: list[int] = []
+    _fake_engine(monkeypatch, runs)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    for i in range(ocr.MEMO_MAX + 20):
+        ocr.ocr_page(pdf, i, {"engine": "fake"})
+    assert len(ocr._MEMO) == ocr.MEMO_MAX
