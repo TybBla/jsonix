@@ -18,6 +18,8 @@ def test_prefix_detected_with_and_without_spaces():
     assert fx.has_pl_prefix(f"Rachunek: PL{NUM}", NUM) is True
     assert fx.has_pl_prefix("PL 68 4382 2304 9992 2952 6283 4736", NUM) is True
     assert fx.has_pl_prefix("nr 68 4382 2304 9992 2952 6283 4736", NUM) is False
+    assert fx.has_pl_prefix("PL68 4382 2304 9992 2952 6283\n4736", NUM) is True, "numer zawinięty"
+    assert fx.has_pl_prefix("PL68 4382 2304 9992 2952 6283 4736", NUM) is True, "twarda spacja"
     assert fx.has_pl_prefix("inny numer 11 1111 1111", NUM) is None
     assert fx.has_pl_prefix(f"9{NUM}", NUM) is None, "nie fragment dłuższego ciągu cyfr"
 
@@ -26,8 +28,11 @@ def test_plan_and_apply_on_copy(tmp_path):
     case = tmp_path / "przyklad_01"
     case.mkdir()
     src = ROOT / "data" / "train" / "przyklad_01"
-    for name in ("potwierdzenie_przelewu.pdf", "przelew.json"):
-        (case / name).write_bytes((src / name).read_bytes())
+    (case / "potwierdzenie_przelewu.pdf").write_bytes((src / "potwierdzenie_przelewu.pdf").read_bytes())
+    gt = json.loads((src / "przelew.json").read_text(encoding="utf-8"))
+    for key in ("na_rachunek", "z_rachunku"):  # stan sprzed poprawki: GT bez „PL”
+        gt["przelew_bankowy"][key] = gt["przelew_bankowy"][key].removeprefix("PL")
+    (case / "przelew.json").write_text(json.dumps(gt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     changes, missing = fx.plan(tmp_path)
     got = {(f, new) for _gt, f, _old, new in changes}
     assert ("na_rachunek", "PL" + NUM) in got and ("z_rachunku", "PL05470680287581539721455024") in got

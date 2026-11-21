@@ -34,7 +34,7 @@ def has_pl_prefix(text: str, number: str) -> bool | None:
     digits = re.sub(r"\D", "", number)
     if len(digits) != 26:
         return None
-    body = r"[  -]?".join(re.escape(d) for d in digits)
+    body = r"[\s\-]?".join(re.escape(d) for d in digits)  # \s obejmuje twardą spację i zawinięcie linii
     hits = [m.group(1) for m in re.finditer(rf"(P\s?L\s?)?(?<!\d){body}(?!\d)", text, re.IGNORECASE)]
     if not hits:
         return None
