@@ -64,7 +64,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 1550,
-        "tn": 256,
+        "tn": 216,
         "docs": 150
       }
     },
@@ -76,20 +76,14 @@
       "przelew/skan": 0.0,
       "przelew/tekst": 0.0
     },
-    "neg_correct": 12,
+    "neg_correct": 15,
     "neg_total": 15,
     "schema_errors": 0,
-    "classification_errors": 5,
+    "classification_errors": 0,
     "pipeline_errors": 0,
-    "classification_error_files": [
-      "negatywne/2025_S 112-383751.pdf",
-      "negatywne/Broszura_JPK_FA(2).pdf",
-      "przyklad_02/pelnomocnictwo.pdf",
-      "przyklad_04/2025_S 112-383751.pdf",
-      "przyklad_32/pelnomocnictwo.pdf"
-    ],
-    "updated": "2026-11-21T16:54:36Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "classification_error_files": [],
+    "updated": "2026-11-21T17:54:36Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   },
   "holdout": {
     "f1": 0.0,
@@ -156,7 +150,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 482,
-        "tn": 80,
+        "tn": 68,
         "docs": 52
       }
     },
@@ -168,17 +162,14 @@
       "przelew/skan": 0.0,
       "przelew/tekst": 0.0
     },
-    "neg_correct": 11,
+    "neg_correct": 13,
     "neg_total": 13,
     "schema_errors": 0,
-    "classification_errors": 2,
+    "classification_errors": 0,
     "pipeline_errors": 0,
-    "classification_error_files": [
-      "negatywne/2025_S 112-383751.pdf",
-      "negatywne/Broszura_JPK_FA(2).pdf"
-    ],
-    "updated": "2026-11-21T16:54:39Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "classification_error_files": [],
+    "updated": "2026-11-21T17:54:39Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   },
   "dev@skan": {
     "f1": 0.0,
@@ -250,8 +241,8 @@
     "classification_errors": 0,
     "pipeline_errors": 0,
     "classification_error_files": [],
-    "updated": "2026-11-21T16:53:45Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "updated": "2026-11-21T17:53:58Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   },
   "dev@tekst": {
     "f1": 0.0,
@@ -308,7 +299,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 1550,
-        "tn": 256,
+        "tn": 216,
         "docs": 150
       }
     },
@@ -317,20 +308,14 @@
       "pelnomocnictwo/tekst": 0.0,
       "przelew/tekst": 0.0
     },
-    "neg_correct": 9,
+    "neg_correct": 12,
     "neg_total": 12,
     "schema_errors": 0,
-    "classification_errors": 5,
+    "classification_errors": 0,
     "pipeline_errors": 0,
-    "classification_error_files": [
-      "negatywne/2025_S 112-383751.pdf",
-      "negatywne/Broszura_JPK_FA(2).pdf",
-      "przyklad_02/pelnomocnictwo.pdf",
-      "przyklad_04/2025_S 112-383751.pdf",
-      "przyklad_32/pelnomocnictwo.pdf"
-    ],
-    "updated": "2026-11-21T16:52:26Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "classification_error_files": [],
+    "updated": "2026-11-21T17:50:44Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   },
   "holdout@skan": {
     "f1": 0.0,
@@ -402,8 +387,8 @@
     "classification_errors": 0,
     "pipeline_errors": 0,
     "classification_error_files": [],
-    "updated": "2026-11-21T16:54:24Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "updated": "2026-11-21T17:54:27Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   },
   "holdout@tekst": {
     "f1": 0.0,
@@ -460,7 +445,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 482,
-        "tn": 80,
+        "tn": 68,
         "docs": 52
       }
     },
@@ -469,16 +454,13 @@
       "pelnomocnictwo/tekst": 0.0,
       "przelew/tekst": 0.0
     },
-    "neg_correct": 8,
+    "neg_correct": 10,
     "neg_total": 10,
     "schema_errors": 0,
-    "classification_errors": 2,
+    "classification_errors": 0,
     "pipeline_errors": 0,
-    "classification_error_files": [
-      "negatywne/2025_S 112-383751.pdf",
-      "negatywne/Broszura_JPK_FA(2).pdf"
-    ],
-    "updated": "2026-11-21T16:52:28Z",
-    "commit": "309d767e870dd347c77d74d29a65cd78d5ccc7c8"
+    "classification_error_files": [],
+    "updated": "2026-11-21T17:50:46Z",
+    "commit": "3747aab4c7635cfe12cb072d44579842f3fb2750"
   }
 }
