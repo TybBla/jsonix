@@ -2,6 +2,7 @@
 
 Użycie: python scripts/make_input_from_train.py [--src data/train] [--dst input] [--clean]
 """
+
 from __future__ import annotations
 
 import argparse

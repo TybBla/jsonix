@@ -1,4 +1,5 @@
 """CLI: python -m odw2json run [input] [output]"""
+
 from __future__ import annotations
 
 import argparse
@@ -23,14 +24,17 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--port", type=int, default=8000)
     a = ap.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO if getattr(a, "verbose", False) else logging.WARNING,
-                        format="%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO if getattr(a, "verbose", False) else logging.WARNING,
+        format="%(levelname)s %(message)s",
+    )
     if a.cmd == "doctypes":
         for k, cfg in load_registry().items():
             print(f"{k}\t{cfg.title}")
         return 0
     if a.cmd == "serve":
         import uvicorn
+
         uvicorn.run("odw2json.api:app", host=a.host, port=a.port)
         return 0
     rep = pipeline.run(Path(a.input), Path(a.output))

@@ -48,20 +48,39 @@ def test_fuzzy_only_on_uzp_long_string_fields():
     # wg UZP (Discord 13:26): nazwa pełnomocnika (firma), tytuł przelewu,
     # nazwa Odwołującego/Zamawiającego, tytuł zamówienia
     fuzzy_ok = [
-        ({"Zamawiajacy": [{"nazwa": "Gmina Miasto Łódź"}]}, {"Zamawiajacy": [{"nazwa": "Gmina Miasto Lódź"}]}),
-        ({"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka Sp. z o.o."}}]},
-         {"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka sp. z o.o."}}]}),
-        ({"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT."}}, {"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT"}}),
-        ({"przelew_bankowy": {"tytul": "WPIS OD ODW. ZP.1.2025"}}, {"przelew_bankowy": {"tytul": "WPIS OD ODW ZP.1.2025"}}),
+        (
+            {"Zamawiajacy": [{"nazwa": "Gmina Miasto Łódź"}]},
+            {"Zamawiajacy": [{"nazwa": "Gmina Miasto Lódź"}]},
+        ),
+        (
+            {"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka Sp. z o.o."}}]},
+            {"Odwolujacy": [{"pelnomocnik": {"nazwa": "Kancelaria Adwokacka sp. z o.o."}}]},
+        ),
+        (
+            {"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT."}},
+            {"ZamowieniePubliczne": {"tytul": "Dostawa sprzętu IT"}},
+        ),
+        (
+            {"przelew_bankowy": {"tytul": "WPIS OD ODW. ZP.1.2025"}},
+            {"przelew_bankowy": {"tytul": "WPIS OD ODW ZP.1.2025"}},
+        ),
     ]
     for p, g in fuzzy_ok:
         assert score_pair(p, g).tp == 1, p
     # pola dokładne mimo podobnej nazwy klucza
     exact = [
-        ({"mocodawca": [{"data": {"nazwa": "FAMBUD Sp. z o.o."}}]}, {"mocodawca": [{"data": {"nazwa": "FAMBUD sp. z o.o."}}]}),
-        ({"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalskiego"}]}, {"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalski"}]}),
-        ({"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi/wyjaśnienia do SWZ"}},
-         {"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi i wyjaśnienia do SWZ"}}),
+        (
+            {"mocodawca": [{"data": {"nazwa": "FAMBUD Sp. z o.o."}}]},
+            {"mocodawca": [{"data": {"nazwa": "FAMBUD sp. z o.o."}}]},
+        ),
+        (
+            {"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalskiego"}]},
+            {"pelnomocnicy": [{"imie_nazwisko": "Jan Kowalski"}]},
+        ),
+        (
+            {"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi/wyjaśnienia do SWZ"}},
+            {"OdwolanieKIO": {"czynnosc_opis": "Odpowiedzi i wyjaśnienia do SWZ"}},
+        ),
     ]
     for p, g in exact:
         c = score_pair(p, g)
@@ -72,14 +91,14 @@ def test_whitespace_normalized_and_numbers():
     assert score_pair({"a": "  x   y "}, {"a": "x y"}).tp == 1
     assert score_pair({"k": 10000}, {"k": 10000.0}).tp == 1
     assert score_pair({"n": "85120133547"}, {"n": 85120133547}).fp == 1
-    assert score_pair({"n": "85120133547"}, {"n": 85120133547},
-                      ScoreConfig(lenient_types=True)).tp == 1
+    assert score_pair({"n": "85120133547"}, {"n": 85120133547}, ScoreConfig(lenient_types=True)).tp == 1
 
 
 def test_list_extra_element_and_reorder():
     gt = {"L": [{"nip": "1", "nazwa": "Alfa"}, {"nip": "2", "nazwa": "Beta"}]}
-    pred = {"L": [{"nip": "2", "nazwa": "Beta"}, {"nip": "1", "nazwa": "Alfa"},
-                  {"nip": "3", "nazwa": "Gamma"}]}
+    pred = {
+        "L": [{"nip": "2", "nazwa": "Beta"}, {"nip": "1", "nazwa": "Alfa"}, {"nip": "3", "nazwa": "Gamma"}]
+    }
     c = score_pair(pred, gt)
     assert c.tp == 4 and c.fp == 2 and c.fn == 0
     assert c.fields["L[].nip"].tp == 2 and c.fields["L[].nip"].fp == 1
@@ -122,11 +141,11 @@ def test_score_dirs(tmp_path):
     _w(gt / "p1" / "odwolanie.json", {"a": "x", "b": None})
     _w(gt / "p1" / "przelew.json", {"kwota": 10.0})
     _w(gt / "p1" / "pelnomocnictwo.json", {"c": "z"})
-    _w(gt / "p1" / "extra.pdf", {})            # negative, no pred
-    _w(gt / "negatywne" / "neg1.pdf", {})      # negative, pred wrong
-    _w(gt / "negatywne" / "neg2.pdf", {})      # negative, empty pred file
-    _w(gt / "negatywne" / "neg3.pdf", {})      # negative, pred {} (UZP: pusty JSON)
-    _w(gt / "negatywne" / "neg4.pdf", {})      # negative, misclassified -> schema of nulls
+    _w(gt / "p1" / "extra.pdf", {})  # negative, no pred
+    _w(gt / "negatywne" / "neg1.pdf", {})  # negative, pred wrong
+    _w(gt / "negatywne" / "neg2.pdf", {})  # negative, empty pred file
+    _w(gt / "negatywne" / "neg3.pdf", {})  # negative, pred {} (UZP: pusty JSON)
+    _w(gt / "negatywne" / "neg4.pdf", {})  # negative, misclassified -> schema of nulls
     _w(pr / "p1" / "odwolanie.json", {"a": "x", "b": None})
     _w(pr / "p1" / "potwierdzenie_przelewu.json", {"kwota": 10})
     # pelnomocnictwo missing entirely
