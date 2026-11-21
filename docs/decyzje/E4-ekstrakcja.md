@@ -146,3 +146,44 @@ z kolejnymi indeksami), ekstraktor `if_match` (stała, gdy fraza występuje). Zm
 - Skan `0008`: OCR „Zawadżki” w „reprezentowana przez:” — podpisujący ze złą literą (FP + FN).
 - Nazwisko jednoczłonowe z małą literą po myślniku, imiona trzyczłonowe i nazwiska z apostrofem nie są
   rozpoznawane (brak w danych).
+
+### Odporność — pełnomocnictwo
+
+Testy: `tests/test_extract_robustness_pelnomocnictwo.py` (warianty prawdziwych tekstów dev w pamięci, każdy na
+≥ 10 dokumentach, próg F1 ≥ 0,97). Wyniki F1 typu (46 dokumentów dev z warstwą tekstową):
+
+| wariant | n | przed | po |
+|---|---|---|---|
+| bez zmian | 46 | 1,000 | 1,000 |
+| wstęp: „umocowuję” | 40 | 0,901 | 1,000 |
+| wstęp: „udzielam umocowania” | 25 | 0,873 | 1,000 |
+| wstęp: „ustanawiam pełnomocnikami” | 25 | 1,000 | 1,000 |
+| wstęp: „upoważniam do reprezentowania” | 25 | 0,886 | 1,000 |
+| wstęp: „niniejszym umocowujemy” | 25 | 0,870 | 1,000 |
+| nazwiska WIELKIMI (całe imię i nazwisko) | 46 | 0,736 | 1,000 |
+| nazwiska WIELKIMI (samo nazwisko) | 46 | 0,736 | 1,000 |
+| etykieta „MOCODAWCA” wersalikami | 21 | 0,983 | 1,000 |
+| puste linie podwojone | 46 | 0,978 | 1,000 |
+
+**Decyzje.**
+- **Wersaliki.** `normalize_name` zamienia człon zapisany w całości wielkimi literami (≥ 2 litery) na postać
+  tytułową („JAN NOWAK-JEZIORAŃSKI” → „Jan Nowak-Jeziorański”) **przed** odmianą; GT UZP ma zawsze postać
+  tytułową, więc dawny wynik „JAN KOWALSKI” dla „JANA KOWALSKIEGO” był błędny (test zmieniony świadomie).
+  Wzorce imion w YAML dopuszczają człon tytułowy albo wersalikowy; linie funkcji („PREZES ZARZĄDU”) odrzuca
+  lookahead bez rozróżniania wielkości liter. Wersalikowy człon musi zaczynać się na granicy wyrazu
+  (inaczej `[A-Z]{2,}` zaczynałby w środku „NOWAK”).
+- **Wstęp pełnomocników.** Zapowiedź: „udziel* pełnomocnictw*/umocowan*”, „ustanawia* pełnomocnik*”,
+  „upoważniam/-my/-ją/-a” (bez „upoważniona do reprezentacji”) z opcjonalnym „do reprezentowania (mnie|nas|…)”
+  zjadanym w całości, „umocowuj*”, „niniejszym …”. Koniec bloku „do reprezentowania” nie ucina po
+  „upoważniam”, „niniejszym” nie ucina przed czasownikiem nadania, a goła linia „Mocodawca:” (blok podpisu)
+  kończy listę pełnomocników.
+- **Mocodawca.** Etykieta „Mocodawca/MOCODAWCA” w dowolnej wielkości liter nie wchodzi do `nazwa`
+  (opcjonalna etykieta przed wartością we wzorcach „X z siedzibą”, „X, ul.”, „X⏎ul.”); adres w następnej linii
+  i nazwa zawinięta na 2 linie tolerują puste linie (`\n{1,2}`, `(?:[ \t]*\n)*`).
+- **`typ`.** `const: osoba_prawna` zastąpiony `if_match` na frazach opisujących stronę (NIP/KRS/REGON,
+  „siedzib”, „mocodawc”, forma prawna, gmina/powiat); pusty lub bezładny tekst daje `null`. DSL nie ma
+  warunku „wypełnij tylko, gdy inne pole mocodawcy niepuste” (ekstraktory nie widzą wartości innych pól),
+  więc to przybliżenie; ścisły warunek wymagałby zmiany silnika (`engine.py`) — poza zakresem tego zadania.
+
+**Ograniczenia.** Imię i nazwisko z członem jednoliterowym wersalikiem („J. KOWALSKI”) nie jest wzorcem
+imienia; warianty „Mocodawca”/„MOCODAWCA” jako goły nagłówek nad nazwą rozpoznaje tylko forma wersalikowa.
