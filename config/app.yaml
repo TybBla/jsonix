@@ -5,3 +5,25 @@
 unknown_output: empty_object
 write_trace: true          # output/.trace/<case>/<plik>.trace.json
 llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
+
+# Ingest PDF (sektor A). Backendy wybierane tu, bez zmian kodu.
+ingest:
+  # Decyzja orkiestratora: docs/decyzje/E2-backend-pdf.md
+  backend: pypdfium2                            # pypdf | pdfplumber | pypdfium2
+  fallback_backends: [pypdf, pdfplumber]        # kolejno, gdy backend rzuci wyjatek lub zwroci pusty tekst
+  # Kroki czyszczenia (odw2json/ingest/clean.py), uruchamiane w tej kolejnosci na calym dokumencie.
+  # Lista = clean.DEFAULT_ORDER wypisana jawnie (bez "dashes", patrz docs/decyzje/E2-backend-pdf.md).
+  clean:
+    - unicode_nfc
+    - nbsp_to_space
+    - ligatures
+    - quotes
+    - strip_page_artifacts
+    - dehyphenate
+    - join_wrapped_lines
+    - collapse_spaces
+  ocr:                                          # OCR dla stron bez tekstu (opcjonalny; wlaczany w T5)
+    enabled: true
+    engine: rapidocr
+    min_chars_per_page: 30
+    cache_dir: output/.cache/ocr                # cache wynikow OCR po hashu pliku (gitignored); decyzja E2-T5

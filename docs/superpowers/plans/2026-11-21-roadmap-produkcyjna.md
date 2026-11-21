@@ -66,6 +66,7 @@ Stan: testy 29/29, klasyfikacja 191/196, F1 = 0 (zaślepki ekstrakcji).
 - Walidacja konfiguracji z czytelnymi błędami (`odw2json validate-config`).
 - Typ referencyjny: **przelew** w całości na regułach.
 - Wstrzykiwanie LLM (z review E1): opcjonalny `llm: LLMClient | None` przekazywany przez `pipeline.run/process_file → classify/extract`; `usage_report()` trafia do `RunReport` i do `.logs/*.summary.json`.
+- Uwagi z E2: regexy muszą dopuszczać `\s+` (także nową linię) między etykietą a wartością (np. `REGON\n999642785`); czyszczony tekst ma cudzysłowy ASCII `"`; offsety wskazują tekst po czyszczeniu (podświetlanie bbox wymaga nowego opcjonalnego pola).
 **Bramka:** przelew F1 ≥ 0.98 na dev i holdout bez LLM; testy jednostkowe każdego normalizatora; błędny YAML daje zrozumiały komunikat.
 
 ## E5 — Reguły dla pełnomocnictwa i odwołania
@@ -77,6 +78,7 @@ Stan: testy 29/29, klasyfikacja 191/196, F1 = 0 (zaślepki ekstrakcji).
 
 ## E6 — Warstwa LLM i wybór modelu (decyzja: z LLM czy bez)
 **Ustalenie UZP (Discord 21.11, 13:52):** rozwiązanie **bez LLM dostaje maksimum punktów za moc modelu** (do 20 pkt w finale). LLM, jeśli jest, musi być open source i hostowany w UE.
+**Ustalenie UZP (2026-11-21):** hosting LLM przez osobę prywatną (własny komputer/serwer) jest **wykluczony**. Dozwolony jest wyłącznie hosting przez **firmę z Polityką Prywatności określającą zakres i miejsce przetwarzania danych** (UE/EOG). Warunek E6: w `docs/decyzje/` cytujemy politykę prywatności i (jeśli jest) DPA dostawcy z miejscem przetwarzania; lokalne modele (np. Ollama) wolno używać wyłącznie do eksperymentów, nigdy w konfiguracji dostarczanej UZP.
 **Konsekwencja:** LLM jest opcjonalną warstwą, a nie fundamentem. E4–E5 wyciskają maksimum z reguł, także dla pól semantycznych (nazwy po etykietach sekcji, imiona z podpisów i list pełnomocników, powód odwołania ze słownika fraz). E6 zaczyna się od pomiaru F1 „same reguły” vs „reguły + LLM” na dev i holdout.
 **Kryterium decyzji (do zatwierdzenia przy planie E6):** zostajemy bez LLM, jeśli strata F1 jest mniejsza niż wartość punktów za rozmiar modelu; w przeciwnym razie najmniejszy model, który domyka różnicę. Tryb `llm_enabled: false` musi zawsze działać, także jako zabezpieczenie na brak sieci.
 **Cel:** najmniejszy model z UE, który domyka pola semantyczne, albo udokumentowana decyzja o braku LLM.

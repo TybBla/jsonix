@@ -63,3 +63,31 @@ Python API: `eval.gate.run_gate(split, cases=None, baseline_path=..., update=Fal
 train_dir=..., negatives=None, gate_dir=None) -> GateResult` (`.exit_code`, `.metrics`, `.regressions`).
 
 Testy: `python -m pytest -q tests/test_gate.py`
+
+## Pokrycie tekstu z ingestu (`eval.ingest_coverage`)
+
+```
+python -m eval.ingest_coverage [--backend NAME] [--split dev|holdout|all] [--show-missing 20] [--json PATH]
+```
+
+Mierzy, ile wartosci z GT wystepuje w tekscie wyciagnietym z PDF (`odw2json.ingest.load`), niezaleznie od
+reszty pipeline'u. Sprawy z `data/splits.yaml`; PDF -> GT jak w `eval.score` (`potwierdzenie_przelewu` ->
+`przelew`), negatywy pomijane. `--backend` wywoluje `load(path, backend=NAME)` (gdy loader nie zna parametru,
+drukuje uwage i uzywa `load(path)`). Kod wyjscia zawsze 0 (narzedzie pomiarowe).
+
+- Pola doslowne: `nazwa`, `tytul`, `imie_nazwisko`, `mail`, `numer_postepowania`, `numer_transakcji`,
+  `miejscowosc`. Normalizacja po obu stronach: NFKC, casefold, ujednolicone cudzyslowy i myslniki, biale
+  znaki (takze nowe linie) zwiniete do spacji; trafienie na granicach slow.
+- Pola cyfrowe: `krs`, `nip`, `regon`, `pesel`, `na_rachunek`, `z_rachunku`. Cyfry wartosci z opcjonalnym
+  separatorem `[\s\-./]?` miedzy cyframi (`12 34` pasuje do 1234, `12 x 34` nie), bez cyfr po bokach.
+- `found_fuzzy` (tylko `imie_nazwisko`, gdy brak trafienia dokladnego): kazde slowo >= 4 liter ma w tekscie
+  token zaczynajacy sie od jego 4 pierwszych liter, krotsze slowa musza byc tokenem identycznym.
+- Pomijane: daty, kwoty, BZP, TED, `czynnosc_*`, `typ`, `przez-pelnomocnika`, `prowadzacy_postepowanie`.
+
+Raport: pokrycie globalne, per typ dokumentu, per pole (sciezki jak w `eval.score`, od najgorszego) i lista
+brakow. `--json` zapisuje `global`, `by_type`, `by_field`, `missing`, `docs`, `load_errors`.
+
+Python API: `coverage_for_doc(text, gt, doc_type) -> Coverage` (`found`, `found_fuzzy`, `total`, `missing`,
+`rate`, `rate_with_fuzzy`, `+`), `run_coverage(split, backend) -> Report`.
+
+Testy: `python -m pytest -q tests/test_ingest_coverage.py`
