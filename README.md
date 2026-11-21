@@ -36,14 +36,16 @@ W GUI jsonix wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, 
 ## Architektura
 
 ```
-PDF → ingest (tekst/OCR) → classify (reguły z YAML, LLM fallback) → extract (regex + LLM + słowniki)
-    → normalizacja i walidacja → JSON wg config/schemas/ (+ trace)
+PDF → ingest (tekst z PDF, czyszczenie, OCR skanów) → classify (punktacja cech z YAML)
+    → extract (pola i listy z YAML, normalizacja, walidacja) → JSON wg config/schemas/ (+ trace)
 ```
+
+Pełny opis (etapy, kontrakty, konfiguracja, API i GUI, jakość): **[docs/architektura.md](docs/architektura.md)**.
 
 - `odw2json/contracts.py` — wspólne struktury danych (Document, Classification, FieldResult, ExtractionResult).
 - `config/doctypes/*.yaml` — **typy dokumentów są konfiguracją**: nowy typ = nowy YAML + szablon JSON ([instrukcja](docs/nowy-typ-dokumentu.md)).
-- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis), `config/prompts/` — prompty LLM.
-- LLM: dowolny dostawca OpenAI-kompatybilny z serwerami w UE (konfiguracja w `.env`), temperatura 0, cache odpowiedzi.
+- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis).
+- **Domyślnie bez LLM** (`config/app.yaml: llm_enabled: false`): reguły z konfiguracji. Warstwa LLM jest opcjonalna — wyłącznie model open source ≤ 8B od dostawcy z serwerami w UE (konfiguracja w `.env`, temperatura 0, kasety odpowiedzi w testach).
 
 ## Ewaluacja
 
