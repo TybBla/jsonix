@@ -17,17 +17,28 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from odw2json import pipeline
-from odw2json.api.files import content_disposition, has_pdf_header, json_name
+from odw2json.api.files import (
+    content_disposition,
+    display_name,
+    has_pdf_header,
+    json_name,
+    storage_name,
+    valid_name,
+)
 from odw2json.api.jobs import Job, JobStore
 from odw2json.config_loader import ROOT_DIR, load_registry
 
 MAX_FILE_BYTES = int(float(os.environ.get("ODW2JSON_MAX_FILE_MB", "25")) * 1024 * 1024)
+MAX_FILES = int(os.environ.get("ODW2JSON_MAX_FILES", "50"))  # plików na jedno żądanie
+MAX_TOTAL_BYTES = int(float(os.environ.get("ODW2JSON_MAX_TOTAL_MB", "200")) * 1024 * 1024)
+MAX_PARALLEL_JOBS = int(os.environ.get("ODW2JSON_MAX_PARALLEL_JOBS", "2"))
+UPLOAD_PATHS = ("/api/jobs", "/api/process")
 JOBS_DIR = Path(os.environ.get("ODW2JSON_JOBS_DIR", ROOT_DIR / "output" / ".jobs"))
 STATIC_DIR = ROOT_DIR / "web" / "static"
 
@@ -40,7 +51,7 @@ for _type, _ext in (
 ):
     mimetypes.add_type(_type, _ext)
 
-_store = JobStore(JOBS_DIR)
+_store = JobStore(JOBS_DIR, max_parallel=MAX_PARALLEL_JOBS)
 
 
 def get_store() -> JobStore:
@@ -54,9 +65,29 @@ StoreDep = Annotated[JobStore, Depends(get_store)]
 async def _lifespan(_app: FastAPI):
     _store.cleanup(drop_orphans=True)  # katalogi jobów z poprzedniego uruchomienia
     yield
+    _store.shutdown()
 
 
-app = FastAPI(title="Odwołania2JSON", version="0.2.0", lifespan=_lifespan)
+app = FastAPI(title="jsonix", version="0.2.0", lifespan=_lifespan)
+
+
+def _too_big() -> str:
+    limit = _mb(MAX_TOTAL_BYTES)
+    return f"Łączny rozmiar plików musi być mniejszy niż {limit}. Wyślij pliki w mniejszych częściach."
+
+
+@app.middleware("http")
+async def _limit_upload_size(request, call_next):
+    """Odrzuca za duże żądanie po nagłówku Content-Length, zanim serwer odczyta i rozpakuje treść."""
+    if request.method == "POST" and request.url.path in UPLOAD_PATHS:
+        try:
+            length = int(request.headers.get("content-length", "0"))
+        except ValueError:
+            return JSONResponse({"detail": "Nieprawidłowy nagłówek Content-Length."}, status_code=400)
+        # zapas na nagłówki części multipart (ok. 1 KB na plik)
+        if length > MAX_TOTAL_BYTES + MAX_FILES * 1024:
+            return JSONResponse({"detail": _too_big()}, status_code=413)
+    return await call_next(request)
 
 
 @app.get("/api/health")
@@ -76,6 +107,33 @@ def _mb(n: int) -> str:
     return f"{n / (1024 * 1024):g} MB"
 
 
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    if n == 1:
+        return one
+    return few if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else many
+
+
+async def _read_uploads(files: list[UploadFile]) -> list[tuple[str, bytes]]:
+    """Odczyt plików z limitami żądania: liczba plików (400) i łączny rozmiar (413).
+
+    Każdy plik jest czytany najwyżej do MAX_FILE_BYTES + 1 (za duży plik to błąd tego pliku).
+    """
+    if len(files) > MAX_FILES:
+        raise HTTPException(
+            400,
+            f"Możesz wysłać najwyżej {MAX_FILES} {_plural(MAX_FILES, 'plik', 'pliki', 'plików')} naraz. "
+            "Podziel pliki na mniejsze części.",
+        )
+    out, total = [], 0
+    for f in files:
+        content = await f.read(MAX_FILE_BYTES + 1)
+        total += len(content)
+        if total > MAX_TOTAL_BYTES:
+            raise HTTPException(413, _too_big())
+        out.append((f.filename or "", content))
+    return out
+
+
 def _validate(name: str, content: bytes) -> str | None:
     """Komunikat błędu po polsku (wg wzorców GOV.UK/Gov.pl) albo None."""
     if not name.lower().endswith(".pdf"):
@@ -91,17 +149,15 @@ def _validate(name: str, content: bytes) -> str | None:
 
 @app.post("/api/jobs", status_code=202)
 async def create_job(
-    background: BackgroundTasks,
     files: Annotated[list[UploadFile], File()],
     store: StoreDep,
 ) -> dict:
-    items = []
-    for f in files:
-        content = await f.read(MAX_FILE_BYTES + 1)
-        name = f.filename or ""
-        items.append((name, content, _validate(name.replace("\\", "/").rsplit("/", 1)[-1], content)))
+    items = [
+        (name, content, _validate(name.replace("\\", "/").rsplit("/", 1)[-1], content))
+        for name, content in await _read_uploads(files)
+    ]
     job = await run_in_threadpool(store.create, items)
-    background.add_task(store.process, job.id)
+    store.submit(job.id)  # kolejka jobów magazynu (najwyżej MAX_PARALLEL_JOBS naraz)
     return {"job_id": job.id, "status_url": f"/api/jobs/{job.id}"}
 
 
@@ -180,25 +236,40 @@ def job_zip(job_id: str, store: StoreDep):
 
 
 @app.post("/api/process")
-async def process(files: list[UploadFile]) -> list[dict]:
+async def process(files: list[UploadFile], store: StoreDep) -> list[dict]:
+    uploads = await _read_uploads(files)
+    for raw, _ in uploads:
+        if not valid_name(raw):
+            raise HTTPException(
+                400, f"Nieprawidłowa nazwa pliku: „{raw}”. Zmień nazwę pliku i wyślij go ponownie."
+            )
     registry = load_registry()
     out = []
+    taken: set[str] = set()
     with tempfile.TemporaryDirectory() as tmp:
-        for f in files:
-            p = Path(tmp) / Path(f.filename or "dokument.pdf").name
-            p.write_bytes(await f.read())
+        for raw, content in uploads:
+            shown = display_name(raw)  # te same funkcje nazw co w jobach (bez ścieżki, bez `..`)
+            if len(content) > MAX_FILE_BYTES:
+                out.append(
+                    {"file": shown, "error": f"Wybrany plik musi być mniejszy niż {_mb(MAX_FILE_BYTES)}."}
+                )
+                continue
+            p = Path(tmp) / storage_name(shown, taken)
+            taken.add(p.name)
+            p.write_bytes(content)
             try:
-                cls, res = pipeline.process_file(p, registry)
+                # wspólny limit równoległości z jobami (ciężkie przetwarzanie, np. OCR)
+                cls, res = await run_in_threadpool(store.run_limited, pipeline.process_file, p, registry)
                 out.append(
                     {
-                        "file": p.name,
+                        "file": shown,
                         "classification": asdict(cls),
                         "data": res.data if res else None,
                         "trace": [asdict(t) for t in res.trace] if res else [],
                     }
                 )
             except Exception as e:
-                out.append({"file": p.name, "error": f"{type(e).__name__}: {e}"})
+                out.append({"file": shown, "error": f"{type(e).__name__}: {e}"})
     return out
 
 

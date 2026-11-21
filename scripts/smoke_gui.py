@@ -76,7 +76,7 @@ def wait_for_server(base: str, proc: subprocess.Popen, timeout: float = 60) -> N
 
 def smoke(base: str) -> None:
     status, _, body = http(f"{base}/")
-    check(status == 200 and b"Odwo" in body, "GET / nie zwraca strony GUI")
+    check(status == 200 and b"jsonix" in body, "GET / nie zwraca strony GUI")
     status, headers, _ = http(f"{base}/static/vendor/pdfjs/pdf.min.mjs")
     check(
         status == 200 and "javascript" in headers.get("content-type", ""),
@@ -104,7 +104,8 @@ def smoke(base: str) -> None:
     for f in job["files"]:
         check(set(f) == RESULT_KEYS, f"{f.get('file')}: pola wyniku {sorted(f)}")
         check(f["status"] == "done", f"{f['file']}: {f['error']}")
-        check(set(f["classification"]) == {"doc_type", "confidence", "method"}, "pola classification")
+        cls_keys = {"doc_type", "confidence", "method", "evidence"}
+        check(set(f["classification"]) == cls_keys, "pola classification")
         check(all(set(t) == TRACE_KEYS for t in f["trace"]), f"{f['file']}: pola trace")
         types.add(f["classification"]["doc_type"])
         status, headers, body = http(f"{base}/api/jobs/{job_id}/files/{f['name']}/json")

@@ -81,7 +81,9 @@ def test_document_basics(page):
     assert html.get("lang") == "pl"
     assert page.find("meta", charset="utf-8") or page.find("meta", charset="UTF-8")
     assert page.find("meta", name="viewport")
-    assert "Odwołania2JSON" in page.title
+    assert "jsonix" in page.title
+    assert "jsonix" in page.raw
+    assert "Odwołania2JSON" not in page.raw
 
 
 def test_landmarks_and_skip_link(page):
@@ -330,3 +332,200 @@ def test_review_offers_edit_and_restore(client):
     js = client.get("/static/js/review.js").text
     for text in ("Zmień", "Przywróć wartość z dokumentu", "Zmieniono ręcznie"):
         assert text in js
+
+
+# --- podgląd przy najechaniu (E8E9 v2): mapa pole ↔ obszary liczona raz, logika stanów hover ---
+
+
+@needs_node
+@pytest.mark.parametrize("fixture", sorted(FIXTURE_PDF))
+def test_source_map_is_built_once_for_all_traced_fields(fixture):
+    result = json.loads((FIXTURES / fixture).read_text(encoding="utf-8"))
+    pages = _pdf_pages(P01 / FIXTURE_PDF[fixture])
+    traced = [t for t in result["trace"] if t["page"] is not None and t["source_snippet"]]
+    out = _node(
+        """const m = await js('match.js');
+        const entries = input.trace.map((t) => (
+          {path: t.path, page: t.page, snippet: t.source_snippet, value: t.value}));
+        const first = input.trace[0].source_snippet;
+        entries.push({path: 'skan', page: 0, snippet: first, value: null, skip: true});
+        const map = m.buildSourceMap(input.pages, entries);
+        output({size: map.size, hits: Object.fromEntries(map), isMap: map instanceof Map});""",
+        {"pages": pages, "trace": traced},
+    )
+    assert out["isMap"] and out["size"] == len(traced) + 1
+    assert out["hits"]["skan"] is None, "skan bez warstwy tekstu: brak dopasowania zamiast zgadywania"
+    for t in traced:
+        hit = out["hits"][t["path"]]
+        assert hit and hit["page"] == t["page"], t["path"]
+        assert hit["end"] > hit["start"]
+
+
+@needs_node
+def test_other_pages_are_searched_only_for_the_exact_snippet():
+    out = _node(
+        """const m = await js('match.js');
+        const snippet = 'Zamawiający: Gmina Przykładowo, ul. Długa 1';
+        const partialOnly = ['brak', 'Zamawiający: Gmina Przykładowo, ul. Krótka 9', 'brak'];
+        const exactLater = ['brak', 'brak', 'xx Zamawiający: Gmina Przykładowo, ul. Długa 1 yy'];
+        output([
+          m.locateInDocument(partialOnly, 0, snippet, null),
+          m.locateInDocument(exactLater, 0, snippet, null)?.page,
+          m.locateInDocument(partialOnly, 1, snippet, null)?.kind,
+        ]);""",
+        None,
+    )
+    assert out == [None, 2, "partial"]
+
+
+@needs_node
+def test_source_map_is_fast_for_long_documents_without_matches():
+    out = _node(
+        """const m = await js('match.js');
+        let seed = 7;
+        const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+        const abc = 'abcdefghijklmnoprstuwyz';
+        const letter = () => abc[Math.floor(rnd() * abc.length)];
+        const word = () => Array.from({length: 3 + Math.floor(rnd() * 8)}, letter).join('');
+        const pages = Array.from({length: 40}, () => Array.from({length: 900}, word).join(' '));
+        const entries = Array.from({length: 40}, (_, i) => ({
+          path: `p${i}`, page: i % 40, value: `9${i}9284065`,
+          snippet: `NIP: 9${i}9284065, REGON: 999642785, KRS 0000${i} pozostała treść fragmentu `
+            + `źródłowego ${'q'.repeat(150)}`,
+        }));
+        const t0 = performance.now();
+        const map = m.buildSourceMap(pages, entries);
+        output({ms: performance.now() - t0, found: [...map.values()].filter(Boolean).length});""",
+        None,
+    )
+    assert out["found"] == 0
+    assert out["ms"] < 3000, f"budowa mapy trwała {out['ms']:.0f} ms"
+
+
+@needs_node
+def test_hover_on_field_previews_fragment_and_marks_other_page():
+    out = _node(
+        """const h = await js('hover.js');
+        const map = new Map([
+          ['a', {page: 3, start: 0, end: 5}], ['b', {page: 0, start: 1, end: 4}], ['c', null]]);
+        const range = {first: 0, last: 1};
+        let s = h.hoverReducer(h.createHoverState(), {type: 'select', path: 'b'});
+        const views = [];
+        s = h.hoverReducer(s, {type: 'enter', source: 'field-pointer', path: 'a'});
+        views.push(h.hoverView(s, map, range));
+        s = h.hoverReducer(s, {type: 'enter', source: 'field-pointer', path: 'b'});
+        views.push(h.hoverView(s, map, range));
+        s = h.hoverReducer(s, {type: 'enter', source: 'field-pointer', path: 'c'});
+        views.push(h.hoverView(s, map, range));
+        s = h.hoverReducer(s, {type: 'leave', source: 'field-pointer', path: 'c'});
+        views.push(h.hoverView(s, map, range));
+        output(views);""",
+        None,
+    )
+    a, b, c, gone = out
+    assert a == {"selected": "b", "preview": "a", "docPreview": "a", "badgePage": 3, "revealField": None}
+    assert b["docPreview"] == "b" and b["badgePage"] is None, "fragment na widocznej stronie: bez znacznika"
+    assert c["preview"] == "c" and c["docPreview"] is None and c["badgePage"] is None
+    assert gone == {
+        "selected": "b",
+        "preview": None,
+        "docPreview": None,
+        "badgePage": None,
+        "revealField": None,
+    }
+
+
+@needs_node
+def test_hover_on_document_fragment_reveals_field_and_sources_stack():
+    out = _node(
+        """const h = await js('hover.js');
+        const map = new Map([['a', {page: 3}], ['b', {page: 0}]]);
+        const range = {first: 3, last: 3};
+        let s = h.createHoverState();
+        s = h.hoverReducer(s, {type: 'enter', source: 'doc-pointer', path: 'a'});
+        const doc = h.hoverView(s, map, range);
+        s = h.hoverReducer(s, {type: 'leave', source: 'doc-pointer', path: 'a'});
+        s = h.hoverReducer(s, {type: 'enter', source: 'field-focus', path: 'b'});
+        s = h.hoverReducer(s, {type: 'enter', source: 'field-pointer', path: 'a'});
+        const top = h.previewPath(s);
+        // zejście z innego elementu niż ten w podglądzie: bez zmian
+        s = h.hoverReducer(s, {type: 'leave', source: 'field-pointer', path: 'b'});
+        const still = h.previewPath(s);
+        s = h.hoverReducer(s, {type: 'leave', source: 'field-pointer', path: 'a'});
+        const back = h.hoverView(s, map, range);
+        s = h.hoverReducer(s, {type: 'reset'});
+        output({doc, top, still, back, reset: h.hoverView(s, map, range)});""",
+        None,
+    )
+    assert out["doc"]["revealField"] == "a" and out["doc"]["badgePage"] is None
+    assert out["top"] == "a" and out["still"] == "a"
+    assert out["back"]["preview"] == "b" and out["back"]["badgePage"] == 0, "wraca podgląd z fokusu"
+    assert out["reset"]["preview"] is None and out["reset"]["selected"] is None
+
+
+@needs_node
+def test_visible_range_of_pages_in_scroll_container():
+    out = _node(
+        """const h = await js('hover.js');
+        const spans = [{top: 0, bottom: 1000}, {top: 1012, bottom: 2012}, {top: 2024, bottom: 3024}];
+        const at = (top) => h.visibleRange(spans, top, 800);
+        output([at(0), at(900), at(2500), h.visibleRange([], 0, 800)]);""",
+        None,
+    )
+    assert out == [{"first": 0, "last": 0}, {"first": 0, "last": 1}, {"first": 2, "last": 2}, None]
+
+
+def test_hover_preview_styles_are_lighter_than_selection_and_not_color_only(client):
+    css = client.get("/static/css/app.css").text
+    for sel in (".hl-box.is-preview", ".field.is-preview", ".page-badge"):
+        assert sel in css, sel
+    rule = re.search(r"\.hl-box\.is-preview\s*\{([^}]*)\}", css).group(1)
+    assert "border" in rule, "podgląd nie tylko kolorem: obramowanie"
+    order = css.index(".hl-box.is-preview") < css.index(".hl-box.is-active")
+    assert order, "zaznaczenie z kliknięcia wygrywa"
+    js = client.get("/static/js/review.js").text
+    for text in ("mouseenter", "mouseleave", "focus", "blur", "strona "):
+        assert text in js, text
+
+
+# --- poprawki z review PR #4 (GUI) ---
+
+
+@needs_node
+def test_plural_forms_in_polish():
+    out = _node(
+        """const u = await js('ui.js');
+        output([1, 2, 4, 5, 12, 22, 25, 101, 0].map((n) => u.plural(n, 'pola', 'pól', 'pól')
+          + '|' + u.plural(n, 'plik', 'pliki', 'plików')));""",
+        None,
+    )
+    assert out == [
+        "pola|plik",
+        "pól|pliki",
+        "pól|pliki",
+        "pól|plików",
+        "pól|plików",
+        "pól|pliki",
+        "pól|plików",
+        "pól|plików",
+        "pól|plików",
+    ]
+
+
+def test_no_hardcoded_plural_after_number(client):
+    for name in ("app.js", "review.js"):
+        js = client.get(f"/static/js/{name}").text
+        assert not re.search(r"\$\{[^}]+\} (pól|plików)", js), f"{name}: odmiana przez plural()"
+
+
+def test_results_explain_document_type(client):
+    js = client.get("/static/js/app.js").text
+    assert "Dlaczego ten typ?" in js
+    assert "evidence" in js
+    assert re.search(r'el\(\s*"details"', js) and re.search(r'el\(\s*"summary"', js)
+
+
+def test_gui_limits_number_of_files_like_api(client):
+    js = client.get("/static/js/app.js").text
+    assert re.search(r"MAX_FILES\s*=\s*50\b", js)
+    assert api.MAX_FILES == 50

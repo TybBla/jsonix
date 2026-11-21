@@ -1,7 +1,10 @@
 """Zadania przetwarzania (joby) dla GUI: pliki w `output/.jobs/<job_id>/`, stan w pamięci.
 
-Przetwarzanie korzysta wyłącznie z publicznych API etapów (ingest -> classify -> extract),
-tak jak `pipeline.process_file`, ale dodatkowo zwraca ostrzeżenia i liczbę stron dokumentu.
+Każdy plik przechodzi przez `pipeline.process_file_ex` — ten sam potok co CLI, więc GUI i CLI dają
+identyczne dane; z `Document` bierzemy dodatkowo ostrzeżenia i liczbę stron. Naraz przetwarzanych jest
+najwyżej `max_parallel` jobów: joby trafiają do własnego executora magazynu (`submit`), więc czekające
+w kolejce (status `pending`) nie zajmują wątków serwera. Ten sam limit (`run_limited`) obejmuje
+synchroniczne `POST /api/process`.
 """
 
 from __future__ import annotations
@@ -12,18 +15,21 @@ import shutil
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from odw2json import classify, extract, ingest
-from odw2json.api.files import display_name, storage_name
+from odw2json import pipeline
+from odw2json.api.files import display_name, storage_name, valid_name
 from odw2json.config_loader import load_app_config, load_registry
 from odw2json.contracts import IngestError
 
 log = logging.getLogger("odw2json.api")
 
 JOB_TTL_S = 24 * 3600
+MAX_PARALLEL_JOBS = 2
+BAD_NAME = "Nazwa pliku jest nieprawidłowa. Zmień nazwę pliku i dodaj go ponownie."
 _JOB_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -54,10 +60,13 @@ class Job:
 
 
 class JobStore:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, max_parallel: int = MAX_PARALLEL_JOBS):
         self.root = Path(root)
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
+        self.max_parallel = max(1, max_parallel)
+        self._slots = threading.BoundedSemaphore(self.max_parallel)  # wspólny limit przetwarzania
+        self._executor: ThreadPoolExecutor | None = None
 
     # --- tworzenie i odczyt ---
     def create(self, items: list[tuple]) -> Job:
@@ -71,8 +80,9 @@ class JobStore:
             shown = display_name(raw_name)
             entry = FileEntry(file=shown, name=storage_name(shown, taken))
             taken.add(entry.name)
-            if rest and rest[0]:
-                entry.status, entry.error = "error", rest[0]
+            error = BAD_NAME if not valid_name(raw_name) else (rest[0] if rest else None)
+            if error:
+                entry.status, entry.error = "error", error
             else:
                 (job.dir / entry.name).write_bytes(content)
             job.files.append(entry)
@@ -99,10 +109,35 @@ class JobStore:
             }
 
     # --- przetwarzanie ---
+    def submit(self, job_id: str) -> None:
+        """Kolejkuje job do przetworzenia w tle (najwyżej `max_parallel` naraz); nie blokuje."""
+        with self._lock:
+            if self._executor is None:
+                self._executor = ThreadPoolExecutor(self.max_parallel, thread_name_prefix="odw2json-job")
+            executor = self._executor
+        executor.submit(self.process, job_id)
+
+    def shutdown(self) -> None:
+        """Czeka na zakolejkowane joby i zamyka executor (zamknięcie serwera, testy)."""
+        with self._lock:
+            executor, self._executor = self._executor, None
+        if executor is not None:
+            executor.shutdown(wait=True)
+
+    def run_limited(self, fn, *args):
+        """Wywołuje `fn(*args)` w ramach wspólnego limitu równoległego przetwarzania."""
+        with self._slots:
+            return fn(*args)
+
     def process(self, job_id: str) -> None:
+        """Przetwarza job synchronicznie (w ramach limitu `max_parallel`)."""
         job = self.get(job_id)
         if job is None:
             return
+        self.run_limited(self._run, job)
+
+    def _run(self, job: Job) -> None:
+        job_id = job.id
         with self._lock:
             job.status = "running"
         try:
@@ -128,9 +163,7 @@ class JobStore:
     @staticmethod
     def _process_one(pdf: Path, registry, ingest_cfg) -> dict[str, Any]:
         try:
-            doc = ingest.load(pdf, cfg=ingest_cfg)
-            cls = classify.classify(doc, registry)
-            res = extract.extract(doc, registry[cls.doc_type]) if cls.doc_type else None
+            doc, cls, res = pipeline.process_file_ex(pdf, registry, ingest_cfg)
         except IngestError as e:
             return {"status": "error", "error": f"Nie udało się odczytać pliku: {e}"}
         except Exception:
@@ -138,7 +171,13 @@ class JobStore:
             return {"status": "error", "error": "Nie udało się przetworzyć pliku. Spróbuj ponownie."}
         return {
             "status": "done",
-            "classification": {"doc_type": cls.doc_type, "confidence": cls.confidence, "method": cls.method},
+            "classification": {
+                "doc_type": cls.doc_type,
+                "confidence": cls.confidence,
+                "method": cls.method,
+                # uzasadnienie typu (lista tekstów); pole Classification.evidence dochodzi z etapem E3
+                "evidence": [str(e) for e in (getattr(cls, "evidence", None) or [])],
+            },
             "data": res.data if res else {},
             "trace": [asdict(t) for t in res.trace] if res else [],
             "warnings": list(doc.warnings),

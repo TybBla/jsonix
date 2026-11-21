@@ -1,9 +1,21 @@
-// Odwołania2JSON — GUI: wgrywanie plików, analiza w tle (joby API), wyniki klasyfikacji.
+// jsonix — GUI: wgrywanie plików, analiza w tle (joby API), wyniki klasyfikacji.
 
-import { $, announce, clearErrors, el, formatSize, initA11yBar, showErrors, showScreen, setTitle } from "./ui.js";
+import {
+  $,
+  announce,
+  clearErrors,
+  el,
+  formatSize,
+  initA11yBar,
+  plural,
+  showErrors,
+  showScreen,
+  setTitle,
+} from "./ui.js";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILE_LABEL = "25 MB";
+const MAX_FILES = 50; // jak limit API (ODW2JSON_MAX_FILES)
 const POLL_MS = 400;
 const LOW_CONFIDENCE = 0.7;
 const POLL_RETRIES = 5;
@@ -23,6 +35,7 @@ const MSG = {
   tooLarge: `Wybrany plik musi być mniejszy niż ${MAX_FILE_LABEL}.`,
   sendFailed: "Nie udało się wysłać plików. Sprawdź połączenie i spróbuj ponownie.",
   jobFailed: "Nie udało się przeanalizować plików. Spróbuj ponownie.",
+  tooMany: `Możesz przeanalizować najwyżej ${MAX_FILES} ${plural(MAX_FILES, "plik", "pliki", "plików")} naraz. Usuń część plików z listy.`,
 };
 
 const state = {
@@ -211,7 +224,7 @@ async function pollJob(jobId) {
     }
     if (job.processed !== lastProcessed) {
       lastProcessed = job.processed;
-      const text = `Przeanalizowano ${job.processed} z ${job.total} ${job.total === 1 ? "pliku" : "plików"}`;
+      const text = `Przeanalizowano ${job.processed} z ${job.total} ${plural(job.total, "pliku", "plików", "plików")}`;
       setProgress("Analiza dokumentów", job.processed, job.total, text);
       announce(text);
     }
@@ -229,6 +242,13 @@ async function onAnalyse(ev) {
     $("#upload-error").textContent = MSG.noFiles;
     $("#uploader").classList.add("has-error");
     showErrors([{ target: "file-input", message: MSG.noFiles }]);
+    return;
+  }
+  if (state.files.length > MAX_FILES) {
+    $("#upload-error").hidden = false;
+    $("#upload-error").textContent = MSG.tooMany;
+    $("#uploader").classList.add("has-error");
+    showErrors([{ target: "file-input", message: MSG.tooMany }]);
     return;
   }
   hideUploadError();
@@ -273,6 +293,16 @@ function confidenceCell(cls) {
   return el("td", { text: pct });
 }
 
+/** Rozwijane uzasadnienie klasyfikacji (classification.evidence); brak uzasadnienia → nic. */
+function whyDetails(cls, title) {
+  const evidence = Array.isArray(cls.evidence) ? cls.evidence.filter((e) => typeof e === "string" && e) : [];
+  if (!evidence.length) return null;
+  return el("details", { class: "why" }, [
+    el("summary", { text: title }),
+    el("ul", {}, evidence.map((e) => el("li", { text: e }))),
+  ]);
+}
+
 function typeCell(file) {
   if (file.status === "error") {
     return el("td", {}, [
@@ -284,10 +314,12 @@ function typeCell(file) {
     return el("td", {}, [
       el("span", { class: "tag tag-unknown" }, [el("span", { "aria-hidden": "true", text: "?" }), " Nieznany dokument"]),
       el("p", { class: "muted", text: "Zapiszemy pusty plik JSON: {}" }),
+      whyDetails(file.classification, "Dlaczego nie rozpoznano?"),
     ]);
   }
   return el("td", {}, [
     el("span", { class: "tag tag-ok" }, [el("span", { "aria-hidden": "true", text: "✓" }), ` ${doctypeLabel(t)}`]),
+    whyDetails(file.classification, "Dlaczego ten typ?"),
   ]);
 }
 
@@ -362,7 +394,7 @@ export function renderResults(job) {
   icon.className = `icon ${allGood ? "icon-success" : "icon-warning"}`;
   icon.textContent = allGood ? "✓" : "!";
   $("#results-notice-text").textContent =
-    `Przeanalizowano ${ok.length} z ${job.files.length} plików.` +
+    `Przeanalizowano ${ok.length} z ${job.files.length} ${plural(job.files.length, "pliku", "plików", "plików")}.` +
     (unknown ? ` Nierozpoznane dokumenty: ${unknown}.` : "");
 
   const zip = $("#zip-btn");
