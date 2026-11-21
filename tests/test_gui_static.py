@@ -486,3 +486,46 @@ def test_hover_preview_styles_are_lighter_than_selection_and_not_color_only(clie
     js = client.get("/static/js/review.js").text
     for text in ("mouseenter", "mouseleave", "focus", "blur", "strona "):
         assert text in js, text
+
+
+# --- poprawki z review PR #4 (GUI) ---
+
+
+@needs_node
+def test_plural_forms_in_polish():
+    out = _node(
+        """const u = await js('ui.js');
+        output([1, 2, 4, 5, 12, 22, 25, 101, 0].map((n) => u.plural(n, 'pola', 'pól', 'pól')
+          + '|' + u.plural(n, 'plik', 'pliki', 'plików')));""",
+        None,
+    )
+    assert out == [
+        "pola|plik",
+        "pól|pliki",
+        "pól|pliki",
+        "pól|plików",
+        "pól|plików",
+        "pól|pliki",
+        "pól|plików",
+        "pól|plików",
+        "pól|plików",
+    ]
+
+
+def test_no_hardcoded_plural_after_number(client):
+    for name in ("app.js", "review.js"):
+        js = client.get(f"/static/js/{name}").text
+        assert not re.search(r"\$\{[^}]+\} (pól|plików)", js), f"{name}: odmiana przez plural()"
+
+
+def test_results_explain_document_type(client):
+    js = client.get("/static/js/app.js").text
+    assert "Dlaczego ten typ?" in js
+    assert "evidence" in js
+    assert re.search(r'el\(\s*"details"', js) and re.search(r'el\(\s*"summary"', js)
+
+
+def test_gui_limits_number_of_files_like_api(client):
+    js = client.get("/static/js/app.js").text
+    assert re.search(r"MAX_FILES\s*=\s*50\b", js)
+    assert api.MAX_FILES == 50

@@ -253,6 +253,9 @@ html[data-contrast="high"] .icon { color: #000; }
 .tag-error { color: var(--red-dark); }
 html[data-contrast="high"] .tag-unknown { background: #000; color: #ff0; }
 .confidence-low { color: var(--red-dark); font-weight: 600; }
+.why { margin-top: .5rem; font-size: .875rem; }
+.why summary { cursor: pointer; color: var(--link); text-decoration: underline; text-underline-offset: .15em; width: fit-content; }
+.why ul { margin: .25rem 0 0; padding-left: 1.1rem; }
 .muted { color: var(--muted); }
 
 /* --- ekran „Sprawdź dane”: pola obok dokumentu --- */

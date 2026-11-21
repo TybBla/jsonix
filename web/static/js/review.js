@@ -13,18 +13,11 @@ import {
 } from "./fields.js";
 import { createHoverState, hoverReducer, hoverView } from "./hover.js";
 import { buildSourceMap } from "./match.js";
-import { $, announce, el, setStep, showScreen } from "./ui.js";
+import { $, announce, el, plural, setStep, showScreen } from "./ui.js";
 import { PdfViewer } from "./viewer.js";
 
 const NARROW = window.matchMedia("(max-width: 63.99rem)");
 const NOT_FOUND = "Nie znaleziono tego fragmentu w dokumencie.";
-
-function plural(n, one, few, many) {
-  if (n === 1) return one;
-  const d = n % 10;
-  const t = n % 100;
-  return d >= 2 && d <= 4 && (t < 12 || t > 14) ? few : many;
-}
 
 let viewer = null;
 const EDITS = new Map(); // `${job_id}/${name}` → Map(path → wartość po edycji)
@@ -477,7 +470,7 @@ async function openReview(job, file) {
     status.textContent =
       `Dokument ma ${pages} ${plural(pages, "stronę", "strony", "stron")}. ` +
       `Podświetlono źródło dla ${found} ${plural(found, "pola", "pól", "pól")}.` +
-      (missing ? ` Nie znaleziono fragmentu dla ${missing} pól.` : "");
+      (missing ? ` Nie znaleziono fragmentu dla ${missing} ${plural(missing, "pola", "pól", "pól")}.` : "");
     status.classList.add("visually-hidden");
   }
 }

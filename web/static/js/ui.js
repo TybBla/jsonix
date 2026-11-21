@@ -20,6 +20,14 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+/** Odmiana po liczbie: plural(1, "plik", "pliki", "plików") → „plik”, 3 → „pliki”, 5 → „plików”. */
+export function plural(n, one, few, many) {
+  if (n === 1) return one;
+  const d = n % 10;
+  const t = n % 100;
+  return d >= 2 && d <= 4 && (t < 12 || t > 14) ? few : many;
+}
+
 export function $(selector, root = document) {
   return root.querySelector(selector);
 }

@@ -13,8 +13,8 @@ Otwórz http://127.0.0.1:8000. Opis API (OpenAPI): http://127.0.0.1:8000/docs.
 ## Jak to działa
 
 1. **Dodaj pliki** — przeciągnij pliki PDF na pole albo wybierz je przyciskiem „Dodaj plik”. Pliki są sprawdzane od razu (format PDF, pusty plik, limit 25 MB). Błędy są pokazywane przy pliku i w podsumowaniu na górze strony.
-2. **Analizuj** — pliki trafiają do `POST /api/jobs`. Pasek postępu pokazuje wysyłkę (%), a potem „Przeanalizowano N z M”. Stan joba jest odpytywany z `GET /api/jobs/{id}`.
-3. **Wyniki klasyfikacji** — tabela z typem dokumentu, pewnością (niska pewność ma ikonę i słowo „niska”), ostrzeżeniami i błędami. Dokument nierozpoznany ma oznaczenie „Nieznany dokument” (wynikowy JSON to `{}`). Pobierzesz tu JSON każdego pliku albo wszystkie naraz (ZIP).
+2. **Analizuj** — pliki trafiają do `POST /api/jobs`, a każdy plik przechodzi przez `pipeline.process_file_ex`, czyli ten sam potok co CLI (identyczne dane w GUI i w `output/`). Pasek postępu pokazuje wysyłkę (%), a potem „Przeanalizowano N z M”. Stan joba jest odpytywany z `GET /api/jobs/{id}`.
+3. **Wyniki klasyfikacji** — tabela z typem dokumentu, pewnością (niska pewność ma ikonę i słowo „niska”), ostrzeżeniami i błędami. Dokument nierozpoznany ma oznaczenie „Nieznany dokument” (wynikowy JSON to `{}`). Rozwijane „Dlaczego ten typ?” („Dlaczego nie rozpoznano?” przy nieznanym dokumencie) pokazuje uzasadnienie klasyfikacji (`classification.evidence`); bez uzasadnienia z klasyfikatora sekcja się nie pojawia. Pobierzesz tu JSON każdego pliku albo wszystkie naraz (ZIP).
 4. **Sprawdź dane** — po lewej pola pogrupowane jak w JSON, po prawej dokument PDF. Najechanie kursorem albo przejście klawiszem Tab na pole lekko podświetla jego fragment w dokumencie (bez przewijania podglądu); gdy fragment jest na stronie poza widokiem, przy polu pojawia się znacznik „strona N”. Kliknięcie pola (albo Enter) przewija podgląd do fragmentu i zaznacza go (obramowanie + etykieta pola). Działa to też w drugą stronę: najechanie na podświetlony fragment w dokumencie wyróżnia odpowiadające mu pole (lista pól przewija się, jeśli pole jest poza widokiem), a kliknięcie fragmentu zaznacza pole. Zejście kursorem lub fokusem przywraca zaznaczenie z ostatniego kliknięcia. Na wąskim ekranie przełączasz widok przyciskami „Pola / Dokument”.
 5. **Popraw wartość (opcjonalnie)** — „Zmień” przy polu otwiera edycję (Enter zapisuje, Esc anuluje, puste pole = `null`). Zmienione pole ma oznaczenie „Zmieniono ręcznie” i przycisk „Przywróć wartość z dokumentu”. Liczby zostają liczbami („7 500,50” → `7500.5`).
 6. **Pobierz JSON** — wynik dokumentu jako plik `.json` o nazwie jak PDF, razem z Twoimi zmianami.
@@ -38,6 +38,7 @@ Lista pól powstaje z `data`, a nie z `trace`, więc widać też pola bez warto�
 - **Skany bez warstwy tekstowej** (ostrzeżenie „OCR strony N”): PDF nie ma tekstu do wyszukania, więc zamiast podświetlenia jest komunikat „Nie znaleziono tego fragmentu w dokumencie. Ta strona jest skanem bez warstwy tekstowej.”
 - **Pola wyliczone** (`method: derived`, np. opis czynności ze słownika) nie mają fragmentu źródłowego — GUI pokazuje komunikat ostrzegawczy z informacją, że wartość wyliczono.
 - Gdy `source_snippet` wskazuje inny fragment niż ten z wartością, podświetlany jest fragment (to informacja zwrotna dla ekstrakcji, nie błąd GUI).
+- Limity API (zmienne środowiskowe): najwyżej 50 plików na żądanie (`ODW2JSON_MAX_FILES`, kod 400), łącznie 200 MB (`ODW2JSON_MAX_TOTAL_MB`, kod 413; za duże żądanie jest odrzucane już po nagłówku `Content-Length`; przy wysyłce bez tego nagłówka limit działa dopiero po odebraniu plików), 25 MB na plik (`ODW2JSON_MAX_FILE_MB`). Naraz przetwarzane są najwyżej 2 joby (`ODW2JSON_MAX_PARALLEL_JOBS`, własna kolejka serwera, która nie blokuje innych żądań), kolejne czekają ze statusem `pending`; ten sam limit obejmuje `POST /api/process`.
 - Joby są trzymane w pamięci serwera i w `output/.jobs/`; po restarcie serwera albo po 24 h trzeba wgrać pliki ponownie.
 - Zmiany wpisane w GUI trafiają do „Pobierz JSON” na ekranie „Sprawdź dane”. ZIP i „Pobierz JSON” w tabeli wyników zawierają wynik z serwera (bez zmian ręcznych). Zmiany są trzymane w przeglądarce do odświeżenia strony.
 
@@ -47,6 +48,6 @@ Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), peł
 
 ## Testy
 
-- `tests/test_api.py` — API jobów (upload, walidacja, path traversal, pobieranie PDF/JSON/ZIP).
+- `tests/test_api.py` — API jobów (upload, walidacja, path traversal, nazwy zarezerwowane Windows, pobieranie PDF/JSON/ZIP, limity żądania, kolejka jobów, zgodność danych z CLI).
 - `tests/test_gui_static.py` — struktura strony (landmarki, ARIA, teksty Gov.pl, lokalne zasoby), a z Node.js także logika JS: dopasowanie fragmentów na prawdziwym tekście PDF z `przyklad_01` (każde pole z `page` w `tests/fixtures/gui/*.result.json` musi zostać znalezione na właściwej stronie), mapa pól liczona raz (także czas dla długiego dokumentu) i stany podglądu przy najechaniu.
 - `scripts/smoke_gui.py` — test dymny na uruchomionym serwerze.
