@@ -2,6 +2,7 @@
 
 ZMIANY TYLKO PRZEZ PR DO main Z AKCEPTACJĄ CAŁEGO ZESPOŁU.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,0 +1,67 @@
+# Podział danych treningowych na dev i holdout (generowany, nie edytować ręcznie).
+# Przydział: sha256('odw2json-split-v1:<sprawa>') % 4 == 0 -> holdout, inaczej dev.
+# Regeneracja: python scripts/make_splits.py
+dev:
+- przyklad_01
+- przyklad_02
+- przyklad_03
+- przyklad_04
+- przyklad_05
+- przyklad_07
+- przyklad_08
+- przyklad_09
+- przyklad_12
+- przyklad_14
+- przyklad_15
+- przyklad_16
+- przyklad_17
+- przyklad_18
+- przyklad_19
+- przyklad_21
+- przyklad_22
+- przyklad_23
+- przyklad_24
+- przyklad_26
+- przyklad_27
+- przyklad_28
+- przyklad_29
+- przyklad_30
+- przyklad_32
+- przyklad_35
+- przyklad_36
+- przyklad_37
+- przyklad_39
+- przyklad_42
+- przyklad_43
+- przyklad_44
+- przyklad_45
+- przyklad_46
+- przyklad_47
+- przyklad_48
+- przyklad_49
+- przyklad_50
+- przyklad_52
+- przyklad_53
+- przyklad_54
+- przyklad_55
+- przyklad_56
+- przyklad_57
+- przyklad_58
+- przyklad_60
+holdout:
+- przyklad_06
+- przyklad_10
+- przyklad_11
+- przyklad_13
+- przyklad_20
+- przyklad_25
+- przyklad_31
+- przyklad_33
+- przyklad_34
+- przyklad_38
+- przyklad_40
+- przyklad_41
+- przyklad_51
+- przyklad_59
+negatives:
+- negatywne

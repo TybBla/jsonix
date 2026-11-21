@@ -41,6 +41,7 @@ def test_unknown_as_empty_object_default(tmp_path, train_dir):
 
 def test_default_app_config_is_empty_object():
     from odw2json.config_loader import load_app_config
+
     assert load_app_config()["unknown_output"] == "empty_object"
 
 

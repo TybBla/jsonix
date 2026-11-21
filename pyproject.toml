@@ -1,0 +1,26 @@
+[project]
+name = "odw2json"
+version = "0.1.0"
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+extend-exclude = ["data", "web", "fundament"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: wolne testy (pomijane w pre-commit)",
+    "live_llm: testy wymagające prawdziwego wywołania LLM przez sieć",
+]
+filterwarnings = [
+    "ignore:_pytest.python.CallSpec2:pytest.PytestRemovedIn10Warning",
+]

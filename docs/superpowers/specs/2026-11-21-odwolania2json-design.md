@@ -125,22 +125,33 @@ HackNation-Project/
 
 ```python
 @dataclass
-class Document:            # A → wszyscy
-    path: Path; text: str; pages: list[str]; ocr_used: bool
+class Document:  # A → wszyscy
+    path: Path
+    text: str
+    pages: list[str]
+    ocr_used: bool
+
 
 @dataclass
-class Classification:      # A → B, C
-    doc_type: str | None   # id z config/doctypes lub None = nieznany
-    confidence: float; method: str   # "keywords" | "llm"
+class Classification:  # A → B, C
+    doc_type: str | None  # id z config/doctypes lub None = nieznany
+    confidence: float
+    method: str  # "keywords" | "llm"
+
 
 @dataclass
-class FieldResult:         # B → C (transparentność)
-    path: str; value: Any; method: str  # "regex" | "llm" | "derived"
-    source_snippet: str | None; page: int | None
+class FieldResult:  # B → C (transparentność)
+    path: str
+    value: Any
+    method: str  # "regex" | "llm" | "derived"
+    source_snippet: str | None
+    page: int | None
+
 
 @dataclass
-class ExtractionResult:    # B → C
-    doc_type: str; data: dict  # dokładnie kształt schematu
+class ExtractionResult:  # B → C
+    doc_type: str
+    data: dict  # dokładnie kształt schematu
     trace: list[FieldResult]
 ```
 Funkcje-interfejsy: `ingest.load(path) -> Document`, `classify.classify(doc, registry) -> Classification`, `extract.extract(doc, doctype_cfg) -> ExtractionResult`, `pipeline.process_case(dir) -> list[...]`. Na `main` każda ma działający **stub** (np. klasyfikacja po nazwie pliku, ekstrakcja zwraca szablon z nullami), więc każdy sektor może pracować i testować end-to-end od pierwszej minuty.
