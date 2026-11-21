@@ -2,10 +2,30 @@ id: przelew
 title: Potwierdzenie przelewu
 output_template: schemas/przelew.json
 classify:
-  strong: ["przelew", "kwota", "tytulem", "beneficjent", "nadawca", "rachunek"]
-  weak: ["pln", "numer transakcji", "data transakcji"]
-  negative: ["zarzut nr", "ogloszenie o zamowieniu"]
-  min_score: 3.0
+  # Wszystkie frazy i regexy dzialaja na tekscie znormalizowanym (male litery, bez polskich znakow).
+  # Tytul dokumentu w naglowku (pierwsze header_chars znakow, rozstrzelone litery zwijane): +weights.title (raz).
+  title:
+    - potwierdzenie przelewu
+    - potwierdzenie realizacji polecenia przelewu
+    - potwierdzenie wykonania przelewu
+    - potwierdzenie transakcji
+    - potwierdzenie operacji
+    - dowod wykonania przelewu
+    - polecenie przelewu
+  header_chars: 600
+  strong: ["przelew", "beneficjent", "zleceniodawc", "rachunek nadawcy", "rachunek obciazany", "numer transakcji"]
+  # Ogolne slowa (rachunek, kwota...) wystepuja tez w ogloszeniach i broszurach - tylko po +1.
+  weak: ["kwota", "rachunek", "tytul", "pln", "data transakcji", "data operacji", "nadawca", "odbiorc", "platnik"]
+  negative: ["zarzut nr", "ogloszenie o zamowieniu", "odwolujacy"]
+  patterns:
+    # numer rachunku (26 cyfr, opcjonalnie w grupach po 4) w poblizu etykiety kwoty z wartoscia
+    - regex: '(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d).{0,800}(?:kwot[aye]|kwocie|wartosc)[^0-9]{0,40}\d+(?: ?\d{3})*[,.]\d{2}(?!\d)|(?:kwot[aye]|kwocie|wartosc)[^0-9]{0,40}\d+(?: ?\d{3})*[,.]\d{2}(?!\d).{0,800}(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
+      weight: 4
+  # Potwierdzenie przelewu zawsze zawiera numer rachunku (IBAN, 26 cyfr).
+  required_any:
+    - 're:(?<!\d)\d{2}(?: ?\d{4}){6}(?!\d)'
+  min_score: 6.0
+  min_margin: 2.0
 fields: {}
 llm:
   prompt: prompts/przelew.md

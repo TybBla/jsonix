@@ -4,22 +4,79 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from functools import cache
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT_DIR / "config"
+REGEX_PREFIX = "re:"  # prefiks wpisu required_any traktowanego jako regex
+
+
+class ClassifyWeights(BaseModel):
+    """Wagi cech klasyfikatora (punkty za trafienie; ``negative`` zwykle ujemna)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    strong: float = 2.0
+    weak: float = 1.0
+    negative: float = -3.0
+    title: float = 4.0
+
+
+class PatternSpec(BaseModel):
+    """Cecha strukturalna: regex na tekście znormalizowanym (małe litery, bez polskich znaków)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    regex: str
+    weight: float = 1.0
+
+    @field_validator("regex")
+    @classmethod
+    def _valid_regex(cls, v: str) -> str:
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"niepoprawny regex {v!r}: {e}") from e
+        return v
 
 
 class ClassifyConfig(BaseModel):
+    """Cechy rozpoznawania typu dokumentu (wszystko poza ``strong/weak/negative/min_score`` opcjonalne).
+
+    ``title`` - frazy szukane w nagłówku (pierwsze ``header_chars`` znaków, z zwijaniem rozstrzelonych liter);
+    ``patterns`` - regexy z wagami; ``required_any`` - frazy lub ``re:<regex>``, bez trafienia typ odpada;
+    ``min_score`` - minimalny wynik; ``min_margin`` - minimalna przewaga nad drugim typem.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     strong: list[str] = Field(default_factory=list)
     weak: list[str] = Field(default_factory=list)
     negative: list[str] = Field(default_factory=list)
+    title: list[str] = Field(default_factory=list)
+    patterns: list[PatternSpec] = Field(default_factory=list)
+    required_any: list[str] = Field(default_factory=list)
     min_score: float = 3.0
+    min_margin: float = Field(0.0, ge=0)
+    header_chars: int = Field(600, gt=0)
+    weights: ClassifyWeights = Field(default_factory=ClassifyWeights)
+
+    @field_validator("required_any")
+    @classmethod
+    def _valid_required(cls, items: list[str]) -> list[str]:
+        for item in items:
+            if item.startswith(REGEX_PREFIX):
+                try:
+                    re.compile(item[len(REGEX_PREFIX) :])
+                except re.error as e:
+                    raise ValueError(f"niepoprawny regex w required_any {item!r}: {e}") from e
+        return items
 
 
 class DocTypeConfig(BaseModel):
