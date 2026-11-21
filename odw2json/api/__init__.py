@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import mimetypes
 import os
 import tempfile
 import zipfile
@@ -29,6 +30,15 @@ from odw2json.config_loader import ROOT_DIR, load_registry
 MAX_FILE_BYTES = int(float(os.environ.get("ODW2JSON_MAX_FILE_MB", "25")) * 1024 * 1024)
 JOBS_DIR = Path(os.environ.get("ODW2JSON_JOBS_DIR", ROOT_DIR / "output" / ".jobs"))
 STATIC_DIR = ROOT_DIR / "web" / "static"
+
+# Rejestr Windows potrafi podać text/plain dla .js/.mjs — przeglądarka odrzuci wtedy moduł ES.
+for _type, _ext in (
+    ("text/javascript", ".js"),
+    ("text/javascript", ".mjs"),
+    ("text/css", ".css"),
+    ("font/woff2", ".woff2"),
+):
+    mimetypes.add_type(_type, _ext)
 
 _store = JobStore(JOBS_DIR)
 
