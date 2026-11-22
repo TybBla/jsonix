@@ -27,3 +27,44 @@ uruchomienie na nowych dokumentach: pusty cache OCR, bez LLM.
 
   Obecne ustawienia: `docs/decyzje/E2b-ocr-wydajnosc.md`.
 - `scripts/quality_report.py` podaje czas na dokument per zbiór, więc wzrost czasu będzie widoczny przy każdym raporcie.
+
+## Pomiar „jak u jury” (22.11.2026, plan do v1.0, pkt 11)
+
+**Warunki.** Kod `main` v0.4.0 (E4+E5 ekstrakcja). Pełny wsad CLI `python -m odw2json run input output`, tak jak
+`start.bat`, w obrazie Dockera (Python 3.13, OCR) z `--cpus=8 --memory=16g`. Zimny cache OCR, `LLM_MODE=replay`
+(bez LLM). Wejście: wszystkie sprawy z `data/train` (`przyklad_*`), negatywy i 30 skanów, razem **226 PDF**.
+
+**Wynik całości:** exit 0, **213 s** (3 min 33 s), 0 błędów; typy: 70 odwołań, 70 pełnomocnictw, 70 przelewów,
+16 nieznanych. Pliki są przetwarzane po kolei, więc czas całości to suma czasów plików.
+
+| Grupa | n | suma | mediana | max |
+|---|---|---|---|---|
+| sprawy `przyklad_*` (tekst), na sprawę | 60 | 6,1 s | 0,09 s | 0,21 s |
+| negatywy | 12 | 15,7 s | 0,09 s | 8,8 s (pierwszy plik: start silnika OCR) |
+| skany odwołań (5–7 stron) | 10 | 157,9 s | 14,3 s | 20,0 s |
+| skany pełnomocnictw | 10 | 18,2 s | 1,8 s | 2,0 s |
+| skany potwierdzeń przelewu | 10 | 15,3 s | 1,5 s | 1,9 s |
+
+- **Sprawa z warstwą tekstu: ok. 0,1 s.** Sprawa złożona z samych skanów (odwołanie + pełnomocnictwo + przelew):
+  ok. 18–24 s. Skany odwołań to 74% czasu całego wsadu.
+- Kontrolnie `scripts/bench_cases.py` w tych samych warunkach (90 spraw, 214 PDF): skan średnio 5,98 s
+  (mediana 1,76 s, max 18,8 s), całość 192 s.
+
+**Wolniej niż 21.11 (ok. ×1,5), ale nie przez kod.** Skany odwołań: 9–13 s wtedy, 14–20 s teraz. Porównanie A/B na
+10 skanach odwołań w tym samym kontenerze: `main` 144 s i 151 s, kod sprzed `248de2a` (stabilność OCR) 140 s,
+czyli różnica w granicach szumu. Spowolnienie pochodzi z maszyny pomiarowej (laptop, obciążenie, zasilanie), więc
+liczby bezwzględne mają co najmniej ±30% niepewności. Laptop jury (i7, 16 GB) może być szybszy albo wolniejszy.
+
+**Zbiór oceniający (≥ 10 spraw).** Przy tych czasach: 10 spraw z tekstem to ok. 1 s; 10 spraw z samych skanów
+to ok. 3–4 min; typowy miks (część skanów) to ok. 1 min. Do tego jednorazowa instalacja paczek przy pierwszym
+`start.bat` (ok. 2 min, `docs/test-jury.md`).
+
+### Decyzja (pkt 11)
+- **Nie przyspieszamy OCR przed v1.0.** Warianty tańsze w OCR były już zmierzone w E2b (DPI, wątki, równoległość
+  po stronach i procesach) i obecne ustawienia są najszybsze z tych, które nie obniżają pokrycia. Dalsze zejście
+  (niższe DPI, mniejszy model) grozi spadkiem F1 na skanach, a F1 waży w ocenie więcej niż czas.
+- **Ryzyko nieznanego limitu czasu ograniczają zmiany z `etap/E11-limit-czasu` (PR #13):** pliki zastępcze `{}`
+  od startu, zapis każdego wyniku od razu i atomowo, oraz **PDF-y z tekstem przed skanami**. Przy przerwaniu
+  przepadają najwyżej najwolniejsze skany, a nie dokumenty, które liczą się w sekundach.
+- Do rozważenia tylko jeśli UZP poda limit krótszy niż kilka minut na cały zbiór: OCR dwóch skanów naraz w osobnych
+  procesach (×1,4 przy 2 procesach, pomiar 21.11) albo niższe DPI tylko dla stron z dużym drukiem.
