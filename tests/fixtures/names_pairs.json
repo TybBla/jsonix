@@ -1,0 +1,1994 @@
+[
+ {
+  "text": "Aleksandra Marciniak",
+  "gt": "Aleksandra Marciniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_01",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Aleksandra Marciniak",
+  "gt": "Aleksandra Marciniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_01",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Jolanta Zajkowski",
+  "gt": "Jolanta Zajkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_01",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Oliwia Kaczmarek",
+  "gt": "Oliwia Kaczmarek",
+  "case": "mianownik",
+  "sprawa": "przyklad_01",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Bartosz Szymanski",
+  "gt": "Bartosz Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_02",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Bartosz Szymanski",
+  "gt": "Bartosz Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_02",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Nowakowicz",
+  "gt": "Aleksandra Nowakowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_02",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Cezary Wierzbicki",
+  "gt": "Cezary Wierzbicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_02",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Szulc",
+  "gt": "Norbert Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_03",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Norbert Szulc",
+  "gt": "Norbert Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_03",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Sławomir Jabłoński",
+  "gt": "Sławomir Jabłoński",
+  "case": "mianownik",
+  "sprawa": "przyklad_03",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Patrycja Furman",
+  "gt": "Patrycja Furman",
+  "case": "mianownik",
+  "sprawa": "przyklad_04",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Patrycja Furman",
+  "gt": "Patrycja Furman",
+  "case": "mianownik",
+  "sprawa": "przyklad_04",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Ewa Szulc",
+  "gt": "Ewa Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_04",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Sławomir Ostrowczyk",
+  "gt": "Sławomir Ostrowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_04",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ignacy Sadowski",
+  "gt": "Ignacy Sadowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_05",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Ignacy Sadowski",
+  "gt": "Ignacy Sadowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_05",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Gajewski",
+  "gt": "Aleksandra Gajewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_05",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Jolanta Szulc",
+  "gt": "Jolanta Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_06",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Jolanta Szulc",
+  "gt": "Jolanta Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_06",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Bartosz Zajkowski",
+  "gt": "Bartosz Zajkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_06",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Oliwia Gajewski",
+  "gt": "Oliwia Gajewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_06",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Cezary Walczak",
+  "gt": "Cezary Walczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_07",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Cezary Walczak",
+  "gt": "Cezary Walczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_07",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Mazurkiewicz",
+  "gt": "Halina Mazurkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_07",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Sławomir Szulc",
+  "gt": "Sławomir Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_07",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Bartosz Jastrzębski",
+  "gt": "Bartosz Jastrzębski",
+  "case": "mianownik",
+  "sprawa": "przyklad_08",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Bartosz Jastrzębski",
+  "gt": "Bartosz Jastrzębski",
+  "case": "mianownik",
+  "sprawa": "przyklad_08",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Ostrowczyk",
+  "gt": "Halina Ostrowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_08",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Oliwia Zajkowski",
+  "gt": "Oliwia Zajkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_08",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ryszard Lewandowski",
+  "gt": "Ryszard Lewandowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_08",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Weronika Kaczmarek",
+  "gt": "Weronika Kaczmarek",
+  "case": "mianownik",
+  "sprawa": "przyklad_09",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Weronika Kaczmarek",
+  "gt": "Weronika Kaczmarek",
+  "case": "mianownik",
+  "sprawa": "przyklad_09",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Dorota Borkowski",
+  "gt": "Dorota Borkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_09",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Weronika Chmielewski",
+  "gt": "Weronika Chmielewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_09",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Patrycja Rutkiewicz",
+  "gt": "Patrycja Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_10",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Patrycja Rutkiewicz",
+  "gt": "Patrycja Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_10",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Halina Przybylski",
+  "gt": "Halina Przybylski",
+  "case": "mianownik",
+  "sprawa": "przyklad_10",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Ignacy Milewski",
+  "gt": "Ignacy Milewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_10",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Marek Łukaszewski",
+  "gt": "Marek Łukaszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_10",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Cezary Bartoszewicz",
+  "gt": "Cezary Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_11",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Cezary Bartoszewicz",
+  "gt": "Cezary Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_11",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Grzegorz Szulc",
+  "gt": "Grzegorz Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_11",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Klaudia Dobrowolski",
+  "gt": "Klaudia Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_12",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Klaudia Dobrowolski",
+  "gt": "Klaudia Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_12",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Cezary Dudziewicz",
+  "gt": "Cezary Dudziewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_12",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ignacy Rutkiewicz",
+  "gt": "Ignacy Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_13",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Ignacy Rutkiewicz",
+  "gt": "Ignacy Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_13",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Jolanta Kaczmarek",
+  "gt": "Jolanta Kaczmarek",
+  "case": "mianownik",
+  "sprawa": "przyklad_13",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Oliwia Górnicki",
+  "gt": "Oliwia Górnicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_13",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Weronika Furman",
+  "gt": "Weronika Furman",
+  "case": "mianownik",
+  "sprawa": "przyklad_13",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Patrycja Bartoszewicz",
+  "gt": "Patrycja Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_14",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Patrycja Bartoszewicz",
+  "gt": "Patrycja Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_14",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Aleksandra Gajewicz",
+  "gt": "Aleksandra Gajewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_14",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Marek Rutkiewicz",
+  "gt": "Marek Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_14",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Zbigniew Dobrowolski",
+  "gt": "Zbigniew Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_14",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ryszard Lipowczyk",
+  "gt": "Ryszard Lipowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_15",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Ryszard Lipowczyk",
+  "gt": "Ryszard Lipowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_15",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Marek Nowakowicz",
+  "gt": "Marek Nowakowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_15",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Cezary Szymanski",
+  "gt": "Cezary Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_16",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Cezary Szymanski",
+  "gt": "Cezary Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_16",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Marek Dobrowolski",
+  "gt": "Marek Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_16",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Patrycja Bąkiewicz",
+  "gt": "Patrycja Bąkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_16",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ryszard Biernacki",
+  "gt": "Ryszard Biernacki",
+  "case": "mianownik",
+  "sprawa": "przyklad_16",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Milewski",
+  "gt": "Norbert Milewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_17",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Norbert Milewski",
+  "gt": "Norbert Milewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_17",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Bartoszewicz",
+  "gt": "Halina Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_17",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Dorota Zawadzki",
+  "gt": "Dorota Zawadzki",
+  "case": "mianownik",
+  "sprawa": "przyklad_18",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Dorota Zawadzki",
+  "gt": "Dorota Zawadzki",
+  "case": "mianownik",
+  "sprawa": "przyklad_18",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Grzegorz Bąkiewicz",
+  "gt": "Grzegorz Bąkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_18",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Wierzbicki",
+  "gt": "Aleksandra Wierzbicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_19",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Aleksandra Wierzbicki",
+  "gt": "Aleksandra Wierzbicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_19",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Ewa Dudziewicz",
+  "gt": "Ewa Dudziewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_19",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Sławomir Niedźwiecki",
+  "gt": "Sławomir Niedźwiecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_19",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Wierzbicka",
+  "gt": "Aleksandra Wierzbicka",
+  "case": "mianownik",
+  "sprawa": "przyklad_20",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Aleksandra Wierzbicka",
+  "gt": "Aleksandra Wierzbicka",
+  "case": "mianownik",
+  "sprawa": "przyklad_20",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Jolanta Najder",
+  "gt": "Jolanta Najder",
+  "case": "mianownik",
+  "sprawa": "przyklad_20",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Sławomir Dudek",
+  "gt": "Sławomir Dudek",
+  "case": "mianownik",
+  "sprawa": "przyklad_20",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Sławomir Mazurkiewicz",
+  "gt": "Sławomir Mazurkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_20",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Marek Sikorski",
+  "gt": "Marek Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_21",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Marek Sikorski",
+  "gt": "Marek Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_21",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Zbigniew Lewandowski",
+  "gt": "Zbigniew Lewandowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_21",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Dorota Sikorski",
+  "gt": "Dorota Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_22",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Dorota Sikorski",
+  "gt": "Dorota Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_22",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Grzegorz Szulc",
+  "gt": "Grzegorz Szulc",
+  "case": "mianownik",
+  "sprawa": "przyklad_22",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Walczak",
+  "gt": "Halina Walczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_23",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Halina Walczak",
+  "gt": "Halina Walczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_23",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Bartosz Bartoszewicz",
+  "gt": "Bartosz Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_23",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Chalupowicz",
+  "gt": "Norbert Chalupowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_23",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ryszard Dobrowolski",
+  "gt": "Ryszard Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_23",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Jabłończyk",
+  "gt": "Halina Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_24",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Halina Jabłończyk",
+  "gt": "Halina Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_24",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Cezary Lipowczyk",
+  "gt": "Cezary Lipowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_24",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Weronika Siedlecki",
+  "gt": "Weronika Siedlecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_24",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Zbigniew Górnicki",
+  "gt": "Zbigniew Górnicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_25",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Zbigniew Górnicki",
+  "gt": "Zbigniew Górnicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_25",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Oliwia Jabłończyk",
+  "gt": "Oliwia Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_25",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Patrycja Głowacz",
+  "gt": "Patrycja Głowacz",
+  "case": "mianownik",
+  "sprawa": "przyklad_25",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Zbigniew Szymanski",
+  "gt": "Zbigniew Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_25",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Ryszard Mazurkiewicz",
+  "gt": "Ryszard Mazurkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_26",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Ryszard Mazurkiewicz",
+  "gt": "Ryszard Mazurkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_26",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Patrycja Głowacz",
+  "gt": "Patrycja Głowacz",
+  "case": "mianownik",
+  "sprawa": "przyklad_26",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ryszard Chalupowicz",
+  "gt": "Ryszard Chalupowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_26",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Jabłończyk",
+  "gt": "Aleksandra Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_27",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Aleksandra Jabłończyk",
+  "gt": "Aleksandra Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_27",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Dorota Jurgielewicz",
+  "gt": "Dorota Jurgielewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_27",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Dudziewicz",
+  "gt": "Halina Dudziewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_27",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Zbigniew Dobrowolski",
+  "gt": "Zbigniew Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_28",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Walczak",
+  "gt": "Aleksandra Walczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_28",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Weronika Pawlak",
+  "gt": "Weronika Pawlak",
+  "case": "mianownik",
+  "sprawa": "przyklad_28",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Ewa Chalupowicz",
+  "gt": "Ewa Chalupowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_29",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Ewa Chalupowicz",
+  "gt": "Ewa Chalupowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_29",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksandra Chmielewski",
+  "gt": "Aleksandra Chmielewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_29",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Weronika Cieślak",
+  "gt": "Weronika Cieślak",
+  "case": "mianownik",
+  "sprawa": "przyklad_29",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Grzegorz Rutkiewicz",
+  "gt": "Grzegorz Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_30",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Grzegorz Rutkiewicz",
+  "gt": "Grzegorz Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_30",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Sławomir Wierzbicki",
+  "gt": "Sławomir Wierzbicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_30",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Halina Ostrowczyk",
+  "gt": "Halina Ostrowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_31",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Grzegorz Dudek",
+  "gt": "Grzegorz Dudek",
+  "case": "mianownik",
+  "sprawa": "przyklad_31",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Cezary Marciniak",
+  "gt": "Cezary Marciniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_32",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Cezary Marciniak",
+  "gt": "Cezary Marciniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_32",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Ignacy Siedlecki",
+  "gt": "Ignacy Siedlecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_32",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Głowacz",
+  "gt": "Norbert Głowacz",
+  "case": "mianownik",
+  "sprawa": "przyklad_32",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Cezary Kaczmark",
+  "gt": "Cezary Kaczmark",
+  "case": "mianownik",
+  "sprawa": "przyklad_33",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Cezary Kaczmark",
+  "gt": "Cezary Kaczmark",
+  "case": "mianownik",
+  "sprawa": "przyklad_33",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Klaudia Bartoszewicz",
+  "gt": "Klaudia Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_33",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Sławomir Sadowski",
+  "gt": "Sławomir Sadowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_33",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Marek Jabłoński",
+  "gt": "Marek Jabłoński",
+  "case": "mianownik",
+  "sprawa": "przyklad_34",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Marek Jabłoński",
+  "gt": "Marek Jabłoński",
+  "case": "mianownik",
+  "sprawa": "przyklad_34",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Ignacy Sikorski",
+  "gt": "Ignacy Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_34",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Norbert Rutkiewicz",
+  "gt": "Norbert Rutkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_34",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Klaudia Szymanski",
+  "gt": "Klaudia Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_35",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Klaudia Szymanski",
+  "gt": "Klaudia Szymanski",
+  "case": "mianownik",
+  "sprawa": "przyklad_35",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Norbert Sadowski",
+  "gt": "Norbert Sadowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_35",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Oliwia Lipowczyk",
+  "gt": "Oliwia Lipowczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_35",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Dorota Siedlecki",
+  "gt": "Dorota Siedlecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_36",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Dorota Siedlecki",
+  "gt": "Dorota Siedlecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_36",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Patrycja Marciniak",
+  "gt": "Patrycja Marciniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_36",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Ryszard Jabłończyk",
+  "gt": "Ryszard Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_36",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Zbigniew Mazurkiewicz",
+  "gt": "Zbigniew Mazurkiewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_36",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Halina Niedźwiecki",
+  "gt": "Halina Niedźwiecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_37",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Halina Niedźwiecki",
+  "gt": "Halina Niedźwiecki",
+  "case": "mianownik",
+  "sprawa": "przyklad_37",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Ignacy Cieślak",
+  "gt": "Ignacy Cieślak",
+  "case": "mianownik",
+  "sprawa": "przyklad_37",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Jolanta Dobrowolski",
+  "gt": "Jolanta Dobrowolski",
+  "case": "mianownik",
+  "sprawa": "przyklad_37",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Oliwia Wierzbicka",
+  "gt": "Oliwia Wierzbicka",
+  "case": "mianownik",
+  "sprawa": "przyklad_38",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Oliwia Wierzbicka",
+  "gt": "Oliwia Wierzbicka",
+  "case": "mianownik",
+  "sprawa": "przyklad_38",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Jolanta Jabłończyk",
+  "gt": "Jolanta Jabłończyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_38",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Jolanta Tomaszewski",
+  "gt": "Jolanta Tomaszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_38",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Ryszard Nowakowicz",
+  "gt": "Ryszard Nowakowicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_38",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Aleksandra Bartoszewicz",
+  "gt": "Aleksandra Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_39",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Aleksandra Bartoszewicz",
+  "gt": "Aleksandra Bartoszewicz",
+  "case": "mianownik",
+  "sprawa": "przyklad_39",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Grzegorz Borkowski",
+  "gt": "Grzegorz Borkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_39",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Halina Różański",
+  "gt": "Halina Różański",
+  "case": "mianownik",
+  "sprawa": "przyklad_39",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Weronika Sikorski",
+  "gt": "Weronika Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_39",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Magdalena Wróblewska",
+  "gt": "Magdalena Wróblewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_40",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Magdalena Wróblewska",
+  "gt": "Magdalena Wróblewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_40",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Ewa Lis",
+  "gt": "Ewa Lis",
+  "case": "mianownik",
+  "sprawa": "przyklad_40",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Krzysztof Nowicki",
+  "gt": "Krzysztof Nowicki",
+  "case": "mianownik",
+  "sprawa": "przyklad_40",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Tomasz Kędzierski",
+  "gt": "Tomasz Kędzierski",
+  "case": "mianownik",
+  "sprawa": "przyklad_40",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Piotr Zalewski",
+  "gt": "Piotr Zalewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_41",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Piotr Zalewski",
+  "gt": "Piotr Zalewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_41",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Agnieszka Kurek",
+  "gt": "Agnieszka Kurek",
+  "case": "mianownik",
+  "sprawa": "przyklad_41",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Marek Domański",
+  "gt": "Marek Domański",
+  "case": "mianownik",
+  "sprawa": "przyklad_41",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Robert Kurek",
+  "gt": "Robert Kurek",
+  "case": "mianownik",
+  "sprawa": "przyklad_41",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Joanna Stępień",
+  "gt": "Joanna Stępień",
+  "case": "mianownik",
+  "sprawa": "przyklad_42",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Joanna Stępień",
+  "gt": "Joanna Stępień",
+  "case": "mianownik",
+  "sprawa": "przyklad_42",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Dariusz Pietrzak",
+  "gt": "Dariusz Pietrzak",
+  "case": "mianownik",
+  "sprawa": "przyklad_42",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Michał Borkowski",
+  "gt": "Michał Borkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_42",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Katarzyna Michalak",
+  "gt": "Katarzyna Michalak",
+  "case": "mianownik",
+  "sprawa": "przyklad_43",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Katarzyna Michalak",
+  "gt": "Katarzyna Michalak",
+  "case": "mianownik",
+  "sprawa": "przyklad_43",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Andrzej Wawrzyniak",
+  "gt": "Andrzej Wawrzyniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_43",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Beata Sobczak",
+  "gt": "Beata Sobczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_43",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Natalia Górecka",
+  "gt": "Natalia Górecka",
+  "case": "mianownik",
+  "sprawa": "przyklad_44",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Natalia Górecka",
+  "gt": "Natalia Górecka",
+  "case": "mianownik",
+  "sprawa": "przyklad_44",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Jarosław Dudek",
+  "gt": "Jarosław Dudek",
+  "case": "mianownik",
+  "sprawa": "przyklad_44",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Łukasz Sikora",
+  "gt": "Łukasz Sikora",
+  "case": "mianownik",
+  "sprawa": "przyklad_44",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Aleksander Kubiak",
+  "gt": "Aleksander Kubiak",
+  "case": "mianownik",
+  "sprawa": "przyklad_45",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Aleksander Kubiak",
+  "gt": "Aleksander Kubiak",
+  "case": "mianownik",
+  "sprawa": "przyklad_45",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Grzegorz Malinowski",
+  "gt": "Grzegorz Malinowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_45",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Weronika Jabłońska",
+  "gt": "Weronika Jabłońska",
+  "case": "mianownik",
+  "sprawa": "przyklad_45",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Rafał Piotrowski",
+  "gt": "Rafał Piotrowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Rafał Piotrowski",
+  "gt": "Rafał Piotrowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Natalia Maciejewska",
+  "gt": "Natalia Maciejewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Rafał Czajka",
+  "gt": "Rafał Czajka",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Wojciech Majewski",
+  "gt": "Wojciech Majewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Wojciech Zieliński",
+  "gt": "Wojciech Zieliński",
+  "case": "mianownik",
+  "sprawa": "przyklad_46",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Elżbieta Woźniak",
+  "gt": "Elżbieta Woźniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_47",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Elżbieta Woźniak",
+  "gt": "Elżbieta Woźniak",
+  "case": "mianownik",
+  "sprawa": "przyklad_47",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Iwona Kucharska",
+  "gt": "Iwona Kucharska",
+  "case": "mianownik",
+  "sprawa": "przyklad_47",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Sebastian Tomaszewski",
+  "gt": "Sebastian Tomaszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_47",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Leszek Jabłoński",
+  "gt": "Leszek Jabłoński",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Leszek Jabłoński",
+  "gt": "Leszek Jabłoński",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Iwona Grabowska",
+  "gt": "Iwona Grabowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Kamil Tomaszewski",
+  "gt": "Kamil Tomaszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Marta Mazur",
+  "gt": "Marta Mazur",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Tadeusz Rutkowski",
+  "gt": "Tadeusz Rutkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Wojciech Wysocki",
+  "gt": "Wojciech Wysocki",
+  "case": "mianownik",
+  "sprawa": "przyklad_48",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Cezary Sikorski",
+  "gt": "Cezary Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Cezary Sikorski",
+  "gt": "Cezary Sikorski",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Damian Tomaszewski",
+  "gt": "Damian Tomaszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Igor Majewski",
+  "gt": "Igor Majewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Iwona Rutkowska",
+  "gt": "Iwona Rutkowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Sebastian Adamczyk",
+  "gt": "Sebastian Adamczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_49",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Rafał Pawłowski",
+  "gt": "Rafał Pawłowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_50",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Rafał Pawłowski",
+  "gt": "Rafał Pawłowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_50",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Bartosz Urbański",
+  "gt": "Bartosz Urbański",
+  "case": "mianownik",
+  "sprawa": "przyklad_50",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Paweł Olszewski",
+  "gt": "Paweł Olszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_50",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Tadeusz Kucharski",
+  "gt": "Tadeusz Kucharski",
+  "case": "mianownik",
+  "sprawa": "przyklad_50",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Tadeusz Nowak",
+  "gt": "Tadeusz Nowak",
+  "case": "mianownik",
+  "sprawa": "przyklad_51",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Tadeusz Nowak",
+  "gt": "Tadeusz Nowak",
+  "case": "mianownik",
+  "sprawa": "przyklad_51",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Grażyna Zielińska",
+  "gt": "Grażyna Zielińska",
+  "case": "mianownik",
+  "sprawa": "przyklad_51",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Olga Baran",
+  "gt": "Olga Baran",
+  "case": "mianownik",
+  "sprawa": "przyklad_51",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Karolina Wiśniewska",
+  "gt": "Karolina Wiśniewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_52",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Karolina Wiśniewska",
+  "gt": "Karolina Wiśniewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_52",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Maciej Jaworski",
+  "gt": "Maciej Jaworski",
+  "case": "mianownik",
+  "sprawa": "przyklad_52",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Celina Ostrowska",
+  "gt": "Celina Ostrowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_53",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Celina Ostrowska",
+  "gt": "Celina Ostrowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_53",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Barbara Piotrowska",
+  "gt": "Barbara Piotrowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_53",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Kubiak",
+  "gt": "Norbert Kubiak",
+  "case": "mianownik",
+  "sprawa": "przyklad_53",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Kamil Bąk",
+  "gt": "Kamil Bąk",
+  "case": "mianownik",
+  "sprawa": "przyklad_54",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Kamil Bąk",
+  "gt": "Kamil Bąk",
+  "case": "mianownik",
+  "sprawa": "przyklad_54",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Cezary Szewczyk",
+  "gt": "Cezary Szewczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_54",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Leszek Piotrowski",
+  "gt": "Leszek Piotrowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_54",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Natalia Kowalczyk",
+  "gt": "Natalia Kowalczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_54",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Renata Kowalczyk",
+  "gt": "Renata Kowalczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_55",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Renata Kowalczyk",
+  "gt": "Renata Kowalczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_55",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Natalia Mazur",
+  "gt": "Natalia Mazur",
+  "case": "mianownik",
+  "sprawa": "przyklad_55",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "r. pr. Renata Jabłońska",
+  "gt": "Renata Jabłońska",
+  "case": "mianownik",
+  "sprawa": "przyklad_55",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Iwona Zawadzka",
+  "gt": "Iwona Zawadzka",
+  "case": "mianownik",
+  "sprawa": "przyklad_56",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Iwona Zawadzka",
+  "gt": "Iwona Zawadzka",
+  "case": "mianownik",
+  "sprawa": "przyklad_56",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Kamil Olszewski",
+  "gt": "Kamil Olszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_56",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Natalia Czerwińska",
+  "gt": "Natalia Czerwińska",
+  "case": "mianownik",
+  "sprawa": "przyklad_56",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Norbert Olszewski",
+  "gt": "Norbert Olszewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_56",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Barbara Włodarczyk",
+  "gt": "Barbara Włodarczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_57",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Barbara Włodarczyk",
+  "gt": "Barbara Włodarczyk",
+  "case": "mianownik",
+  "sprawa": "przyklad_57",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "Tadeusz Szymański",
+  "gt": "Tadeusz Szymański",
+  "case": "mianownik",
+  "sprawa": "przyklad_57",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Grzegorz Wiśniewski",
+  "gt": "Grzegorz Wiśniewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_58",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Grzegorz Wiśniewski",
+  "gt": "Grzegorz Wiśniewski",
+  "case": "mianownik",
+  "sprawa": "przyklad_58",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Leszek Wieczorek",
+  "gt": "Leszek Wieczorek",
+  "case": "mianownik",
+  "sprawa": "przyklad_58",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Sebastian Baran",
+  "gt": "Sebastian Baran",
+  "case": "mianownik",
+  "sprawa": "przyklad_58",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Damian Sobczak",
+  "gt": "Damian Sobczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_59",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "adw. Damian Sobczak",
+  "gt": "Damian Sobczak",
+  "case": "mianownik",
+  "sprawa": "przyklad_59",
+  "doc": "odwolanie",
+  "split": "holdout"
+ },
+ {
+  "text": "Felicja Wiśniewska",
+  "gt": "Felicja Wiśniewska",
+  "case": "mianownik",
+  "sprawa": "przyklad_59",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "r. pr. Henryk Ostrowski",
+  "gt": "Henryk Ostrowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_59",
+  "doc": "pelnomocnictwo",
+  "split": "holdout"
+ },
+ {
+  "text": "Bartosz Rutkowski",
+  "gt": "Bartosz Rutkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_60",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Bartosz Rutkowski",
+  "gt": "Bartosz Rutkowski",
+  "case": "mianownik",
+  "sprawa": "przyklad_60",
+  "doc": "odwolanie",
+  "split": "dev"
+ },
+ {
+  "text": "adw. Olga Bąk",
+  "gt": "Olga Bąk",
+  "case": "mianownik",
+  "sprawa": "przyklad_60",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Paweł Wieczorek",
+  "gt": "Paweł Wieczorek",
+  "case": "mianownik",
+  "sprawa": "przyklad_60",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ },
+ {
+  "text": "Teresa Sadowska",
+  "gt": "Teresa Sadowska",
+  "case": "mianownik",
+  "sprawa": "przyklad_60",
+  "doc": "pelnomocnictwo",
+  "split": "dev"
+ }
+]

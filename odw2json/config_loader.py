@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT_DIR / "config"
@@ -138,14 +138,154 @@ class ClassifySettings(BaseModel):
     foreign_titles: ForeignTitles = Field(default_factory=ForeignTitles)
 
 
+FieldType = Literal[
+    "str", "int", "amount", "date", "iban", "digits", "email", "name", "company", "enum", "lookup"
+]
+
+
+def _engine():
+    """Rejestry silnika (import leniwy: engine importuje ten moduł)."""
+    from odw2json.extract import engine
+
+    return engine
+
+
+def _check_phrases(v: str | list[str] | None) -> str | list[str] | None:
+    items = [v] if isinstance(v, str) else (v or [])
+    for p in items:
+        _engine().check_phrase(p)
+    return v
+
+
+class ScopeSpec(BaseModel):
+    """Zakres wyszukiwania pola: od końca frazy ``after`` do początku ``before`` / ``max_chars`` znaków.
+
+    Frazy jak w ``classify`` (``re:<regex>`` na tekście złożonym). Brak frazy ``after`` = pole ``null``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    after: str | list[str] | None = None
+    before: str | list[str] | None = None
+    max_chars: int | None = Field(None, gt=0)
+
+    @field_validator("after", "before")
+    @classmethod
+    def _valid_phrases(cls, v: str | list[str] | None) -> str | list[str] | None:
+        return _check_phrases(v)
+
+
+class DerivedSpec(BaseModel):
+    """Pole wyliczane z innego pola: ``{lookup: <słownik z config/lookups>, from: <ścieżka>}``."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    lookup: str | None = None
+    from_: str = Field(alias="from")
+
+
+class FieldSpec(BaseModel):
+    """Reguła jednego pola (klucz = ścieżka w szablonie, listy: ``Odwolujacy[].nip``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: FieldType = "str"
+    scope: ScopeSpec | None = None
+    extract: list[dict[str, Any]] = Field(default_factory=list)
+    normalize: list[str] | None = None
+    validate_: dict[str, Any] = Field(default_factory=dict, alias="validate")
+    derived: DerivedSpec | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> FieldSpec:
+        eng = _engine()
+        if not self.extract and self.derived is None:
+            raise ValueError("pole musi mieć 'extract' (lista ekstraktorów) albo 'derived'")
+        for i, entry in enumerate(self.extract):
+            try:
+                eng.parse_extractor_entry(entry)
+            except ValueError as e:
+                raise ValueError(f"extract[{i}]: {e}") from e
+        for name in self.normalize or []:
+            if name not in eng.NORMALIZERS:
+                raise ValueError(
+                    f"nieznany normalizator {name!r} (dostępne: {', '.join(sorted(eng.NORMALIZERS))})"
+                )
+        for name in self.validate_:
+            if name not in eng.VALIDATORS:
+                raise ValueError(
+                    f"nieznany walidator {name!r} (dostępne: {', '.join(sorted(eng.VALIDATORS))})"
+                )
+        if "regex" in self.validate_:
+            try:
+                re.compile(self.validate_["regex"])
+            except re.error as e:
+                raise ValueError(f"validate.regex: niepoprawny regex: {e}") from e
+        return self
+
+
+class SplitSpec(BaseModel):
+    """Podział tekstu na elementy listy: blok od ``start`` do ``end``, elementy od ``item_sep``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start: str | None = None
+    end: str | None = None
+    item_sep: str | None = None
+    # elementy od trafień regexu na ORYGINALE (wielkość liter ma znaczenie), np. imię i nazwisko
+    item_regex: str | None = None
+
+    @field_validator("start", "end", "item_sep")
+    @classmethod
+    def _valid_phrases(cls, v: str | None) -> str | None:
+        return _check_phrases(v)
+
+    @field_validator("item_regex")
+    @classmethod
+    def _valid_regex(cls, v: str | None) -> str | None:
+        if v is not None:
+            try:
+                re.compile(v)
+            except re.error as e:
+                raise ValueError(f"item_regex: niepoprawny regex {v!r}: {e}") from e
+        return v
+
+
+class ListSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    split: SplitSpec | None = None
+    max_items: int | None = Field(None, gt=0)
+    # lista zagnieżdżona: i-ty element rodzica szukany w i-tym bloku CAŁEGO dokumentu
+    # (brak bloków = fragment rodzica)
+    groups: SplitSpec | None = None
+    # bez duplikatów i pustych elementów (gdy nic nie znaleziono - jeden pusty element z szablonu)
+    unique: bool = False
+
+
 class DocTypeConfig(BaseModel):
     id: str
     title: str = ""
     output_template: str
     classify: ClassifyConfig = Field(default_factory=ClassifyConfig)
-    fields: dict[str, Any] = Field(default_factory=dict)
+    fields: dict[str, FieldSpec] = Field(default_factory=dict)
+    lists: dict[str, ListSpec] = Field(default_factory=dict)
     llm: dict[str, Any] = Field(default_factory=dict)
     config_dir: Path = CONFIG_DIR
+
+    def check_paths(self) -> None:
+        """Ścieżki ``fields``/``lists`` muszą istnieć w szablonie wyniku (czytelny błąd przy starcie).
+
+        Typ bez ``fields`` i ``lists`` nie ma czego sprawdzać, więc szablonu nie czytamy wcale.
+        """
+        if not self.fields and not self.lists:
+            return
+        eng = _engine()
+        tmpl = self.template()
+        bad = [p for p in self.fields if not eng.template_has_path(tmpl, p)]
+        bad += [p for p in self.lists if not eng.template_has_path(tmpl, p + eng.LIST_MARK)]
+        if bad:
+            raise ValueError(f"typ {self.id!r}: ścieżki spoza szablonu {self.output_template}: {bad}")
 
     def template(self) -> dict:
         """Świeża kopia szablonu wyniku (wszystkie wartości null)."""
@@ -169,7 +309,8 @@ def load_registry(config_dir: Path = CONFIG_DIR) -> dict[str, DocTypeConfig]:
     """Wszystkie typy dokumentów z config/doctypes. Nowy typ = nowy plik YAML."""
     reg: dict[str, DocTypeConfig] = {}
     for f in sorted((config_dir / "doctypes").glob("*.yaml")):
-        cfg = DocTypeConfig(**_read_yaml(f), config_dir=config_dir)
+        cfg = DocTypeConfig(**_read_yaml(f), config_dir=config_dir)  # błąd -> pydantic ValidationError
+        cfg.check_paths()
         if cfg.id in reg:
             raise ValueError(f"Zduplikowane id typu dokumentu: {cfg.id} ({f})")
         reg[cfg.id] = cfg
