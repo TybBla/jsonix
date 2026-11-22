@@ -654,3 +654,304 @@ def test_node_helper_timeout_from_env(monkeypatch):
     monkeypatch.setenv("O2J_NODE_TIMEOUT", "7")
     _node("output(1)", None)
     assert seen == [7.0]
+
+
+# --- redesign v1.0.1: nagłówek, kontrast szarego, źródło w dymku, stopka ---
+
+CSS_PATH = JS.parent / "css" / "app.css"
+DECLARATION_PATH = JS.parent / "deklaracja-dostepnosci.html"
+
+
+def _luminance(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    chans = []
+    for i in (0, 2, 4):
+        c = int(h[i : i + 2], 16) / 255
+        chans.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * chans[0] + 0.7152 * chans[1] + 0.0722 * chans[2]
+
+
+def _contrast(fg: str, bg: str) -> float:
+    a, b = sorted((_luminance(fg), _luminance(bg)), reverse=True)
+    return (a + 0.05) / (b + 0.05)
+
+
+def _root_vars(css: str) -> dict[str, str]:
+    root = re.search(r":root\s*\{([^}]*)\}", css).group(1)
+    return dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", root))
+
+
+def _rule(css: str, selector: str) -> str:
+    m = re.search(r"(?m)^\s*" + re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    assert m, f"brak reguły {selector}"
+    return m.group(1)
+
+
+def test_contrast_helper_matches_known_values():
+    assert round(_contrast("#000000", "#ffffff"), 1) == 21.0
+    assert round(_contrast("#767676", "#ffffff"), 1) == 4.5
+
+
+def test_header_is_flush_left_without_logo(page):
+    css = CSS_PATH.read_text(encoding="utf-8")
+    for source in (page.raw, css, DECLARATION_PATH.read_text(encoding="utf-8")):
+        assert "brand-mark" not in source, "logo „{ }” usunięte"
+    inner = page.find("div", class_="header-inner")
+    assert inner, "nagłówek z elementem .header-inner"
+    assert "container" not in inner[0].get("class", "").split(), "bez wcięcia kontenera po lewej"
+    rule = _rule(css, ".header-inner")
+    assert "max-width" not in rule and "margin: 0 auto" not in rule, "header-inner przy lewej ścianie okna"
+    assert re.search(r"padding[^;]*1rem", rule), "mały odstęp od krawędzi"
+    assert page.find("nav", class_="a11y-bar"), "ustawienia wyglądu zostają"
+
+
+def test_site_title_is_large_and_bold():
+    css = CSS_PATH.read_text(encoding="utf-8")
+    rule = _rule(css, ".brand-name")
+    size = re.search(r"font-size:\s*([^;]+);", rule).group(1)
+    smallest = float(re.search(r"([\d.]+)rem", size).group(1))  # pierwszy człon clamp() = minimum
+    assert smallest >= 1.75, f"tytuł za mały: {size}"
+    assert re.search(r"font-weight:\s*(700|800)", rule)
+    assert ".brand-sub" in css
+
+
+def test_muted_text_color_has_aaa_contrast_on_white_and_light_gray():
+    css = CSS_PATH.read_text(encoding="utf-8")
+    root = _root_vars(css)
+    assert root["--muted"].startswith("var(--gray")
+    muted = root[root["--muted"].removeprefix("var(").removesuffix(")")]
+    for bg in ("#ffffff", root["--gray-4"]):
+        assert _contrast(muted, bg) >= 7, f"{muted} na {bg}: {_contrast(muted, bg):.2f}"
+    # szary tekst tylko z tokenów spełniających 7:1 (obramowania i tła mogą zostać jasne)
+    for value in re.findall(r"(?<![-\w])color:\s*var\((--gray-\w+)\)", css):
+        assert _contrast(root[value], "#ffffff") >= 7, f"jasny szary jako kolor tekstu: {value}"
+    assert "--muted: #ffff00" in css, "wysoki kontrast bez zmian"
+
+
+def test_source_is_not_a_permanently_visible_line_in_the_list(client):
+    css = CSS_PATH.read_text(encoding="utf-8")
+    js = client.get("/static/js/review.js").text
+    assert not re.search(r"\.field-source\b", css), "stała linia „Źródło:” zastąpiona dymkiem"
+    assert "field-source" not in js
+    for token in ("source-btn", "source-pop", "bindSourcePopover", "describeSource"):
+        assert token in js, token
+    pop = _rule(css, ".source-pop")
+    assert "position: absolute" in pop, "dymek nie przesuwa układu listy"
+
+
+def test_source_icon_is_an_accessible_button(client):
+    css = CSS_PATH.read_text(encoding="utf-8")
+    js = client.get("/static/js/review.js").text
+    assert re.search(r'"button",\s*\{\s*type:\s*"button",\s*class:\s*`source-btn', js)
+    for attr in ("aria-label", "aria-expanded", "aria-controls", "aria-describedby"):
+        assert attr in js, attr
+    assert 'role: "tooltip"' in js
+    rule = _rule(css, ".source-btn")
+    for prop in ("min-width", "min-height"):
+        size = float(re.search(prop + r":\s*([\d.]+)rem", rule).group(1))
+        assert size >= 1.5, f"cel dotyku {prop} < 24 px (WCAG 2.5.8)"
+    assert ".source-btn.is-warning" in css, "wariant ostrzegawczy"
+    assert ".source-btn:focus-visible" in css or ":focus-visible" in css
+
+
+def test_warning_variant_differs_by_shape_not_only_color(client):
+    js = client.get("/static/js/review.js").text
+    assert "createElementNS" in js, "ikony jako SVG (inny kształt dla ostrzeżenia)"
+    assert re.search(r"is-warning", js)
+    assert "si-triangle" in js and "si-circle" in js
+
+
+@needs_node
+def test_describe_source_for_value_with_fragment_and_for_warnings():
+    out = _node(
+        """const s = await js('source-pop.js');
+        const trace = {page: 1, source_snippet: 'NIP:   9999284065, REGON 1', method: 'regex'};
+        const base = {label: 'NIP', state: 'source', trace, located: true, ocr: false};
+        output({
+          ok: s.describeSource(base),
+          empty: s.describeSource({...base, state: 'empty'}),
+          notFound: s.describeSource({...base, located: false}),
+          scan: s.describeSource({...base, located: false, ocr: true}),
+          derived: s.describeSource({label: 'Opis', state: 'missing',
+            trace: {page: null, source_snippet: null, method: 'derived'}, located: true, ocr: false}),
+          missing: s.describeSource({label: 'X', state: 'missing', trace: null, located: true, ocr: false}),
+        });""",
+        None,
+    )
+    ok = out["ok"]
+    assert ok["variant"] == "source"
+    assert ok["ariaLabel"] == "Źródło wartości „NIP”: strona 2"
+    assert ok["srText"] == "Źródło: strona 2, „NIP: 9999284065, REGON 1”"
+    assert ok["rows"] == [
+        {"term": "Strona", "text": "2"},
+        {"term": "Fragment", "text": "„NIP: 9999284065, REGON 1”"},
+    ]
+    assert ok["notes"] == []
+    assert out["empty"] is None, "brak wartości: brak ikony"
+    for key in ("notFound", "scan", "derived", "missing"):
+        info = out[key]
+        assert info["variant"] == "warning", key
+        assert info["ariaLabel"].startswith("Źródło wartości"), key
+        assert info["notes"], key
+        assert info["srText"].startswith("Ostrzeżenie"), key
+    assert "Nie znaleziono tego fragmentu w dokumencie." in out["notFound"]["notes"]
+    assert any("skanem bez warstwy tekstowej" in n for n in out["scan"]["notes"])
+    assert any("wyliczono" in n for n in out["derived"]["notes"])
+    assert out["notFound"]["rows"][0] == {"term": "Strona", "text": "2"}, "strona zostaje w szczegółach"
+    assert out["missing"]["rows"] == []
+
+
+@needs_node
+def test_popover_state_machine_hover_click_and_dismiss():
+    out = _node(
+        """const s = await js('source-pop.js');
+        const r = s.popReducer;
+        const z = s.createPopState();
+        const hov = r(z, 'hover-open');
+        const hovOut = r(hov, 'hover-close');
+        const clicked = r(hov, 'toggle');
+        const stays = r(clicked, 'hover-close');
+        const closedByClick = r(clicked, 'toggle');
+        const fromClosed = r(z, 'toggle');
+        output({z, hov, hovOut, clicked, stays, closedByClick, fromClosed,
+                esc: r(clicked, 'dismiss'), unknown: r(z, 'nic')});""",
+        None,
+    )
+    closed = {"open": False, "pinned": False}
+    assert out["z"] == closed and out["hovOut"] == closed and out["closedByClick"] == closed
+    assert out["hov"] == {"open": True, "pinned": False}
+    assert out["clicked"] == {"open": True, "pinned": True}, "kliknięcie utrwala dymek"
+    assert out["stays"] == out["clicked"], "zjechanie nie chowa dymka otwartego kliknięciem"
+    assert out["fromClosed"] == out["clicked"]
+    assert out["esc"] == closed and out["unknown"] == closed
+
+
+@needs_node
+def test_popover_placement_stays_inside_viewport():
+    out = _node(
+        """const s = await js('source-pop.js');
+        const vp = {width: 400, height: 600};
+        const rect = (l, t, w, h) => ({left: l, top: t, width: w, height: h, right: l + w, bottom: t + h});
+        output({
+          fits: s.placePopover(rect(300, 100, 24, 24), rect(100, 128, 250, 80), vp),
+          left: s.placePopover(rect(10, 100, 24, 24), rect(-200, 128, 250, 80), vp),
+          right: s.placePopover(rect(380, 100, 24, 24), rect(300, 128, 250, 80), vp),
+          flip: s.placePopover(rect(300, 560, 24, 24), rect(100, 588, 250, 80), vp),
+          noRoomAbove: s.placePopover(rect(300, 20, 24, 24), rect(100, 560, 250, 80), vp),
+          wide: s.placePopover(rect(300, 100, 24, 24), rect(-100, 128, 500, 80), vp),
+        });""",
+        None,
+    )
+    assert out["fits"] == {"shiftX": 0, "above": False}
+    assert out["left"] == {"shiftX": 208, "above": False}
+    assert out["right"] == {"shiftX": -158, "above": False}
+    assert out["flip"]["above"] is True
+    assert out["noRoomAbove"]["above"] is False, "bez miejsca u góry zostaje pod ikoną"
+    assert out["wide"]["shiftX"] == 108, "szerszy od okna: przy lewej krawędzi"
+
+
+_FAKE_DOM = """
+const listeners = {};
+const mk = () => {
+  const l = {};
+  const attrs = {};
+  const classes = new Set();
+  const el = {
+    hidden: true, style: {setProperty() {}, removeProperty() {}},
+    addEventListener: (t, fn) => { (l[t] ||= []).push(fn); },
+    removeEventListener: (t, fn) => { l[t] = (l[t] || []).filter((f) => f !== fn); },
+    setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: (k) => attrs[k] ?? null,
+    classList: {
+      add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c),
+    },
+    getBoundingClientRect: () => ({left: 0, top: 0, width: 10, height: 10, right: 10, bottom: 10}),
+    focus: () => { el.focused = true; },
+    fire: (t, ev = {}) => (l[t] || []).forEach((fn) => fn({target: el, preventDefault() {}, ...ev})),
+  };
+  return el;
+};
+globalThis.window = {innerWidth: 1000, innerHeight: 800, setTimeout, clearTimeout};
+globalThis.document = {
+  addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); },
+  removeEventListener: () => {},
+  fire: (t, ev) => (listeners[t] || []).forEach((fn) => fn(ev)),
+};
+const make = () => {
+  const wrap = mk(); const button = mk(); const pop = mk();
+  wrap.contains = (n) => n === wrap || n === button || n === pop;
+  pop.hidden = true;
+  return {wrap, button, pop};
+};
+"""
+
+
+@needs_node
+def test_popover_dom_binding_hover_click_escape_outside_and_single_open():
+    out = _node(
+        _FAKE_DOM
+        + """
+        const s = await js('source-pop.js');
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const a = make(); const b = make();
+        let activated = 0;
+        const fast = {openDelay: 20, closeDelay: 10};
+        const ca = s.bindSourcePopover({...a, ...fast, onActivate: () => { activated += 1; }});
+        const cb = s.bindSourcePopover({...b, ...fast});
+        const snap = () => ({a: a.pop.hidden, b: b.pop.hidden, ea: a.button.getAttribute('aria-expanded')});
+        const log = {start: snap()};
+        a.wrap.fire('mouseenter'); log.beforeDelay = snap();
+        await wait(80); log.hovered = snap();
+        a.wrap.fire('mouseleave'); await wait(50); log.unhovered = snap();
+        a.button.fire('click'); log.clicked = snap();
+        a.wrap.fire('mouseleave'); await wait(50); log.pinned = snap();
+        document.fire('keydown', {key: 'Escape', target: a.button}); log.escaped = snap();
+        a.button.fire('click'); b.button.fire('click'); log.single = snap();
+        document.fire('pointerdown', {target: b.wrap}); log.insideKeeps = snap();
+        document.fire('pointerdown', {target: {}}); log.outside = snap();
+        const listScroll = {target: {closest: () => null}};
+        const pdfScroll = {target: {closest: (q) => (q === '#pdf-view' ? {} : null)}};
+        b.button.fire('click'); document.fire('scroll', listScroll); log.scrolled = snap();
+        a.button.fire('click'); document.fire('scroll', pdfScroll);
+        log.pdfScrollIgnored = snap();
+        document.fire('keydown', {key: 'Escape', target: {}}); log.escElsewhere = snap();
+        log.activated = activated;
+        ca.destroy(); cb.destroy();
+        output(log);""",
+        None,
+    )
+    assert out["start"]["a"] is True and out["start"]["b"] is True
+    assert out["beforeDelay"]["a"] is True, "dymek pojawia się z opóźnieniem"
+    assert out["hovered"] == {"a": False, "b": True, "ea": "true"}
+    assert out["unhovered"]["a"] is True, "zjechanie chowa dymek"
+    assert out["clicked"]["a"] is False and out["clicked"]["ea"] == "true"
+    assert out["pinned"]["a"] is False, "otwarty kliknięciem zostaje po zjechaniu"
+    assert out["escaped"]["a"] is True and out["escaped"]["ea"] == "false", "Esc zamyka"
+    assert out["single"]["a"] is True and out["single"]["b"] is False, "naraz jeden dymek"
+    assert out["insideKeeps"]["b"] is False
+    assert out["outside"]["b"] is True, "kliknięcie poza zamyka"
+    assert out["scrolled"]["b"] is True, "przewinięcie listy zamyka"
+    assert out["pdfScrollIgnored"]["a"] is False, "przewijanie PDF (zaznaczenie pola) nie zamyka dymka"
+    assert out["escElsewhere"]["a"] is True
+    assert out["activated"] == 3, "każde kliknięcie ikonki może zaznaczyć pole"
+
+
+def test_footer_has_version_and_required_links(client, page):
+    footer = page.raw[page.raw.index("<footer") : page.raw.index("</footer>")]
+    text = " ".join(re.sub(r"<[^>]+>", " ", footer).split())
+    assert "jsonix v1.0.0 · projekt HackNation 2026 (zadanie UZP)" in text
+    hrefs = {h: t.strip() for h, t in re.findall(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>', footer)}
+    assert hrefs.get("/static/deklaracja-dostepnosci.html") == "Deklaracja dostępności"
+    assert hrefs.get("/docs") == "Dokumentacja API"
+    assert hrefs.get("https://github.com/TybBla/jsonix") == "Kod źródłowy"
+    assert "Urzędu Zamówień Publicznych" not in footer, "nie sugerujemy oficjalnego serwisu UZP"
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert re.search(r"^## v1\.0\.0\b", changelog, re.M), "wersja w stopce zgodna z CHANGELOG"
+    assert client.get("/docs").status_code == 200
+
+
+def test_accessibility_statement_repeats_header_and_footer():
+    html = DECLARATION_PATH.read_text(encoding="utf-8")
+    assert "brand-mark" not in html and "jsonix v1.0.0" in html
+    assert "Dokumentacja API" in html and "Kod źródłowy" in html

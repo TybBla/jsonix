@@ -7,17 +7,17 @@ import {
   displayValue,
   ocrPages,
   parseEditedValue,
-  shortSnippet,
   sourceState,
   traceIndex,
 } from "./fields.js";
 import { createHoverState, hoverReducer, hoverView } from "./hover.js";
 import { buildSourceMap } from "./match.js";
+import { bindSourcePopover, describeSource } from "./source-pop.js";
 import { $, announce, el, plural, setStep, showScreen } from "./ui.js";
 import { PdfViewer } from "./viewer.js";
 
 const NARROW = window.matchMedia("(max-width: 63.99rem)");
-const NOT_FOUND = "Nie znaleziono tego fragmentu w dokumencie.";
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 let viewer = null;
 const EDITS = new Map(); // `${job_id}/${name}` → Map(path → wartość po edycji)
@@ -85,32 +85,91 @@ function setView(view, { focus = false } = {}) {
   }
 }
 
-function sourceText(entry) {
-  const { trace } = entry;
-  return `Źródło: strona ${trace.page + 1}, „${shortSnippet(trace.source_snippet)}”`;
+/** Mała ikonka SVG: „i” w kółku (źródło) albo „!” w trójkącie (ostrzeżenie) — różnią się kształtem, nie tylko kolorem. */
+function sourceIcon(variant) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("class", "source-icon");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const part = (tag, cls, attrs) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    node.setAttribute("class", cls);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    svg.append(node);
+  };
+  if (variant === "warning") {
+    part("path", "si-shape si-triangle", { d: "M8 1.75 15 14.25H1Z" });
+    part("rect", "si-mark", { x: "7.1", y: "6", width: "1.8", height: "4.4" });
+    part("circle", "si-mark", { cx: "8", cy: "12.2", r: "1" });
+  } else {
+    part("circle", "si-shape si-circle", { cx: "8", cy: "8", r: "6.75" });
+    part("circle", "si-mark", { cx: "8", cy: "4.9", r: "1" });
+    part("rect", "si-mark", { x: "7.1", y: "6.9", width: "1.8", height: "5" });
+  }
+  return svg;
 }
 
+/** Dymek ze szczegółami źródła: strona, fragment, ostrzeżenia. */
+function sourcePopover(info, id) {
+  const rows = info.rows.map((r) =>
+    el("p", { class: "source-pop-row" }, [el("span", { class: "source-pop-term", text: `${r.term}: ` }), r.text]),
+  );
+  const notes = info.notes.map((text) =>
+    el("p", { class: "source-pop-note" }, [
+      el("span", { class: "icon icon-warning", "aria-hidden": "true", text: "!" }),
+      el("span", { text }),
+    ]),
+  );
+  return el("div", { class: "source-pop", id, role: "tooltip", hidden: true }, [
+    el("p", { class: "source-pop-title", text: info.variant === "warning" ? "Źródło wartości: uwaga" : "Źródło wartości" }),
+    ...notes,
+    ...rows,
+  ]);
+}
+
+/**
+ * Źródło pola: tylko mała ikonka przy wartości; szczegóły w dymku (najechanie, kliknięcie, Enter / spacja).
+ * Czytnik ekranu dostaje opis źródła także przy samym polu (ukryty akapit `entry.source`).
+ */
 function renderSource(entry, located) {
-  const p = entry.source;
-  p.replaceChildren();
-  p.className = "field-source";
-  if (entry.state === "empty") {
-    p.hidden = true;
-    return;
-  }
-  p.hidden = false;
-  if (entry.state === "source" && located !== false) {
-    p.append(sourceText(entry));
-    return;
-  }
-  p.classList.add("is-warning");
-  const reason =
-    entry.trace?.method === "derived"
-      ? " Wartość wyliczono z innych danych dokumentu."
-      : entry.ocr
-        ? " Ta strona jest skanem bez warstwy tekstowej."
-        : "";
-  p.append(el("span", { class: "icon icon-warning", "aria-hidden": "true", text: "!" }), ` ${NOT_FOUND}${reason}`);
+  entry.popover?.destroy();
+  entry.popover = null;
+  entry.wrap?.remove();
+  entry.wrap = null;
+  const info = describeSource({
+    label: entry.node.label,
+    state: entry.state,
+    trace: entry.trace,
+    located,
+    ocr: entry.ocr,
+  });
+  entry.source.textContent = info ? info.srText : "";
+  if (!info) return;
+  const popId = `${entry.source.id.replace(/-zrodlo$/, "")}-dymek`;
+  const button = el(
+    "button",
+    {
+      type: "button",
+      class: `source-btn${info.variant === "warning" ? " is-warning" : ""}`,
+      "aria-label": info.ariaLabel,
+      "aria-expanded": "false",
+      "aria-controls": popId,
+      "aria-describedby": popId,
+    },
+    [sourceIcon(info.variant)],
+  );
+  const pop = sourcePopover(info, popId);
+  const wrap = el("span", { class: "source-wrap" }, [button, pop]);
+  entry.row.append(wrap);
+  entry.wrap = wrap;
+  entry.popover = bindSourcePopover({
+    wrap,
+    button,
+    pop,
+    // kliknięcie ikonki zaznacza też pole (podświetlenie w PDF), bez przełączania widoku na wąskim ekranie
+    onActivate: () => select(entry.node.path, { scroll: true, fromField: true }),
+  });
 }
 
 function renderField(node, index, ocr) {
@@ -119,7 +178,7 @@ function renderField(node, index, ocr) {
   const edited = current.edits.has(node.path);
   const shown = displayValue(edited ? current.edits.get(node.path) : node.value);
   const id = fieldId(node.path);
-  const source = el("p", { class: "field-source", id: `${id}-zrodlo` });
+  const source = el("p", { class: "visually-hidden", id: `${id}-zrodlo` });
   // znacznik „strona N” przy podglądzie fragmentu spoza widoku; czytnik ekranu dostaje to samo z opisu źródła
   const badge = el("span", { class: "page-badge", "aria-hidden": "true", hidden: true });
   const button = el(
@@ -137,6 +196,7 @@ function renderField(node, index, ocr) {
     ],
   );
   const entry = { node, trace, state, button, source, badge, ocr: trace && ocr.has(trace.page) };
+  entry.row = el("div", { class: "field-row" }, [button]);
   entry.controls = el("div", { class: "field-controls" });
   renderSource(entry);
   // najechanie / fokus = podgląd (bez przewijania PDF); kliknięcie = zaznaczenie z przewinięciem
@@ -155,7 +215,7 @@ function renderField(node, index, ocr) {
   });
   current.fields.set(node.path, entry);
   renderControls(entry);
-  return el("li", { class: "field-item" }, [button, source, entry.controls]);
+  return el("li", { class: "field-item" }, [entry.row, source, entry.controls]);
 }
 
 // --- edycja wartości ---
@@ -477,6 +537,7 @@ async function openReview(job, file) {
 
 NARROW.addEventListener("change", () => viewer?.redraw());
 document.addEventListener("o2j:leave-review", () => {
+  for (const entry of current?.fields.values() ?? []) entry.popover?.close();
   viewer?.destroy();
   viewer = null;
   hover = createHoverState();
