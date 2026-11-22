@@ -13,8 +13,10 @@ Gałąź `etap/E11-limit-czasu` → `main`. UZP (21.11, 21:13): każde rozwiąza
 Uprawnienia zablokowały mi edycję `odw2json/pipeline.py` (plik chroniony), więc dwie rzeczy zostają propozycją:
 1. **Najtańsze dokumenty najpierw.** `pipeline.run` przetwarza pliki alfabetycznie. Sortowanie po rozmiarze (małe PDF-y z tekstem ~0,01 s, na końcu duże skany 4–12 s) sprawia, że przerwanie zabiera najmniej gotowych wyników:
    ```python
-   pdfs = sorted((p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf"),
-                 key=lambda p: (p.stat().st_size, str(p)))
+   pdfs = sorted(
+       (p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf"),
+       key=lambda p: (p.stat().st_size, str(p)),
+   )
    ```
 2. **Timeout na dokument.** Bez osobnego procesu na dokument nie da się bezpiecznie przerwać OCR w trakcie, a osobny proces to ładowanie modeli OCR za każdym razem. Pomiar (`docs/decyzje/E11-wydajnosc.md`, PR `etap/E11-wydajnosc`): najwolniejszy skan to 12,6 s, więc timeout nie jest dziś potrzebny. Bezpieczniejszy byłby limit stron OCR na dokument w `ingest/ocr.py`, czyli obszar OCR.
 
