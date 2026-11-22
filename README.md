@@ -60,14 +60,16 @@ W GUI jsonix wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, 
 ## Architektura
 
 ```
-PDF → ingest (tekst/OCR) → classify (reguły z YAML, LLM fallback) → extract (regex + LLM + słowniki)
-    → normalizacja i walidacja → JSON wg config/schemas/ (+ trace)
+PDF → ingest (tekst z PDF, czyszczenie, OCR skanów) → classify (punktacja cech z YAML)
+    → extract (pola i listy z YAML, normalizacja, walidacja) → JSON wg config/schemas/ (+ trace)
 ```
+
+Pełny opis (etapy, kontrakty, konfiguracja, API i GUI, jakość): **[docs/architektura.md](docs/architektura.md)**.
 
 - `odw2json/contracts.py` — wspólne struktury danych (Document, Classification, FieldResult, ExtractionResult).
 - `config/doctypes/*.yaml` — **typy dokumentów są konfiguracją**: nowy typ = nowy YAML + szablon JSON ([instrukcja](docs/nowy-typ-dokumentu.md)).
-- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis), `config/prompts/` — prompty LLM.
-- LLM: dowolny dostawca OpenAI-kompatybilny z serwerami w UE (konfiguracja w `.env`), temperatura 0, cache odpowiedzi.
+- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis).
+- **Domyślnie bez LLM** (`config/app.yaml: llm_enabled: false`): reguły z konfiguracji. Warstwa LLM jest opcjonalna — wyłącznie model open source ≤ 8B od dostawcy z serwerami w UE (konfiguracja w `.env`, temperatura 0, kasety odpowiedzi w testach).
 
 ## Ewaluacja
 
@@ -78,9 +80,14 @@ python -m eval.score --pred output --gt data/train
 ```
 F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
 
-| Wersja | Klasyfikacja (train) | F1 (train) |
-|---|---|---|
-| szkielet (stuby) | 190/194 | 0.000 (negatywy 14/14) |
+Aktualne wyniki v0.4.0 (F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
+
+| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
+|---|---|---|---|---|---|---|
+| dev | 0,996 | 0,999 | 0,977 | 0,997 | 0,980 | 0,882 |
+| holdout | 0,988 | 0,997 | 0,912 | 1,000 | 0,833 (3 dok.) | 0,933 |
+
+Klasyfikacja: 0 błędów; dokumenty spoza typów odrzucone 15/15 (dev) i 13/13 (holdout), w tym skany.
 
 ## Praca zespołu
 
