@@ -23,3 +23,4 @@ Zmiany tylko w dokumentacji. `ruff`: czysto. Testy GUI i `test_tooling`: zielone
 - Liczby z `eval/baseline.json`: skany rozbite na typy (przelew osobno), negatywy 15/15 i 13/13.
 - Uzupełnione ⟨…⟩: wyniki testów odporności z E4. Dodane zdanie o limicie czasu UZP w scenariuszu i na slajdzie 9. Demo E10 tylko na kopii konfiguracji.
 - Wpisany skład zespołu (slajd 10 i `docs/demo.md`): Aleksander Czajkowski, Tyberiusz Błażewicz, Damian Beldegrin.
+- Test offline (22.11): Chrome headless z odciętą siecią, `file://` — 10 slajdów, fonty Open Sans i zrzuty ładują się lokalnie; `demo-gui.gif` poprawny (800×515, 7 klatek, 19,6 s w pętli).
