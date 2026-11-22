@@ -46,6 +46,12 @@ fields:
     extract:
       - label: [data operacji, data transakcji, data realizacji, data wykonania, data ksiegowania, w dniu]
         max_chars: 60
+      # skany (E7): OCR gubi kropki w dacie („Zlecona data wykonania 20 04 2026”)
+      - label: [data wykonania, data realizacji, data operacji]
+        value: '(?<!\d)\d{1,2} \d{1,2} \d{4}(?!\d)'
+        max_chars: 40
+      # skany (E7): etykieta rozbita na dwie linie („Data 2026-03-26⏎wykonania”)
+      - regex: '(?m)^[ \t]*data[ \t]+(?P<v>\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})[ \t]*\n[ \t]*(?:wykonania|operacji|transakcji|realizacji)\b'
   przelew_bankowy.kwota:
     type: amount
     extract:
@@ -74,12 +80,16 @@ fields:
       - label: [numer transakcji, numer referencyjny, nr referencyjny, nr ref., nr ref, identyfikator operacji, identyfikator transakcji, numer operacji, id transakcji]
         value: '(?<![A-Za-z0-9])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{8,}(?![A-Za-z0-9])'
         max_chars: 60
+      # skany (E7): etykieta rozbita na dwie linie („Numer 305494⏎transakcji”), numer krótszy niż 8 znaków
+      - regex: '(?m)^[ \t]*numer[ \t]+(?P<v>[A-Za-z0-9]{4,})[ \t]*\n[ \t]*transakcji\b'
   przelew_bankowy.tytul:
     type: str
     extract:
       # tytul bywa zawiniety: doklejamy kolejne linie do pustej linii albo nastepnej etykiety
       - label:
-          labels: [tytul platnosci, tytul przelewu, tytul operacji, opis operacji, tytulem, tytul, opis]
+          # „szczegoty platnosci” = OCR „Szczegóły płatności” (E7)
+          labels: [tytul platnosci, tytul przelewu, tytul operacji, opis operacji, tytulem, tytul, opis,
+                   szczegoly platnosci, szczegoty platnosci]
           line_start: true
           multiline: true
           max_lines: 6
@@ -87,8 +97,11 @@ fields:
           stop: [nr ref, nr klienta, numer, identyfikator, kwota, wartosc, data, status, waluta, kanal, typ operacji,
                  tryb, oplata, zrealizowano, wykonano, nadawca, odbiorca, platnik, zleceniodawca, adresat, beneficjent,
                  dane nadawcy, dane odbiorcy, rachunek, z rachunku, na rachunek, z powazaniem, bank, potwierdzenie,
-                 typ, dokument, strona, niniejsze,
+                 typ, dokument, strona, niniejsze, signature,
                  're:^-{3,}', 're:^\*{3}']
+      # skany (E7): OCR przestawia kolumny — wartość, a za nią etykieta „Opis” w tej samej linii
+      - regex: '(?m)^(?P<v>[^\n]{10,}?)[ \t]+Opis[ \t]*$'
+        case: true
     normalize: [ws, trim_quotes]
     validate: {min_len: 3}
 llm:
