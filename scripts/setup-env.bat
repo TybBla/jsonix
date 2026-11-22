@@ -1,7 +1,8 @@
 @echo off
 rem Przygotowuje interpreter Pythona dla jsonix i ustawia zmienna JSONIX_PY (wolane przez start.bat i start-gui.bat).
 rem Kolejnosc:
-rem   1. "python" z PATH, jesli to Python 3.13+ i ma juz zainstalowane zaleznosci (np. aktywny venv, CI),
+rem   1. "python" z PATH, jesli to Python 3.13+ i ma juz zainstalowane zaleznosci (np. aktywny venv, CI);
+rem      na 3.13/3.14 wymagany jest tez OCR (rapidocr, onnxruntime),
 rem   2. srodowisko .venv w katalogu repo (albo JSONIX_VENV), jesli ma zaleznosci,
 rem   3. nowe .venv na Pythonie 3.13 lub 3.14 (launcher "py"), potem dowolny Python 3.13+,
 rem      i instalacja requirements.txt.
@@ -12,6 +13,9 @@ set "JSONIX_PY="
 for %%I in ("%~dp0..") do set "JSONIX_ROOT=%%~fI"
 if not defined JSONIX_VENV set "JSONIX_VENV=%JSONIX_ROOT%\.venv"
 set "JSONIX_DEPS=import fastapi, pypdfium2, yaml, rapidfuzz, uvicorn"
+rem Na Pythonie 3.13/3.14 gotowe srodowisko musi miec tez OCR (inaczej skany bylyby po cichu nieodczytane).
+set "JSONIX_OCR_DEPS=import rapidocr, onnxruntime"
+set "JSONIX_NOOCR_PY="
 
 rem --- 1. gotowe srodowisko w PATH ---
 call :usable python
@@ -19,6 +23,17 @@ if defined JSONIX_PY goto :ready
 
 rem --- 2. istniejace .venv ---
 if exist "%JSONIX_VENV%\Scripts\python.exe" call :usable "%JSONIX_VENV%\Scripts\python.exe"
+if defined JSONIX_PY goto :ready
+rem Istniejace .venv bez OCR na 3.13/3.14: doinstaluj zaleznosci w tym venv zamiast cichego uzycia.
+if /i "%JSONIX_NOOCR_PY%"=="%JSONIX_VENV%\Scripts\python.exe" (
+  echo [jsonix] Srodowisko "%JSONIX_VENV%" nie ma OCR ^(rapidocr, onnxruntime^) - doinstalowuje zaleznosci...
+  "%JSONIX_VENV%\Scripts\python.exe" -m pip install --disable-pip-version-check -q -r "%JSONIX_ROOT%\requirements.txt" -c "%JSONIX_ROOT%\requirements-lock.txt"
+  if errorlevel 1 (
+    echo [jsonix] Instalacja zaleznosci nie powiodla sie. Sprawdz polaczenie z internetem i uruchom ponownie.
+    exit /b 1
+  )
+  call :usable "%JSONIX_VENV%\Scripts\python.exe"
+)
 if defined JSONIX_PY goto :ready
 
 rem --- 3. nowe .venv ---
@@ -63,5 +78,14 @@ rem Ustawia JSONIX_PY, gdy %1 to Python 3.13+ z zainstalowanymi zaleznosciami js
 if errorlevel 1 exit /b 0
 %1 -c "%JSONIX_DEPS%" >nul 2>nul
 if errorlevel 1 exit /b 0
+rem OCR wymagany tylko na Pythonie 3.13/3.14 (od 3.15 brak paczek onnxruntime).
+%1 -c "import sys; sys.exit(0 if sys.version_info[:2] < (3, 15) else 1)" >nul 2>nul
+if not errorlevel 1 (
+  %1 -c "%JSONIX_OCR_DEPS%" >nul 2>nul
+  if errorlevel 1 (
+    set "JSONIX_NOOCR_PY=%~1"
+    exit /b 0
+  )
+)
 set "JSONIX_PY=%~1"
 exit /b 0
