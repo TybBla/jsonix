@@ -6,6 +6,16 @@ def test_registry_has_three_doctypes():
     assert set(reg) == {"odwolanie", "pelnomocnictwo", "przelew"}
 
 
+def test_typ_bez_fields_i_lists_nie_czyta_szablonu(tmp_path):
+    (tmp_path / "doctypes").mkdir()
+    (tmp_path / "doctypes" / "t.yaml").write_text(
+        "id: t\noutput_template: schemas/brak.json\nclassify:\n  strong: [alfa]\n",
+        encoding="utf-8",
+    )
+    reg = load_registry(tmp_path)
+    assert set(reg) == {"t"}
+
+
 def test_template_shape_and_isolation():
     cfg = load_registry()["odwolanie"]
     t = cfg.template()
