@@ -48,6 +48,7 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 **Wpływ na projekt (stan 21.11, wieczór):**
 - `data/train`: w 138 ze 140 numerów rachunków w GT brak „PL”, a w 95 ze 119 przypadków, w których numer da się znaleźć w warstwie tekstu PDF, dokument ma „PL” przed numerem (w 71 numer jest zapisany ze spacjami). Bramka F1 liczona na obecnym GT będzie więc **karać poprawny wynik z „PL”** — GT trzeba poprawić albo porównywać IBAN po normalizacji (decyzja etapu E4/eval).
 - Ekstrakcja (gałąź E4, `odw2json/extract/normalize.py: iban`) **usuwa prefiks „PL”** — zgodnie z obecnym GT, ale niezgodnie z ustaleniem UZP: do zmiany na „PL” zachowane, gdy jest w dokumencie.
+- **Stan po v0.4.0:** GT w `data/train` poprawione (numer rachunku z „PL” tam, gdzie ma go dokument; `scripts/fix_gold_iban.py`), normalizator `iban` zachowuje „PL”, gdy jest w dokumencie, i zapisuje numer bez spacji — dwa punkty wyżej są zamknięte.
 - Nazwa firmy (`company`) bierze tekst z dokumentu (np. „pod firmą …”) bez rozwijania skrótów — zgodnie z ustaleniem.
 - Czas: raport jakości ma podawać czas na sprawę (CPU, z OCR i bez); aplikacja nie powinna wykonywać zbędnej pracy (cache OCR, LLM domyślnie wyłączony).
 
@@ -56,10 +57,11 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 - **Dostęp zespołów zostanie odcięty 22.11.2026 o 11:00**, potem ocena odbywa się bez nas: obrazy i zależności muszą być pobrane/zbudowane wcześniej.
 - Ocena: jury wgrywa tajny zbiór do **`/opt/solution/input`**, w katalogu **`/opt/solution`** uruchamia z `sudo` **komendę z pliku `/opt/solution/RUN.md`** i zabiera pliki z **`/opt/solution/output`**. Komenda ma działać bez interakcji i sama się zakończyć po przetworzeniu wszystkich plików; usługa w tle jest niepotrzebna.
 - Katalogi `input/` i `output/` już istnieją i mogą zostać wyczyszczone przed oceną. Cały projekt leży w `/opt/solution` (u nas klon w `/opt/solution/repo`). Klucze API (my: bez LLM) byłyby w `/opt/solution/.env`.
-- **Limit czasu jury (22.11.2026): maksymalnie 60 minut na 150 plików** (średnio 24 s na plik) na tej VM (2 vCPU). **Pomiar na VM (v1.0.1, 22.11):** cały zbiór treningowy (226 PDF, w tym 30 skanów) w 365 s; skan średnio ok. 12 s, dokument z tekstem < 0,1 s; 150 plików nawet w proporcji skanów jak w danych to ok. 30 min. Wdrożenie: obraz `jsonix:latest`, `/opt/solution/RUN.md`, test jak u jury z `sudo` i po restarcie — exit 0, w `output/` same JSON-y; `input/` i `output/` zostawione puste. Po przekroczeniu liczy się to, co jest w `output/` — stąd `{}` od startu, zapis każdego wyniku od razu i dokumenty z tekstem przed skanami (#13).
+- **Limit czasu jury (22.11.2026): maksymalnie 60 minut na 150 plików** (średnio 24 s na plik) na tej VM (2 vCPU). **Pomiar na VM (v1.0.1, 22.11):** cały zbiór treningowy (226 PDF, w tym 30 skanów) w 365 s; skan średnio ok. 12 s, dokument z tekstem < 0,1 s; 150 plików w proporcji skanów jak w danych to ok. 4 min, a nawet same skany (150 × ok. 12 s) to ok. 30 min. Wdrożenie: obraz `jsonix:latest`, `/opt/solution/RUN.md`, test jak u jury z `sudo` i po restarcie — exit 0, w `output/` same JSON-y; `input/` i `output/` zostawione puste. Po przekroczeniu liczy się to, co jest w `output/` — stąd `{}` od startu, zapis każdego wyniku od razu i dokumenty z tekstem przed skanami (#13).
 - Wpływ na projekt: w `output/` mają być **wyłącznie** `<sprawa>/<nazwa_jak_pdf>.json`, dlatego profil `config/app.jury.yaml` (`JSONIX_APP_CONFIG`) wyłącza trace i wynosi logi oraz cache OCR poza output. `RUN.md` w repo = wzorzec pliku jury, wdrożenie i testy: `scripts/deploy-vm.sh`, [vm-jury.md](vm-jury.md).
 
 ## 6. Gdzie to jest w projekcie
-- Architektura i decyzje: `docs/superpowers/specs/2026-11-21-odwolania2json-design.md`, `docs/decyzje/`.
+- Architektura i decyzje: [architektura.md](architektura.md) (stan obecny), projekt `docs/superpowers/specs/2026-11-21-odwolania2json-design.md`, `docs/decyzje/`.
+- Zgodność z regulaminem i stan zgłoszenia: [zgloszenie.md](zgloszenie.md); wyniki jakości: [raport-jakosci.md](raport-jakosci.md).
 - Roadmapa i zakres v1.0: `docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md` (sekcja „Aktualizacja zakresu”).
 - Ewaluacja (F1 wg reguł z pkt 4): `eval/score.py`, bramka `python -m eval.gate`.

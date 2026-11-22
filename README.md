@@ -1,131 +1,111 @@
-# jsonix — HackNation 2026 (UZP)
+# jsonix
 
-**jsonix** zamienia dokumenty PDF spraw odwoławczych KIO (odwołanie, pełnomocnictwo, potwierdzenie przelewu) na dane JSON zgodne ze schematami UZP: rozpoznaje typ dokumentu z treści i wyodrębnia pola, pokazując, skąd pochodzi każda wartość. Dokumenty spoza tych typów są rozpoznawane jako **nieznane**.
+jsonix czyta dokumenty PDF ze sprawy odwoławczej KIO i zamienia je na dane JSON w formacie UZP. Sam rozpoznaje, czy dokument to odwołanie, pełnomocnictwo czy potwierdzenie przelewu, i wyciąga z niego pola. Przy każdej wartości zapisuje, z której strony i z którego fragmentu ją wziął. Dokument innego rodzaju dostaje plik z `{}`. Skany bez tekstu czyta lokalny OCR, bez GPU i bez wysyłania danych na zewnątrz. Nie używamy LLM.
 
-## Szybki start (Windows)
+![jsonix — demo GUI](docs/img/demo-gui.gif)
 
-**Wymagania:** Windows 10/11 i **Python 3.13 lub 3.14** ([python.org](https://www.python.org/downloads/), przy instalacji zaznacz „Add python.exe to PATH”), internet przy pierwszym uruchomieniu (instalacja zależności). Albo zamiast Pythona: Docker Desktop (sekcja „Docker”).
+Wersja **v1.0.1** · F1 wg reguł UZP: **0,998** (dev) / **0,994** (holdout) · [raport jakości](docs/raport-jakosci.md) · projekt HackNation 2026 (zadanie UZP)
 
-1. Umieść dokumenty w `input\` — jeden podfolder na sprawę: `input\<sprawa>\<plik>.pdf` (PDF-y luzem w `input\` też działają).
-2. Uruchom w terminalu (PowerShell albo cmd) w katalogu repozytorium:
+## Uruchomienie na VM jury (tak, jak sprawdza jury)
+
+Ocena odbywa się na VM UZP: Ubuntu 24.04, 2 vCPU, 16 GB RAM, Docker. Jury wrzuca dokumenty do `/opt/solution/input`, w katalogu `/opt/solution` uruchamia z `sudo` komendę z pliku `/opt/solution/RUN.md` i zabiera wyniki z `/opt/solution/output`. Limit czasu to 60 minut na 150 plików.
+
+**1. Przygotowanie VM** (jednorazowo, robi to zespół):
+
+```bash
+cd /opt/solution
+git clone https://github.com/TybBla/jsonix.git repo
+docker build -t jsonix:latest repo      # kilka minut; potem nic nie jest pobierane
+cp repo/RUN.md /opt/solution/RUN.md
+```
+
+**2. Ocena** (to robi jury):
+
+```bash
+# dokumenty: /opt/solution/input/<sprawa>/<plik>.pdf (albo PDF-y luzem w input/)
+cd /opt/solution
+sudo docker run --rm -e JSONIX_APP_CONFIG=config/app.jury.yaml \
+  -v /opt/solution/input:/app/input -v /opt/solution/output:/app/output \
+  jsonix:latest python -m odw2json run input output
+```
+
+To ta sama komenda co w [RUN.md](RUN.md). Kończy się sama, nie zadaje pytań, nie potrzebuje usług w tle ani kluczy API.
+
+**3. Wynik:** `/opt/solution/output/<sprawa>/<nazwa_pdf>.json`, jeden plik na każdy PDF, w tym `{}` dla dokumentów spoza trzech typów. W `output/` nie ma nic poza tymi plikami.
+
+**Czas na tej VM:** 226 PDF-ów ze zbioru treningowego, w tym 30 skanów, przetwarza się w 6 minut. Dokument z tekstem zajmuje ułamek sekundy, skan średnio około 12 s. Nawet 150 samych skanów to około 30 minut. Plik `{}` powstaje dla każdego PDF-a od razu na starcie, a wyniki zapisują się na bieżąco. Dzięki temu po ewentualnym przerwaniu w `output/` są wszystkie gotowe wyniki.
+
+Wdrożenie jest gotowe i przetestowane: komenda działa z `sudo` i po restarcie VM. Szczegóły i skrypt z autotestem: [docs/vm-jury.md](docs/vm-jury.md), `scripts/deploy-vm.sh`.
+
+## Uruchomienie u siebie
+
+**Windows** (Python 3.13 lub 3.14 z [python.org](https://www.python.org/downloads/), z zaznaczonym „Add python.exe to PATH”):
 
 ```powershell
-.\start.bat              # wsad: input\ -> output\ (python -m odw2json run input output)
-.\start-gui.bat          # GUI w przeglądarce: http://127.0.0.1:8000
+.\start-gui.bat     # aplikacja w przeglądarce: http://127.0.0.1:8000
+.\start.bat         # wsad: PDF-y z input\<sprawa>\ → wyniki w output\<sprawa>\
 ```
 
-3. Wyniki: `output\<sprawa>\<plik>.json` (nazwa jak PDF). W `cmd.exe` wpisz `start.bat` bez `.\`; PowerShell wymaga `.\` przed nazwą pliku z bieżącego katalogu.
+Za pierwszym razem skrypt sam tworzy środowisko i instaluje zależności. Trwa to kilka minut i wymaga internetu. Potem aplikacja działa offline.
 
-Przy pierwszym uruchomieniu `start.bat` (i `start-gui.bat`) sam przygotowuje środowisko (`scripts/setup-env.bat`): użyje Pythona z `PATH`, jeśli ma już zależności, a w przeciwnym razie utworzy `.venv` na **Pythonie 3.13 lub 3.14** (launcher `py`) i zainstaluje `requirements.txt` (jednorazowo, kilka minut, potrzebny internet). Plik `.env` jest opcjonalny — tylko z LLM (`copy .env.example .env`, uzupełnij `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
+**Docker** (dowolny system):
 
-**Wersja Pythona.** Zalecany **Python 3.13 lub 3.14**. Na nowszym (3.15+) aplikacja się instaluje i działa, ale **OCR skanów jest niedostępny** (paczki `onnxruntime`/`pyclipper` nie mają jeszcze wersji dla 3.15): dokumenty z warstwą tekstową są przetwarzane normalnie, a skan bez tekstu dostaje ostrzeżenie. Ręcznie: `py -3.13 -m venv .venv`, `.venv\Scripts\pip install -r requirements.txt`, `.venv\Scripts\python -m odw2json run input output`. Linux/macOS: `pip install -r requirements.txt`, `sh start.sh` (wybiera Pythona 3.13+).
-
-- Wejście: `input/<sprawa>/<plik>.pdf` (lub PDF-y luzem w `input/`).
-- Wyjście: `output/<sprawa>/<plik>.json` — nazwa jak plik wejściowy.
-- Dokument nieznany: plik `<nazwa>.json` z zawartością `{}` (wg UZP); przełącznik `config/app.yaml: unknown_output` (`empty_object` | `empty_file` | `none`).
-- Ścieżka ekstrakcji (skąd pochodzi każda wartość): `output/.trace/`.
-
-Inne komendy:
-```powershell
-python -m odw2json doctypes      # lista skonfigurowanych typów dokumentów
-python -m odw2json serve         # API + GUI na http://127.0.0.1:8000
-docker compose up --build        # to samo w Dockerze (sekcja „Docker” niżej)
+```bash
+docker compose up --build                            # aplikacja: http://127.0.0.1:8000
+docker compose run --rm app python -m odw2json run   # wsad: input/ → output/
 ```
 
-**OCR.** Skany bez warstwy tekstowej czyta OCR (rapidocr + onnxruntime, w `requirements.txt`, modele w paczce, bez sieci w czasie działania). Paczki OCR są dostępne dla Pythona 3.13 i 3.14 (na 3.15+ OCR jest pomijany, patrz wyżej); ten sam OCR jest w obrazie Dockera.
+**Linux/macOS:** `pip install -r requirements.txt`, potem `sh start.sh` (wsad) albo `python -m odw2json serve` (aplikacja).
 
-## Docker
+W aplikacji wgrywasz PDF-y sprawy i klikasz „Analizuj”. Potem sprawdzasz rozpoznany typ (wraz z uzasadnieniem „Dlaczego ten typ?”) i przeglądasz dane obok podglądu dokumentu. Ikonka „i” przy wartości pokazuje stronę i fragment źródła, a najechanie na pole podświetla je w PDF. Wartości można poprawić i pobrać jako JSON albo ZIP. Więcej: [docs/gui.md](docs/gui.md).
 
-```powershell
-docker compose up --build                              # API + GUI: http://127.0.0.1:8000
-docker compose run --rm app python -m odw2json run     # wsad: input/ -> output/, bez GUI
-python scripts/smoke_docker.py                         # test: build, healthcheck, GUI/API, wsad = CLI
-```
+## Wyniki
 
-- Plik `.env` jest **opcjonalny**: bez niego działa domyślny tryb bez LLM.
-- Katalogi `input/`, `output/` i `config/` są montowane z repo, więc konfigurację typów dokumentów zmieniasz bez przebudowy obrazu (wystarczy restart).
-- Port zmienisz zmienną `JSONIX_PORT` (np. `$env:JSONIX_PORT=8080; docker compose up`). Serwer nasłuchuje tylko na `127.0.0.1`.
-- Kontener ma healthcheck (`/api/health`); `docker compose ps` pokazuje stan `healthy`.
-- `scripts/smoke_docker.py` uruchamia osobny projekt `jsonix-smoke`, sprawdza GUI/API, przetwarza w kontenerze `przyklad_01` i skan (OCR), porównuje JSON-y z CLI na hoście i sprząta po sobie (kod wyjścia 0/1, 2 = brak Dockera).
-- **VM jury (Azure, 22.11.2026):** ocena odbywa się komendą z `/opt/solution/RUN.md` (obraz Dockera `jsonix:latest`, profil `config/app.jury.yaml`, w `output/` tylko pliki JSON). Wdrożenie i testy na VM: [docs/vm-jury.md](docs/vm-jury.md), `scripts/deploy-vm.sh`.
+F1 liczone wg reguł UZP na danych treningowych (podział dev/holdout):
 
-## GUI
+| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) |
+|---|---|---|---|
+| dev | 0,998 | 0,999 | 0,992 |
+| holdout | 0,994 | 0,997 | 0,967 |
 
-```powershell
-.\start-gui.bat                  # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
-python scripts/smoke_gui.py      # test dymny API + GUI (kod wyjścia 0/1)
-```
+Klasyfikacja nie popełnia błędów, a wszystkie dokumenty spoza typów dostają `{}` (15/15 i 13/13). Wyniki per typ i pole oraz czasy są w [raporcie jakości](docs/raport-jakosci.md). Skrypt `python scripts/quality_report.py` generuje go od nowa.
 
-W GUI jsonix wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, a potem przejrzyj wyodrębnione pola **obok podglądu PDF** z podświetleniem fragmentu, z którego pochodzi każda wartość. JSON pobierzesz dla jednego dokumentu albo dla wszystkich (ZIP). GUI działa offline (PDF.js i font dołączone lokalnie), styl wg Design System Gov.pl. Szczegóły i ograniczenia: [docs/gui.md](docs/gui.md).
-
-## Architektura
+## Jak to działa
 
 ```
-PDF → ingest (tekst z PDF, czyszczenie, OCR skanów) → classify (punktacja cech z YAML)
-    → extract (pola i listy z YAML, normalizacja, walidacja) → JSON wg config/schemas/ (+ trace)
+PDF → tekst z PDF albo OCR → rozpoznanie typu → wyodrębnienie pól → JSON wg schematu UZP (+ źródło każdej wartości)
 ```
 
-Pełny opis (etapy, kontrakty, konfiguracja, API i GUI, jakość): **[docs/architektura.md](docs/architektura.md)**.
+- **Konfiguracja zamiast kodu.** Każdy typ dokumentu to plik `config/doctypes/<typ>.yaml`: jak go rozpoznać i skąd brać pola. Nowy typ dodaje się samą konfiguracją ([instrukcja](docs/nowy-typ-dokumentu.md), [przykład: orzeczenie KIO](examples/nowy-typ/orzeczenie_kio/README.md)).
+- **Przejrzystość.** Każda wartość ma zapisaną stronę i fragment tekstu, z którego pochodzi. GUI pokazuje je w dokumencie.
+- **Bez LLM.** Reguły dają F1 0,999 na dokumentach z tekstem, nic nie kosztują, działają lokalnie i dają powtarzalny wynik, a za moc modelu jest wtedy maksimum punktów. Uzasadnienie: [decyzja E6](docs/decyzje/E6-bez-llm.md). Opcjonalną warstwę LLM można włączyć w `config/app.yaml`, wyłącznie z modelem do 8B od dostawcy z UE.
 
-- `odw2json/contracts.py` — wspólne struktury danych (Document, Classification, FieldResult, ExtractionResult).
-- `config/doctypes/*.yaml` — **typy dokumentów są konfiguracją**: nowy typ = nowy YAML + szablon JSON ([instrukcja](docs/nowy-typ-dokumentu.md)).
-- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis).
-- **Domyślnie bez LLM** (`config/app.yaml: llm_enabled: false`): reguły z konfiguracji. Warstwa LLM jest opcjonalna — wyłącznie model open source ≤ 8B od dostawcy z serwerami w UE (konfiguracja w `.env`, temperatura 0, kasety odpowiedzi w testach).
+Pełny opis: [docs/architektura.md](docs/architektura.md).
 
-## Ewaluacja
+## Dokumentacja
 
-```powershell
-python scripts/make_input_from_train.py --clean   # data/train → input/
-python -m odw2json run
-python -m eval.score --pred output --gt data/train
-```
-F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
+| Dokument | Co zawiera |
+|---|---|
+| [RUN.md](RUN.md) | komenda dla jury na VM |
+| [docs/vm-jury.md](docs/vm-jury.md) | wdrożenie i test na VM krok po kroku |
+| [docs/architektura.md](docs/architektura.md) | architektura: etapy, kontrakty danych, konfiguracja, API i GUI |
+| [docs/nowy-typ-dokumentu.md](docs/nowy-typ-dokumentu.md) | konfiguracja ekstrakcji i dodawanie nowej klasy dokumentów |
+| [docs/gui.md](docs/gui.md) | aplikacja w przeglądarce |
+| [docs/raport-jakosci.md](docs/raport-jakosci.md) | wyniki testów jakości |
+| [docs/test-jury.md](docs/test-jury.md) | test instalacji ze świeżego klonu (Windows, Docker) |
+| [docs/decyzje/E6-bez-llm.md](docs/decyzje/E6-bez-llm.md) | dlaczego bez LLM |
+| [docs/zgloszenie.md](docs/zgloszenie.md) | zgodność z regulaminem, użyte komponenty open source i licencje |
+| [docs/kryteria-uzp.md](docs/kryteria-uzp.md) | kryteria oceny i ustalenia organizatora |
+| [CHANGELOG.md](CHANGELOG.md) | historia wersji |
 
-**Raport jakości do zgłoszenia** (F1 dev/holdout × tekst/skan, per typ i pole, czas na dokument): `python scripts/quality_report.py` → `docs/raport-jakosci.md` (`--source tekst` = szybko, bez OCR).
+## Dla programistów
 
-Wyniki v1.0.0 (F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
-
-| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
-|---|---|---|---|---|---|---|
-| dev | 0,998 | 0,999 | 0,992 | 0,997 | 0,980 | 0,987 |
-| holdout | 0,994 | 0,997 | 0,967 | 1,000 | 0,943 (3 dok.)* | 0,968 |
-
-\* Holdout skanów pełnomocnictw nie jest niezależną oceną (błędy diagnozowano na tych dokumentach). Czas przy zimnym cache OCR: dokument z tekstem 0,04 s, skan 3–8 s ([raport jakości](docs/raport-jakosci.md)).
-
-Klasyfikacja: 0 błędów; dokumenty spoza typów odrzucone 15/15 (dev) i 13/13 (holdout), w tym skany.
-
-## Ocena na VM UZP
-
-Ocena na VM jury (22.11.2026) odbywa się komendą z [RUN.md](RUN.md) (obraz `jsonix:latest`, profil `config/app.jury.yaml`, w `output/` tylko pliki JSON). Wdrożenie i testy na VM: [docs/vm-jury.md](docs/vm-jury.md). Repozytorium: https://github.com/TybBla/jsonix.
-
-## Praca zespołu
-
-Gałęzie i zakresy: [docs/sektory.md](docs/sektory.md). Projekt: [docs/superpowers/specs](docs/superpowers/specs/).
-
-## Dane
-
-`data/train/` — zestawy treningowe UZP (https://github.com/Urzad-Zamowien-Publicznych/hacknation-2026), `data/oczekiwane-json/` — schematy z opisami pól.
-
-## Jakość i CI
-
-```powershell
+```bash
 pip install -r requirements-dev.txt
-pre-commit install                       # hook: ruff + szybkie testy (bez slow/live_llm)
-ruff check . ; ruff format --check .     # lint i format
-python -m pytest -q -m "not slow"        # szybkie testy (tak jak w pre-commit)
-python -m pytest -q -m "not live_llm"    # pełny zestaw (z wolnymi), tak jak w CI; bez sieci
-python -m eval.gate --split all          # bramka regresji F1 (dev + holdout) względem eval/baseline.json
-python -m eval.gate --split dev --update-baseline   # TYLKO świadomie, razem ze zmianą poprawiającą wynik
-powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1   # Windows: smoke end-to-end
-bash scripts/smoke.sh                                         # Linux/macOS: smoke end-to-end
+python -m pytest -q -m "not slow"                  # szybkie testy
+python -m eval.gate --split dev --source tekst     # bramka jakości F1 (jak w CI)
 ```
 
-- **Gate**: szczegóły i kody wyjścia w [eval/README.md](eval/README.md); raporty trafiają do `output/.gate/`.
-- **Smoke**: tworzy świeży venv w katalogu tymczasowym, instaluje tylko `requirements.txt`, kopiuje jedną sprawę
-  i jeden negatyw, uruchamia `start.bat` / `start.sh` i sprawdza wynik (4 pliki JSON, negatyw = `{}`).
-  `start.bat` / `start.sh` robią `cd` do katalogu repozytorium, więc **ścieżki wejścia/wyjścia podawane
-  skryptom muszą być bezwzględne** (względne zostałyby rozwiązane względem katalogu repo).
-- **CI** (`.github/workflows/ci.yml`, push i PR, Ubuntu + Windows, Python 3.13, `LLM_MODE=replay`):
-  `ruff check`, `ruff format --check`, pełne testy (`-m "not live_llm"`), gate F1 dev i holdout (raporty
-  jako artefakt), potem smoke na obu systemach oraz `docker build`. `PYTHONUTF8` celowo nie jest ustawione,
-  aby sprawdzać odporność na kodowanie konsoli.
+CI na GitHub Actions uruchamia lint, testy, bramkę F1, testy dymne na Windows i Ubuntu oraz `docker build`. Jak liczymy F1: [eval/README.md](eval/README.md). Zasady pracy w repo: [AGENTS.md](AGENTS.md).
+
+Dane treningowe pochodzą z [repozytorium UZP](https://github.com/Urzad-Zamowien-Publicznych/hacknation-2026).

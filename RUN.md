@@ -17,6 +17,9 @@ wszystkich plików. Obraz `jsonix:latest` jest zbudowany wcześniej na tej VM
 
 ## Czas
 - Najpierw `{}` dla każdego PDF (żeby przerwanie nie zostawiło brakujących plików), potem przetwarzanie:
-  najpierw dokumenty z warstwą tekstową (ok. 0,01 s na dokument), na końcu skany (OCR na CPU: kilka sekund na stronę;
+  najpierw dokumenty z warstwą tekstową (< 0,1 s na dokument), na końcu skany (OCR na CPU: kilka sekund na stronę;
   VM ma 2 vCPU, profil jury ustawia 2 wątki onnxruntime).
+- Pomiar na tej VM (v1.0.1, 22.11.2026): cały zbiór treningowy, 226 PDF (w tym 30 skanów), w 365 s; skan średnio
+  ok. 12 s. Limit jury to 60 minut na 150 plików: 150 plików w proporcji skanów jak w danych treningowych
+  to ok. 4 min, a nawet same skany (150 × ok. 12 s) to ok. 30 min.
 - Kod wyjścia 0 także wtedy, gdy część plików się nie przetworzyła (wynik `{}` zostaje); 1 tylko gdy nie przetworzono żadnego.

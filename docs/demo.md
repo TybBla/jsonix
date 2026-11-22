@@ -5,7 +5,7 @@ Materiał dla zespołu na prezentację finałową. Ocena w finale to 50% F1 i 50
 - łatwość dodawania typów i pól bez przebudowy: 20 pkt;
 - inne funkcje, np. GUI: 10 pkt.
 
-Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1: v0.4.0 (`eval/baseline.json`); pełny raport per pole i czas: `python scripts/quality_report.py`.
+Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1: v1.0.1 (`eval/baseline.json`, [raport-jakosci.md](raport-jakosci.md)); pełny raport per pole i czas: `python scripts/quality_report.py`.
 
 ## Przygotowanie (15 minut przed)
 
@@ -27,21 +27,21 @@ Materiał dla zespołu na prezentację finałową. Ocena w finale to 50% F1 i 50
 | 1 | 0:30 | Ekran „Dodaj pliki”, przeciągasz 5 plików | „Sekretariat KIO dostaje komplet dokumentów sprawy. Wrzucamy je naraz, bez nazywania i sortowania.” |
 | 2 | 0:45 | „Analizuj”, pasek „Przeanalizowano N z 5” | „Każdy dokument przechodzi przez ten sam potok co wersja wsadowa: tekst z PDF albo OCR, klasyfikacja, ekstrakcja.” |
 | 3 | 1:00 | Tabela wyników; rozwijasz „Dlaczego ten typ?” przy pełnomocnictwie i „Dlaczego nie rozpoznano?” przy ogłoszeniu | „Typ rozpoznajemy z treści, nie z nazwy pliku. System pokazuje, dlaczego tak zdecydował. Dokument spoza typów dostaje pusty JSON `{}`, tak jak wymaga UZP.” |
-| 4 | 1:30 | „Sprawdź dane” przy odwołaniu; najeżdżasz kursorem na NIP, potem klikasz Tytuł | „Każda wartość ma źródło: strona i fragment. Najechanie podświetla je w dokumencie, kliknięcie przewija. Działa też odwrotnie: najedź na fragment w PDF.” |
+| 4 | 1:30 | „Sprawdź dane” przy odwołaniu; najeżdżasz kursorem na NIP, potem klikasz Tytuł | „Każda wartość ma źródło: strona i fragment — w dymku przy ikonce „i” obok wartości; brak źródła oznacza trójkąt z „!”. Najechanie na pole podświetla fragment w dokumencie, kliknięcie przewija. Działa też odwrotnie: najedź na fragment w PDF.” |
 | 5 | 0:45 | Pełnomocnictwo: klikasz imię i nazwisko podpisującego | „Imiona sprowadzamy do mianownika, jak wymaga UZP. Tu widać, z którego podpisu pochodzą.” |
 | 6 | 0:30 | „Zmień” przy jednym polu, zapis, potem „Przywróć wartość z dokumentu” | „Urzędnik może poprawić wartość. Zmiana jest oznaczona, a oryginał da się przywrócić. Pobrany JSON zawiera poprawkę.” |
 | 7 | 0:30 | „Pobierz wszystkie wyniki (ZIP)”, otwierasz jeden JSON | „Wynik ściśle wg schematu UZP: kolejność kluczy, `null` tam, gdzie dokument nie podaje wartości. Niczego nie zmyślamy.” |
 | 8 | 1:00 | Terminal: `start.bat`, potem `output/` i `output/.trace/` | „To samo bez GUI, wsadowo, dla folderu `input/`. Trace zapisuje metodę i źródło każdej wartości: to transparentność ekstrakcji.” |
 | 9 | 0:30 | Pokazujesz `config/doctypes/*.yaml` i [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md) | „Nowy typ dokumentu to plik YAML i szablon JSON, bez zmian w kodzie. Na żywo **na kopii repozytorium (albo kopii `config/`)**: skopiuj 3 pliki z `examples/nowy-typ/orzeczenie_kio`, uruchom na postanowieniu KIO — wynik z 8 polami; w oddawanej wersji typ zostaje wyłączony (inaczej orzeczenia nie dadzą `{}`).” |
 
-Zrzuty ekranu do slajdów są w `docs/img/`: `gui-dodaj-pliki.jpg`, `gui-dlaczego-ten-typ.jpg`, `gui-hover-pole.jpg`, `gui-hover-dokument.jpg` i `gui-zaznaczenie-podpis.jpg`.
+Zrzuty ekranu do slajdów są w `docs/img/`: `gui-dodaj-pliki.jpg`, `gui-dlaczego-ten-typ.jpg`, `gui-hover-pole.jpg`, `gui-zrodlo-dymek.jpg`, `gui-hover-dokument.jpg` i `gui-zaznaczenie-podpis.jpg` (zrzuty z v1.0.1).
 
 ![Dodaj pliki](img/gui-dodaj-pliki.jpg)
 
 ![Zaznaczenie podpisu w pełnomocnictwie](img/gui-zaznaczenie-podpis.jpg)
 
 ### Plan B
-- **Nagranie zamiast pokazu na żywo:** [img/demo-gui.gif](img/demo-gui.gif) — 7 kroków z podpisami (wgranie, „Dlaczego ten typ?”, podświetlenie źródła w obie strony, zaznaczenie, ręczna poprawka, wysoki kontrast), ok. 20 s w pętli; działa offline w każdej przeglądarce i w PowerPoincie.
+- **Nagranie zamiast pokazu na żywo:** [img/demo-gui.gif](img/demo-gui.gif) (to samo nagranie jest na górze README); GIF działa offline w każdej przeglądarce i w PowerPoincie.
 - **Docker nie startuje:** `start-gui.bat` (lokalny Python 3.13).
 - **GUI nie działa:** sam CLI (`start.bat`) i pliki z `output/`, w tym `.trace/`.
 - **Sieć niedostępna:** nic nie trzeba zmieniać. Aplikacja działa offline: PDF.js, fonty i modele OCR są lokalne, LLM domyślnie wyłączony.
@@ -57,7 +57,7 @@ Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otw
    - dokumenty z tekstem: dev 0,999, holdout 0,997;
    - skany z OCR: dev 0,992, holdout 0,967 — odwołania 0,997 / 1,000, pełnomocnictwa 0,980 / 0,943 (3 dok.; holdout użyty przy diagnozie), przelewy 0,987 / 0,968;
    - klasyfikacja: 0 błędów na dev i holdout, dokumenty spoza typów 15/15 i 13/13 (z OCR);
-   - czas: UZP ogranicza czas na rozwiązanie — dokument z tekstem 0,01 s, skan ~4 s; najpierw dokumenty z tekstem, `{}` zapisywane przed przetwarzaniem, więc nawet przerwany przebieg zostawia wyniki;
+   - czas: limit jury to 60 min na 150 plików — dokument z tekstem ok. 0,04–0,1 s, skan 3–8 s (laptop), na VM UZP (2 vCPU) 226 PDF w 365 s; najpierw dokumenty z tekstem, `{}` zapisywane przed przetwarzaniem, więc nawet przerwany przebieg zostawia wyniki;
    - jak liczymy: `eval/score.py` wg reguł UZP, bramka regresji w CI.
 5. **Transparentność:** podświetlenie źródła w PDF, trace z metodą i fragmentem, „Dlaczego ten typ?”.
 6. **Bez LLM, z wyboru:**
