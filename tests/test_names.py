@@ -157,14 +157,39 @@ def test_titles_removed(text, expected):
         ("Daniela Kowalska", "Daniela Kowalska"),
         ("Daniela Kowalskiego", "Daniel Kowalski"),
         ("Józefa Nowak", "Józefa Nowak"),
-        # wielkie litery
-        ("JANA KOWALSKIEGO", "JAN KOWALSKI"),
+        # wielkie litery: GT UZP ma zawsze postac tytulowa („Jan Kowalski”), nigdy „JAN KOWALSKI”
+        ("JANA KOWALSKIEGO", "Jan Kowalski"),
         # puste / pojedyncze słowo
         ("", ""),
         ("Kowalski", "Kowalski"),
     ],
 )
 def test_edge_cases(text, expected):
+    assert normalize_name(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("JAN NOWAK", "Jan Nowak"),
+        ("ANNA KOWALSKA", "Anna Kowalska"),
+        ("ŁUKASZ ŻÓŁTOWSKI", "Łukasz Żółtowski"),
+        ("ANNA NOWAK-JEZIORAŃSKA", "Anna Nowak-Jeziorańska"),
+        ("JEAN-PIERRE DUPONT", "Jean-Pierre Dupont"),
+        ("Jan NOWAK", "Jan Nowak"),
+        ("Anna KOWALSKA", "Anna Kowalska"),
+        ("JAN Nowak", "Jan Nowak"),
+        ("ADW. JAN NOWAK", "Jan Nowak"),
+        ("r. pr. ANNA NOWAK", "Anna Nowak"),
+        ("KATARZYNIE WIŚNIEWSKIEJ", "Katarzyna Wiśniewska"),
+        ("Tomaszowi ZIELIŃSKIEMU", "Tomasz Zieliński"),
+        ("JOHN SMITH", "John Smith"),
+        ("KOWALSKI", "Kowalski"),
+        ("J. KOWALSKI", "J. Kowalski"),
+        ("Jan McDonald", "Jan McDonald"),
+    ],
+)
+def test_uppercase_names_become_title_case_before_inflection(text, expected):
     assert normalize_name(text) == expected
 
 

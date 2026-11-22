@@ -263,3 +263,28 @@ def test_pelnomocnictwo_trace_has_concrete_paths_page_and_snippet(train_dir):
     for t in res.trace:
         if t.method != "const":
             assert t.page == 0 and t.source_snippet
+
+
+# ---------------------------------------------------------------- odporność (wersaliki, synonimy)
+
+
+def test_osoba_fizyczna_nazwisko_wersalikami_daje_postac_tytulowa():
+    text = (
+        "PEŁNOMOCNICTWO\nJa, niżej podpisany JAROSŁAW DUDEK, prowadzący działalność gospodarczą pod firmą "
+        "DUDEK-TECH\nJarosław Dudek, ul. Nadbystrzycka 40, 20-618 Lublin, NIP 9994150873, "
+        "niniejszym umocowuję\nadw. Natalia GÓRECKA (nr wpisu).\nMocodawca:\n.........\nJAROSŁAW DUDEK\n"
+        "Pełnomocnictwo przyjmuję:\n.........\nadw. Natalia GÓRECKA\n"
+    )
+    d = _pel(text)
+    assert d["mocodawca"][0]["data"]["imie_nazwisko"] == "Jarosław Dudek"
+    assert d["mocodawca"][0]["podpisujacy"] == [{"imie_nazwisko": "Jarosław Dudek"}]
+    assert [p["imie_nazwisko"] for p in d["pelnomocnicy"]] == ["Natalia Górecka"]
+
+
+def test_linie_funkcji_wersalikami_nie_sa_podpisujacym():
+    text = (
+        "PEŁNOMOCNICTWO\nAlfa Beta S.A., KRS 0000123456, NIP 1234567890, "
+        "udzielam pełnomocnictwa adw. Jan Nowak do reprezentowania.\n"
+        "............\nANNA KOWALSKA\nPREZES ZARZĄDU\n(PODPIS I PIECZĘĆ)\n"
+    )
+    assert _pel(text)["mocodawca"][0]["podpisujacy"] == [{"imie_nazwisko": "Anna Kowalska"}]

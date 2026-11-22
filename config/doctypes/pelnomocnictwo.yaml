@@ -24,7 +24,7 @@ fields:
     extract:
       # tylko osoba fizyczna: "Ja, nizej podpisany Jan Nowak, prowadzacy dzialalnosc gospodarcza ..."
       - regex:
-          pattern: '(?i:podpisan\w*)(?:/a|\(a\))?,?\s+(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?)\s*,\s*(?i:prowadz)'
+          pattern: '(?i:podpisan\w*)(?:/a|\(a\))?,?\s+(?P<v>(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?)\s*,\s*(?i:prowadz)'
           case: true
   mocodawca[].data.krs:
     extract:
@@ -40,25 +40,25 @@ fields:
       # 2) po zapowiedzi: "Mocodawca jest X, ul." / "w imieniu X (dalej" / "do reprezentacji X (KRS" /
       #    pozycja konsorcjum "1) X, ul." (nazwa moze byc zawinieta na 2 linie)
       - regex:
-          pattern: '(?:(?i:mocodawc[aą]\s+jest|w\s+imieniu|do\s+reprezentacji)\s+|(?:(?i:konsorcjum)\)?\s*:\s*|;\s*)\d{1,2}\)\s+)(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ0-9„"][^\n,(:;]{1,120}?(?:\n[^\n,(:;]{1,80}?)?)(?=\s*(?:,\s*(?:ul\.|al\.|pl\.|os\.|KRS)|\(|\s+z\s+siedzib))'
+          pattern: '(?:(?i:mocodawc[aą]\s+jest|w\s+imieniu|do\s+reprezentacji)\s+|(?:(?i:konsorcjum)\)?\s*:\s*|;\s*)\d{1,2}\)\s+)(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ0-9„"][^\n,(:;]{1,120}?(?:\n{1,2}[^\n,(:;]{1,80}?)?)(?=\s*(?:,\s*(?:ul\.|al\.|pl\.|os\.|KRS)|\(|\s+z\s+siedzib))'
           case: true
       # 3) "X z siedziba w ..." (takze w skanach, gdzie OCR przestawia kolejnosc linii)
       - regex:
-          pattern: '(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{1,120}?)\s+z\s+siedzib'
+          pattern: '(?:(?i:mocodawc\w*)[ \t]+)?(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{1,120}?)\s+z\s+siedzib'
           case: true
       # 4) tabela: "Mocodawca X" w jednej linii; 5) naglowek "MOCODAWCA" i nazwa w nastepnej linii
       - regex:
-          pattern: '^[ \t]*Mocodawca[ \t]+(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n]+?)[ \t]*$'
+          pattern: '^[ \t]*(?i:mocodawca)[ \t]+(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n]+?)[ \t]*$'
           case: true
       - regex:
-          pattern: '^[ \t]*MOCODAWCA[ \t]*\n[ \t]*(?P<v>[^\n]+?)[ \t]*$'
+          pattern: '^[ \t]*MOCODAWCA[ \t]*\n(?:[ \t]*\n)*[ \t]*(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ0-9„"][^\n]*?)[ \t]*$'
           case: true
       # 6) "X, ul. ..." od poczatku linii; 7) naglowek: X w linii, adres w nastepnej
       - regex:
-          pattern: '^[ \t]*(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{2,120}?),\s*(?:ul\.|al\.|pl\.)'
+          pattern: '^[ \t]*(?:(?i:mocodawc\w*)[ \t]+)?(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{2,120}?),\s*(?:ul\.|al\.|pl\.)'
           case: true
       - regex:
-          pattern: '^[ \t]*(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{2,120}?)[ \t]*\n[ \t]*(?:ul\.|al\.|pl\.)'
+          pattern: '^[ \t]*(?:(?i:mocodawc\w*)[ \t]+)?(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][^\n,(:;]{2,120}?)[ \t]*\n(?:[ \t]*\n)*[ \t]*(?:ul\.|al\.|pl\.)'
           case: true
     validate: {min_len: 3}
   mocodawca[].data.nip:
@@ -74,14 +74,18 @@ fields:
           # "prowadzacy/a dzialalnosc gospodarcza" (druk z ukosnikiem), CEIDG
           phrases: ['re:prowadz\w*(?:/\w{1,2})?\s+dzialalnosc\w*\s+gospodarcz', centralnej ewidencji, ceidg]
           then: osoba_fizyczna
-      - const: osoba_prawna
+      # osoba prawna tylko, gdy tekst opisuje strone (NIP/KRS/REGON, siedziba, forma prawna, "mocodawca");
+      # pusty / bezladny tekst daje null, a nie zgadniete "osoba_prawna" (DSL nie ma warunku "inne pole niepuste")
+      - if_match:
+          phrases: ['re:(?<![a-z])(?:nip|krs|regon)(?![a-z])|siedzib|mocodawc|spolk|sp\.\s*(?:z|k|j|p)\b|(?<![a-z])s\.\s?a\.|gmin|powiat']
+          then: osoba_prawna
   # ---------------------------------------------------------------- osoby podpisujace w imieniu mocodawcy
   mocodawca[].podpisujacy[].imie_nazwisko:
     type: name
     extract:
       # imie i nazwisko w osobnej linii (pod kropkami) albo po "przez:" / przecinku, przed funkcja "- Prezes"
       - regex:
-          pattern: '(?:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*)(?!(?:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni|Mocodaw|Zarząd|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn|Data|Signature|Dokument|Kancelaria|Za)\b)(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?)(?=[ \t]*(?:$|[-–(]))'
+          pattern: '(?:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?P<v>(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?)(?=[ \t]*(?:$|[-–(]))'
           case: true
   # ---------------------------------------------------------------- pelnomocnicy
   pelnomocnicy[].imie_nazwisko:
@@ -89,7 +93,7 @@ fields:
     extract:
       # pierwszy "Imie Nazwisko" w elemencie (element zaczyna sie od tytulu / numeru / "oraz"); zawiniecie linii dozwolone
       - regex:
-          pattern: '(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:[ \t]+|[ \t]*\n[ \t]*)[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?)'
+          pattern: '(?!(?i:Adwokat\w*|Radc\w*|Radczyni|Prawn\w*|Mecenas\w*|Pani?|Pełnomocni\w*)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?P<v>(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:[ \t]+|[ \t]*\n(?:[ \t]*\n)*[ \t]*)(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?)'
           case: true
   pelnomocnicy[].pesel:
     extract:
@@ -112,7 +116,7 @@ lists:
     split:
       start: 're:^[ \t]*\.{5,}|reprezentowan\w*\s+przez\s*:|podpisany\s+przez|^[ \t]*za\s+mocod'
       end: 're:pelnomocnictwo\s+przyjmuj|\(dalej'
-      item_regex: '(?m:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*)(?!(?:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni|Mocodaw|Zarząd|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn|Data|Signature|Dokument|Kancelaria|Za)\b)[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?(?=[ \t]*(?:$|[-–(]))'
+      item_regex: '(?m:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?(?=[ \t]*(?:$|[-–(]))'
     groups:
       start: 're:^[ \t]*w\s+imieniu[^\n]{3,120}:[ \t]*$'
       end: 're:pelnomocnictwo\s+przyjmuj'
@@ -124,9 +128,9 @@ lists:
     # do "do reprezentowania" / "Zamawiajacy" / "§ 3" / "Niniejszym" / tytulu dokumentu;
     # element = tytul + imie i nazwisko | linia z samym nazwiskiem (skany, "1. Jan Nowak - adwokat") | "oraz Jan Nowak ("
     split:
-      start: 're:udziel\w*\s+pelnomocnictw\w*|ustanawiam\s+pelnomocnik\w*|upowazniam|niniejszym\s+udziela\w*|(?<![a-z])pelnomocni(?:k|cy)(?![a-z])'
-      end: 're:do\s+reprezentowania|^[ \t]*zamawiajac|pelnomocnictwo\s+udzielone|§\s*3|niniejszym|^[ \t]*p\s?e\s?l\s?n\s?o\s?m\s?o\s?c\s?n\s?i\s?c\s?t\s?w\s?o'
-      item_regex: '(?:\b[Aa]dw\.|\b[Rr]\.[ \t]?[Pp]r\.|\b[Rr]adc[aey][ \t]+[Pp]rawn\w*|\b[Aa]dwokat(?:em)?)\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+\s+[A-ZĄĆĘŁŃÓŚŹŻ]|^[ \t]*(?:\d{1,2}[.)][ \t]*)?(?!(?:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni|Mocodaw|Zamawiaj|Kancelaria)\b)[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:-[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)?(?=[ \t]*(?:$|\(|–|-|,))|\boraz[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+[ \t]+[A-ZĄĆĘŁŃÓŚŹŻ]'
+      start: 're:(?:niniejszym\s+)?(?:udziel\w*\s+(?:pelnomocnictw|umocowani)\w*|ustanawia\w*\s+pelnomocnik\w*|upowazni(?:am|amy|aja|a)(?![a-z])(?:\s+do\s+reprezentowani\w*(?:\s+(?:mnie|nas|mocodawc\w*|wykonawc\w*|spolk\w*)){0,2})?|umocowuj\w*)|niniejszym\s+udziela\w*|(?<![a-z])pelnomocni(?:k|cy)(?![a-z])'
+      end: 're:(?<!upowazniam[ \n])(?<!upowazniamy[ \n])(?<!upowazniaja[ \n])do\s+reprezentowania|^[ \t]*zamawiajac|^[ \t]*(?:za\s+)?mocodaw\w*[ \t]*:[ \t]*$|pelnomocnictwo\s+udzielone|§\s*3|niniejszym(?!\s+(?:udziela|umocowuj|upowazni|ustanawia))|^[ \t]*p\s?e\s?l\s?n\s?o\s?m\s?o\s?c\s?n\s?i\s?c\s?t\s?w\s?o'
+      item_regex: '(?i:\badw\.|\br\.[ \t]?pr\.|\bradc[aey][ \t]+prawn\w*|\badwokat(?:em)?)\s+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})\s+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})|^[ \t]*(?:\d{1,2}[.)][ \t]*)?(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zamawiaj\w*|Kancelaria|Zakres|Dane|Postępowani\w*|Wykonawc\w*|Dokument|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?(?=[ \t]*(?:$|\(|–|-|,))|(?i:\boraz)[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})'
     unique: true
     max_items: 10
 llm:
