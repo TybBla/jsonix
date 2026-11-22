@@ -2,6 +2,14 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v1.0.1 — nowy wygląd GUI (2026-11-22)
+
+- **Źródło wartości w dymku (#28):** zamiast stałej linii „Źródło: strona N, …” pod każdą wartością jest mała ikonka „i” obok wartości. Dymek ze stroną, fragmentem i ostrzeżeniami otwiera się po najechaniu, kliknięciu albo z klawiatury (Enter/Spacja; Esc zamyka). Ostrzeżenia mają osobną ikonkę (trójkąt z „!”). Czytnik ekranu dostaje opis źródła bez otwierania dymka. Podświetlanie źródła w PDF bez zmian.
+- **Nagłówek:** tytuł „jsonix” przy lewej krawędzi, większy, bez logo.
+- **Czytelność:** szary tekst zmieniony z #656565 na #4a4a4a (kontrast 8,9:1 na bieli i 7,9:1 na jasnoszarym, poziom WCAG AAA).
+- **Stopka:** „jsonix v1.0.1 · projekt HackNation 2026 (zadanie UZP)” oraz linki: Deklaracja dostępności, Dokumentacja API, Kod źródłowy.
+- Ekstrakcja, klasyfikacja i wyniki F1 bez zmian względem v1.0.0.
+
 ## v1.0.0 — wydanie zgłoszeniowe (2026-11-22)
 
 Notatki dla GitHub Release: [docs/wydanie-v1.0.md](docs/wydanie-v1.0.md). Zakres: wszystko scalone od v0.4.0.
