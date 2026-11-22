@@ -172,13 +172,13 @@
     "commit": "9746ad01ef36bbd6dffd38d765d222e7c2de8ac1"
   },
   "dev@skan": {
-    "f1": 0.977319587628866,
-    "precision": 0.983402489626556,
-    "recall": 0.9713114754098361,
+    "f1": 0.991869918699187,
+    "precision": 0.9838709677419355,
+    "recall": 1.0,
     "f1_by_type": {
       "odwolanie": 0.9968454258675079,
       "pelnomocnictwo": 0.98,
-      "przelew": 0.8823529411764706
+      "przelew": 0.9866666666666667
     },
     "f1_by_field": {
       "OdwolanieKIO.czynnosc_dzien": 1.0,
@@ -211,21 +211,21 @@
       "mocodawca[].podpisujacy[].imie_nazwisko": 0.9333333333333333,
       "pelnomocnicy[].imie_nazwisko": 1.0,
       "pelnomocnicy[].pesel": 1.0,
-      "przelew_bankowy.data_operacji": 0.7272727272727273,
+      "przelew_bankowy.data_operacji": 1.0,
       "przelew_bankowy.kwota": 1.0,
       "przelew_bankowy.na_rachunek": 1.0,
-      "przelew_bankowy.numer_transakcji": 0.5,
-      "przelew_bankowy.tytul": 0.7272727272727273,
+      "przelew_bankowy.numer_transakcji": 1.0,
+      "przelew_bankowy.tytul": 0.9230769230769231,
       "przelew_bankowy.z_rachunku": 1.0
     },
     "by_source": {
       "skan": {
-        "f1": 0.977319587628866,
-        "precision": 0.983402489626556,
-        "recall": 0.9713114754098361,
-        "tp": 237,
+        "f1": 0.991869918699187,
+        "precision": 0.9838709677419355,
+        "recall": 1.0,
+        "tp": 244,
         "fp": 4,
-        "fn": 7,
+        "fn": 0,
         "tn": 66,
         "docs": 26
       }
@@ -233,7 +233,7 @@
     "f1_by_type_source": {
       "odwolanie/skan": 0.9968454258675079,
       "pelnomocnictwo/skan": 0.98,
-      "przelew/skan": 0.8823529411764706
+      "przelew/skan": 0.9866666666666667
     },
     "neg_correct": 3,
     "neg_total": 3,
@@ -241,8 +241,8 @@
     "classification_errors": 0,
     "pipeline_errors": 0,
     "classification_error_files": [],
-    "updated": "2026-11-22T00:14:51Z",
-    "commit": "9746ad01ef36bbd6dffd38d765d222e7c2de8ac1"
+    "updated": "2026-11-22T06:22:23Z",
+    "commit": "38bd93097d2ea0e3827881be7798a48949e7dd72"
   },
   "dev@tekst": {
     "f1": 0.9990313206328705,
@@ -318,13 +318,13 @@
     "commit": "9746ad01ef36bbd6dffd38d765d222e7c2de8ac1"
   },
   "holdout@skan": {
-    "f1": 0.9122807017543859,
-    "precision": 0.9629629629629629,
-    "recall": 0.8666666666666667,
+    "f1": 0.9666666666666667,
+    "precision": 0.9666666666666667,
+    "recall": 0.9666666666666667,
     "f1_by_type": {
       "odwolanie": 1.0,
-      "pelnomocnictwo": 0.8333333333333334,
-      "przelew": 0.9333333333333333
+      "pelnomocnictwo": 0.9433962264150944,
+      "przelew": 0.967741935483871
     },
     "f1_by_field": {
       "OdwolanieKIO.czynnosc_dzien": 1.0,
@@ -350,36 +350,36 @@
       "ZamowieniePubliczne.numer_ted": 1.0,
       "ZamowieniePubliczne.tytul": 1.0,
       "mocodawca[].data.imie_nazwisko": 0.0,
-      "mocodawca[].data.krs": 0.8571428571428571,
-      "mocodawca[].data.nazwa": 0.6666666666666666,
-      "mocodawca[].data.nip": 0.8571428571428571,
-      "mocodawca[].data.typ": 0.8571428571428571,
-      "mocodawca[].podpisujacy[].imie_nazwisko": 0.6666666666666666,
+      "mocodawca[].data.krs": 1.0,
+      "mocodawca[].data.nazwa": 0.8571428571428571,
+      "mocodawca[].data.nip": 1.0,
+      "mocodawca[].data.typ": 1.0,
+      "mocodawca[].podpisujacy[].imie_nazwisko": 0.8,
       "pelnomocnicy[].imie_nazwisko": 1.0,
       "pelnomocnicy[].pesel": 1.0,
       "przelew_bankowy.data_operacji": 1.0,
       "przelew_bankowy.kwota": 1.0,
       "przelew_bankowy.na_rachunek": 1.0,
       "przelew_bankowy.numer_transakcji": 1.0,
-      "przelew_bankowy.tytul": 0.5,
+      "przelew_bankowy.tytul": 0.8,
       "przelew_bankowy.z_rachunku": 1.0
     },
     "by_source": {
       "skan": {
-        "f1": 0.9122807017543859,
-        "precision": 0.9629629629629629,
-        "recall": 0.8666666666666667,
-        "tp": 52,
+        "f1": 0.9666666666666667,
+        "precision": 0.9666666666666667,
+        "recall": 0.9666666666666667,
+        "tp": 58,
         "fp": 2,
-        "fn": 8,
+        "fn": 2,
         "tn": 12,
         "docs": 10
       }
     },
     "f1_by_type_source": {
       "odwolanie/skan": 1.0,
-      "pelnomocnictwo/skan": 0.8333333333333334,
-      "przelew/skan": 0.9333333333333333
+      "pelnomocnictwo/skan": 0.9433962264150944,
+      "przelew/skan": 0.967741935483871
     },
     "neg_correct": 3,
     "neg_total": 3,
@@ -387,8 +387,8 @@
     "classification_errors": 0,
     "pipeline_errors": 0,
     "classification_error_files": [],
-    "updated": "2026-11-22T00:15:03Z",
-    "commit": "9746ad01ef36bbd6dffd38d765d222e7c2de8ac1"
+    "updated": "2026-11-22T06:22:27Z",
+    "commit": "38bd93097d2ea0e3827881be7798a48949e7dd72"
   },
   "holdout@tekst": {
     "f1": 0.9968782518210197,
