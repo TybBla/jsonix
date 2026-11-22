@@ -1,0 +1,4 @@
+# Nakladka do pomiaru wariantu hybrydowego (reguly + LLM dla pol null), nie do oddania UZP:
+#   JSONIX_APP_CONFIG=config/app.llm.yaml python -m eval.gate --split dev --source tekst
+# Wymaga LLM_API_KEY w .env (config/llm.yaml, .env.example). Wyniki: docs/decyzje/2026-11-21-llm-darmowe-vs-bez.md
+llm_enabled: true

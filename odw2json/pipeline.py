@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from odw2json import classify, extract, ingest
+from odw2json import classify, extract, ingest, llm_fill
 from odw2json.config_loader import ROOT_DIR, DocTypeConfig, load_app_config, load_registry
 from odw2json.contracts import Classification, Document, ExtractionResult
 from odw2json.logging_setup import new_run_id
@@ -35,14 +35,24 @@ class RunReport:
 
 
 def process_file_ex(
-    pdf: Path, registry: dict[str, DocTypeConfig], ingest_cfg: dict | None = None
+    pdf: Path,
+    registry: dict[str, DocTypeConfig],
+    ingest_cfg: dict | None = None,
+    llm_filler: llm_fill.LLMFiller | None = None,
 ) -> tuple[Document, Classification, ExtractionResult | None]:
-    """Jak ``process_file``, ale zwraca też ``Document`` (``ocr_used``/``backend``/``warnings`` do trace)."""
+    """Jak ``process_file``, ale zwraca też ``Document`` (``ocr_used``/``backend``/``warnings`` do trace).
+
+    ``llm_filler`` (wariant hybrydowy, ``llm_enabled``): LLM uzupełnia pola, w których reguły dały null.
+    """
     doc = ingest.load(pdf, cfg=ingest_cfg)
     cls = classify.classify(doc, registry)
     if cls.doc_type is None:
         return doc, cls, None
-    return doc, cls, extract.extract(doc, registry[cls.doc_type])
+    cfg = registry[cls.doc_type]
+    res = extract.extract(doc, cfg)
+    if llm_filler is not None:
+        llm_filler.fill(doc, res, cfg)
+    return doc, cls, res
 
 
 def process_file(
@@ -180,11 +190,12 @@ def run(
     t_run = time.perf_counter()
     min_chars = int(((effective.get("ocr") or {}).get("min_chars_per_page")) or 30)
     pdfs = list_inputs(Path(input_dir), min_chars)
+    filler = llm_fill.from_app_config(app_cfg)  # None przy llm_enabled: false (domyślnie)
     for pdf in pdfs:
         t0 = time.perf_counter()
         rel = str(pdf.relative_to(input_dir))
         try:
-            doc, cls, res = process_file_ex(pdf, registry, ingest_cfg)
+            doc, cls, res = process_file_ex(pdf, registry, ingest_cfg, filler)
             write_outputs(pdf, Path(input_dir), Path(output_dir), cls, res, app_cfg, run_id, doc=doc)
             report.processed += 1
             key = cls.doc_type or "nieznany"
@@ -227,6 +238,8 @@ def run(
         "unknown": report.unknown,
         "errors": [{"file": str(e.path), "error": e.error} for e in report.errors],
     }
+    if filler is not None:
+        summary["llm"] = dict(filler.stats)
     logs = resolve_log_dir(app_cfg, Path(output_dir))
     logs.mkdir(parents=True, exist_ok=True)
     (logs / f"{run_id}.summary.json").write_text(_dump(summary), encoding="utf-8")

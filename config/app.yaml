@@ -4,7 +4,7 @@
 #   none         - brak pliku
 unknown_output: empty_object
 write_trace: true          # output/.trace/<case>/<plik>.trace.json
-llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
+llm_enabled: false         # wariant hybrydowy: LLM uzupelnia pola null po regulach (pomiar E6); oddajemy bez LLM
 log_dir: null              # logi CLI i podsumowanie przebiegu; null = <output>/.logs (profil jury: poza output)
 
 # Ingest PDF (sektor A). Backendy wybierane tu, bez zmian kodu.

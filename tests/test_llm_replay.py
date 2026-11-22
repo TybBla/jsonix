@@ -153,3 +153,70 @@ def test_cassette_written_atomically(tmp_path):
     c.complete_json("s", "u")
     assert list(tmp_path.glob("*.tmp")) == []
     assert len(list(tmp_path.glob("*.json"))) == 1
+
+
+def test_min_interval_throttles_network_calls(tmp_path, monkeypatch):
+    sleeps = []
+    clock = iter([100.0, 100.2, 101.1])  # po 1., przed 2., po 2. zapytaniu
+    monkeypatch.setattr("odw2json.llm.time.monotonic", lambda: next(clock))
+    monkeypatch.setattr("odw2json.llm.time.sleep", sleeps.append)
+    c, fake = make(tmp_path, "live", min_interval_s=1.1)
+    c.complete_json("s", "u1")
+    c.complete_json("s", "u2")
+    assert fake.calls == 2
+    assert sleeps and abs(sleeps[0] - 0.9) < 1e-9  # darmowy Mistral: 1 zapytanie/s
+
+
+def test_cassette_dir_from_env(tmp_path, monkeypatch):
+    monkeypatch.setattr("odw2json.llm.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setattr("odw2json.llm.load_llm_config", lambda: {"mode": "replay", "model": "m"})
+    monkeypatch.setenv("LLM_CASSETTE_DIR", str(tmp_path / "kasety"))
+    assert LLMClient.from_config().cassette_dir == tmp_path / "kasety"
+
+
+def test_anonymous_key_omits_authorization_header(tmp_path):
+    from openai import Omit
+
+    c, fake = make(tmp_path, "live", api_key="anonim")
+    c.complete_json("s", "u")
+    assert isinstance(fake.kwargs[0]["extra_headers"]["Authorization"], Omit)  # OVH AI Endpoints bez konta
+    c2, fake2 = make(tmp_path, "live", api_key="sk-123")
+    c2.complete_json("s", "u")
+    assert "extra_headers" not in fake2.kwargs[0]
+
+
+def test_min_interval_from_env(tmp_path, monkeypatch):
+    monkeypatch.setattr("odw2json.llm.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setattr("odw2json.llm.load_llm_config", lambda: {"mode": "replay", "min_interval_s": 1.1})
+    monkeypatch.setenv("LLM_MIN_INTERVAL_S", "31")
+    assert LLMClient.from_config().min_interval_s == 31
+
+
+def test_truncated_response_raises_and_is_not_cached(tmp_path):
+    from types import SimpleNamespace as NS
+
+    class Truncated(FakeClient):
+        def _create(self, **kw):
+            self.calls += 1
+            self.kwargs.append(kw)
+            return NS(
+                choices=[NS(message=NS(content=None), finish_reason="length")],
+                usage=NS(prompt_tokens=1, completion_tokens=4000),
+            )
+
+    c, fake = make(tmp_path, "auto", fake=Truncated())
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        c.complete_json("s", "u")
+    assert list(tmp_path.glob("*.json")) == [] and c.usage["truncated"] == 1
+
+
+def test_temperature_and_extra_body_from_env(tmp_path, monkeypatch):
+    monkeypatch.setattr("odw2json.llm.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setattr("odw2json.llm.load_llm_config", lambda: {"mode": "replay", "temperature": 0})
+    monkeypatch.setenv("LLM_TEMPERATURE", "0.6")
+    monkeypatch.setenv("LLM_EXTRA_BODY", '{"reasoning_effort": "low"}')
+    c = LLMClient.from_config()
+    assert c.temperature == 0.6 and c.extra_body == {"reasoning_effort": "low"}
+    c2, fake = make(tmp_path, "live", extra_body={"reasoning_effort": "low"})
+    c2.complete_json("s", "u")
+    assert fake.kwargs[0]["extra_body"] == {"reasoning_effort": "low"}

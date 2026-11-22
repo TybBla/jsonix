@@ -3,9 +3,20 @@ base_url: null
 # Kasety sa kluczowane modelem: zmiana modelu wymaga ponownego nagrania kaset (LLM_MODE=record).
 model: ministral-8b-latest   # env LLM_MODEL wygrywa
 temperature: 0
-max_tokens: 2000
+max_tokens: 4000      # modele z rozumowaniem (np. Olala na OVH) zuzywaja czesc limitu na reasoning
 timeout_s: 120
 retries: 2
 mode: auto            # live | record | replay | auto (env LLM_MODE wygrywa; w pytest domyslnie replay)
 cassette_dir: tests/cassettes
 json_mode: true       # false, gdy dostawca nie obsluguje response_format=json_object
+min_interval_s: 1.1   # odstep miedzy zapytaniami do sieci (darmowy plan Mistral: 1 zapytanie/s); 0 = bez limitu
+
+# Wariant hybrydowy (odw2json/llm_fill.py, wlaczany app.yaml: llm_enabled): LLM tylko dla pol null po regulach,
+# na wycinku tekstu. Pola i frazy wycinka: naglowki YAML w config/prompts/<typ>.md.
+hybryda:
+  head_chars: 800          # poczatek dokumentu zawsze w wycinku
+  window_before: 200       # okno wokol trafienia frazy pola
+  window_after: 400
+  max_hits_per_field: 3
+  max_chars: 6000          # limit dlugosci wycinka
+  cassette_dir: output/.cache/llm   # kasety pomiaru poza tests/ (env LLM_CASSETTE_DIR wygrywa)
