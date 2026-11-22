@@ -63,6 +63,14 @@ def run_section(split: str, source: str, gate_dir: Path) -> Run:
     return Run(split, source, res.metrics, _docs(score), seconds, res.exit_code, score)
 
 
+def _field_f1(run: Run, name: str) -> float | None:
+    """F1 pola; None, gdy w zbiorze są same TN (tp + fp + fn = 0) albo pola nie ma."""
+    c = ((run.score or {}).get("fields") or {}).get(name)
+    if c is not None and c.get("tp", 0) + c.get("fp", 0) + c.get("fn", 0) == 0:
+        return None
+    return (run.metrics.get("f1_by_field") or {}).get(name)
+
+
 def _pct(v: float | None) -> str:
     return "—" if v is None else f"{v * 100:.1f}%"
 
@@ -160,13 +168,14 @@ def render(runs: list[Run], env: dict[str, str], cache: str) -> str:
         out += ["", "## F1 per pole", ""]
         out.append(
             f"Pola z F1 < {LOW_FIELD_F1:.2f} w którymkolwiek zbiorze są pogrubione "
-            "— wymagają opisu przyczyny."
+            "— wymagają opisu przyczyny. „—” = w tym zbiorze same TN (pola nie ma w dokumentach "
+            "i wynik poprawnie ma `null`), więc F1 jest niezdefiniowane."
         )
         out.append("")
         out.append("| Pole | " + " | ".join(f"{r.split} {r.source}" for r in runs) + " |")
         out.append("|---" * (len(runs) + 1) + "|")
         for f in fields:
-            vals = [(r.metrics.get("f1_by_field") or {}).get(f) for r in runs]
+            vals = [_field_f1(r, f) for r in runs]
             low = any(v is not None and v < LOW_FIELD_F1 for v in vals)
             name = f"**{f}**" if low else f
             out.append(f"| {name} | " + " | ".join(_pct(v) for v in vals) + " |")

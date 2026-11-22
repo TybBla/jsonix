@@ -1,5 +1,9 @@
 import json
+import os
 import shutil
+from pathlib import Path
+
+import pytest
 
 from odw2json import pipeline
 
@@ -161,3 +165,48 @@ def test_write_outputs_is_atomic(tmp_path, train_dir, monkeypatch):
     pipeline.write_outputs(inp / "p.pdf", inp, out, cls, res, {"write_trace": False})
     assert json.loads(target.read_text(encoding="utf-8")) == res.data
     assert not list(out.glob("*.tmp")), "bez plików tymczasowych po udanym zapisie"
+
+
+def test_write_text_atomic_tmp_name_has_pid(tmp_path, monkeypatch):
+    target = tmp_path / "a.json"
+    seen = []
+    real = pipeline.os.replace
+
+    def spy(src, dst):
+        seen.append(Path(src).name)
+        real(src, dst)
+
+    monkeypatch.setattr(pipeline.os, "replace", spy)
+    pipeline.write_text_atomic(target, "{}")
+    assert seen == [f"a.json.{os.getpid()}.tmp"]
+    assert target.read_text(encoding="utf-8") == "{}"
+
+
+def test_write_text_atomic_retries_permission_error(tmp_path, monkeypatch):
+    target = tmp_path / "a.json"
+    real = pipeline.os.replace
+    calls = []
+
+    def flaky(src, dst):
+        calls.append(1)
+        if len(calls) < 3:
+            raise PermissionError("plik otwarty")
+        real(src, dst)
+
+    monkeypatch.setattr(pipeline.os, "replace", flaky)
+    monkeypatch.setattr(pipeline.time, "sleep", lambda _s: None)
+    pipeline.write_text_atomic(target, "{}")
+    assert len(calls) == 3 and target.read_text(encoding="utf-8") == "{}"
+
+
+def test_write_text_atomic_gives_up_after_retries(tmp_path, monkeypatch):
+    target = tmp_path / "a.json"
+
+    def locked(*_a):
+        raise PermissionError("plik otwarty")
+
+    monkeypatch.setattr(pipeline.os, "replace", locked)
+    monkeypatch.setattr(pipeline.time, "sleep", lambda _s: None)
+    with pytest.raises(PermissionError):
+        pipeline.write_text_atomic(target, "{}")
+    assert not list(tmp_path.glob("*.tmp")), "bez plików tymczasowych po błędzie"

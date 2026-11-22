@@ -95,7 +95,10 @@ UZP ogranicza czas działania każdego rozwiązania ([kryteria-uzp.md](kryteria-
 ## Jakość
 - **F1 wg reguł UZP:** `eval/score.py`. Długie teksty porównujemy z progiem podobieństwa 80%, pozostałe pola dokładnie, listy po treści.
 - **Bramka regresji:** `python -m eval.gate --split dev|holdout [--source tekst|skan]`. Porównuje wynik z `eval/baseline.json` i kończy się kodem 1 przy spadku F1. Podział spraw na dev i holdout jest deterministyczny (`data/splits.yaml`); holdout sprawdzamy rzadko, żeby nie dopasować reguł do zbioru testowego.
-- **CI (GitHub Actions, Ubuntu i Windows, Python 3.13):** ruff, pytest, bramka F1 na dev i holdout, smoke CLI, `docker build`. Lokalnie dochodzą `scripts/smoke_gui.py` (API i GUI) oraz `scripts/smoke_docker.py` (Compose, healthcheck, wsad w kontenerze porównany z CLI).
+- **CI (GitHub Actions, Ubuntu i Windows, Python 3.13 i 3.14):** ruff, pytest, bramka F1 na dev i holdout, smoke CLI, `docker build`. Lokalnie dochodzą `scripts/smoke_gui.py` (API i GUI) oraz `scripts/smoke_docker.py` (Compose, healthcheck, wsad w kontenerze porównany z CLI).
+
+## Ocena na VM UZP
+Jury uruchamia obraz Dockera według `RUN.md`. Zmienna `JSONIX_APP_CONFIG=config/app.jury.yaml` wskazuje profil jury, który wyłącza trace i wynosi logi oraz cache OCR poza `output/`, dzięki czemu w `output/` są wyłącznie pliki JSON (`<sprawa>/<nazwa_jak_pdf>.json`). Wdrożenie i autotest na VM wykonuje `scripts/deploy-vm.sh`. Szczegóły: [vm-jury.md](vm-jury.md).
 
 ## Uruchomienie
 - **CLI:** `pip install -r requirements.txt`, potem `start.bat` (Windows) albo `start.sh`, co odpowiada `python -m odw2json run input output`.

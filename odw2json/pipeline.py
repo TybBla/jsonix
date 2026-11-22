@@ -62,10 +62,18 @@ def write_text_atomic(path: Path, text: str) -> None:
     Przerwanie procesu (np. limit czasu UZP, kryteria pkt 5a) nie zostawia pustego ani uciętego pliku:
     w miejscu docelowym jest albo poprzednia, albo pełna nowa zawartość.
     """
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
+        for attempt in range(3):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                # Windows: plik docelowy bywa chwilowo otwarty (np. podgląd, antywirus)
+                if attempt == 2:
+                    raise
+                time.sleep(0.1)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
