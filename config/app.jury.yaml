@@ -1,0 +1,15 @@
+# Profil jury (VM Azure UZP, 22.11.2026): nakladka na config/app.yaml, wlaczana zmienna srodowiskowa
+#   JSONIX_APP_CONFIG=config/app.jury.yaml      (patrz RUN.md i docs/vm-jury.md)
+# Jest scalana GLEBOKO na app.yaml: tu tylko to, co sie rozni. Wyniki ekstrakcji sie nie zmieniaja.
+#
+# Po co: jury zabiera caly katalog /opt/solution/output. Maja w nim byc WYLACZNIE pliki
+# <sprawa>/<nazwa_jak_pdf>.json (takze {} dla nieznanych), wiec trace, logi, podsumowanie przebiegu
+# i cache OCR trafiaja poza output (do /tmp kontenera).
+write_trace: false              # bez output/.trace/**/*.trace.json
+log_dir: /tmp/jsonix-logs       # logi CLI i <run_id>.summary.json poza output (domyslnie <output>/.logs)
+
+ingest:
+  ocr:
+    cache_dir: /tmp/jsonix-ocr  # cache OCR poza output (domyslnie output/.cache/ocr)
+    engine_params:
+      EngineConfig.onnxruntime.intra_op_num_threads: 2   # VM ma 2 vCPU (w app.yaml: 4)

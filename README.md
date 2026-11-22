@@ -2,13 +2,23 @@
 
 **jsonix** zamienia dokumenty PDF spraw odwoławczych KIO (odwołanie, pełnomocnictwo, potwierdzenie przelewu) na dane JSON zgodne ze schematami UZP: rozpoznaje typ dokumentu z treści i wyodrębnia pola, pokazując, skąd pochodzi każda wartość. Dokumenty spoza tych typów są rozpoznawane jako **nieznane**.
 
-## Szybki start (Windows, Python 3.13+)
+## Szybki start (Windows)
+
+**Wymagania:** Windows 10/11 i **Python 3.13 lub 3.14** ([python.org](https://www.python.org/downloads/), przy instalacji zaznacz „Add python.exe to PATH”), internet przy pierwszym uruchomieniu (instalacja zależności). Albo zamiast Pythona: Docker Desktop (sekcja „Docker”).
+
+1. Umieść dokumenty w `input\` — jeden podfolder na sprawę: `input\<sprawa>\<plik>.pdf` (PDF-y luzem w `input\` też działają).
+2. Uruchom w terminalu (PowerShell albo cmd) w katalogu repozytorium:
 
 ```powershell
-pip install -r requirements.txt
-copy .env.example .env    # uzupełnij LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
-start.bat                 # = python -m odw2json run input output
+.\start.bat              # wsad: input\ -> output\ (python -m odw2json run input output)
+.\start-gui.bat          # GUI w przeglądarce: http://127.0.0.1:8000
 ```
+
+3. Wyniki: `output\<sprawa>\<plik>.json` (nazwa jak PDF). W `cmd.exe` wpisz `start.bat` bez `.\`; PowerShell wymaga `.\` przed nazwą pliku z bieżącego katalogu.
+
+Przy pierwszym uruchomieniu `start.bat` (i `start-gui.bat`) sam przygotowuje środowisko (`scripts/setup-env.bat`): użyje Pythona z `PATH`, jeśli ma już zależności, a w przeciwnym razie utworzy `.venv` na **Pythonie 3.13 lub 3.14** (launcher `py`) i zainstaluje `requirements.txt` (jednorazowo, kilka minut, potrzebny internet). Plik `.env` jest opcjonalny — tylko z LLM (`copy .env.example .env`, uzupełnij `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
+
+**Wersja Pythona.** Zalecany **Python 3.13 lub 3.14**. Na nowszym (3.15+) aplikacja się instaluje i działa, ale **OCR skanów jest niedostępny** (paczki `onnxruntime`/`pyclipper` nie mają jeszcze wersji dla 3.15): dokumenty z warstwą tekstową są przetwarzane normalnie, a skan bez tekstu dostaje ostrzeżenie. Ręcznie: `py -3.13 -m venv .venv`, `.venv\Scripts\pip install -r requirements.txt`, `.venv\Scripts\python -m odw2json run input output`. Linux/macOS: `pip install -r requirements.txt`, `sh start.sh` (wybiera Pythona 3.13+).
 
 - Wejście: `input/<sprawa>/<plik>.pdf` (lub PDF-y luzem w `input/`).
 - Wyjście: `output/<sprawa>/<plik>.json` — nazwa jak plik wejściowy.
@@ -19,15 +29,30 @@ Inne komendy:
 ```powershell
 python -m odw2json doctypes      # lista skonfigurowanych typów dokumentów
 python -m odw2json serve         # API + GUI na http://127.0.0.1:8000
-docker compose up --build        # to samo w Dockerze
+docker compose up --build        # to samo w Dockerze (sekcja „Docker” niżej)
 ```
 
-**OCR (opcjonalny).** Skany bez warstwy tekstowej czyta OCR po `pip install -r requirements-ocr.txt` (~107 MB, modele w paczce, bez sieci w czasie działania). Obraz Dockera domyślnie go nie zawiera: skan dostaje wtedy ostrzeżenie, a pusty tekst jest traktowany jako dokument nieznany.
+**OCR.** Skany bez warstwy tekstowej czyta OCR (rapidocr + onnxruntime, w `requirements.txt`, modele w paczce, bez sieci w czasie działania). Paczki OCR są dostępne dla Pythona 3.13 i 3.14 (na 3.15+ OCR jest pomijany, patrz wyżej); ten sam OCR jest w obrazie Dockera.
+
+## Docker
+
+```powershell
+docker compose up --build                              # API + GUI: http://127.0.0.1:8000
+docker compose run --rm app python -m odw2json run     # wsad: input/ -> output/, bez GUI
+python scripts/smoke_docker.py                         # test: build, healthcheck, GUI/API, wsad = CLI
+```
+
+- Plik `.env` jest **opcjonalny**: bez niego działa domyślny tryb bez LLM.
+- Katalogi `input/`, `output/` i `config/` są montowane z repo, więc konfigurację typów dokumentów zmieniasz bez przebudowy obrazu (wystarczy restart).
+- Port zmienisz zmienną `JSONIX_PORT` (np. `$env:JSONIX_PORT=8080; docker compose up`). Serwer nasłuchuje tylko na `127.0.0.1`.
+- Kontener ma healthcheck (`/api/health`); `docker compose ps` pokazuje stan `healthy`.
+- `scripts/smoke_docker.py` uruchamia osobny projekt `jsonix-smoke`, sprawdza GUI/API, przetwarza w kontenerze `przyklad_01` i skan (OCR), porównuje JSON-y z CLI na hoście i sprząta po sobie (kod wyjścia 0/1, 2 = brak Dockera).
+- **VM jury (Azure, 22.11.2026):** ocena odbywa się komendą z `/opt/solution/RUN.md` (obraz Dockera `jsonix:latest`, profil `config/app.jury.yaml`, w `output/` tylko pliki JSON). Wdrożenie i testy na VM: [docs/vm-jury.md](docs/vm-jury.md), `scripts/deploy-vm.sh`.
 
 ## GUI
 
 ```powershell
-start-gui.bat                    # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
+.\start-gui.bat                  # = python -m odw2json serve + otwarcie http://127.0.0.1:8000
 python scripts/smoke_gui.py      # test dymny API + GUI (kod wyjścia 0/1)
 ```
 
@@ -36,14 +61,16 @@ W GUI jsonix wgraj PDF-y sprawy, uruchom analizę, sprawdź wynik klasyfikacji, 
 ## Architektura
 
 ```
-PDF → ingest (tekst/OCR) → classify (reguły z YAML, LLM fallback) → extract (regex + LLM + słowniki)
-    → normalizacja i walidacja → JSON wg config/schemas/ (+ trace)
+PDF → ingest (tekst z PDF, czyszczenie, OCR skanów) → classify (punktacja cech z YAML)
+    → extract (pola i listy z YAML, normalizacja, walidacja) → JSON wg config/schemas/ (+ trace)
 ```
+
+Pełny opis (etapy, kontrakty, konfiguracja, API i GUI, jakość): **[docs/architektura.md](docs/architektura.md)**.
 
 - `odw2json/contracts.py` — wspólne struktury danych (Document, Classification, FieldResult, ExtractionResult).
 - `config/doctypes/*.yaml` — **typy dokumentów są konfiguracją**: nowy typ = nowy YAML + szablon JSON ([instrukcja](docs/nowy-typ-dokumentu.md)).
-- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis), `config/prompts/` — prompty LLM.
-- LLM: dowolny dostawca OpenAI-kompatybilny z serwerami w UE (konfiguracja w `.env`), temperatura 0, cache odpowiedzi.
+- `config/schemas/` — szablony wyników, `config/lookups/` — słowniki (np. powód odwołania → opis).
+- **Domyślnie bez LLM** (`config/app.yaml: llm_enabled: false`): reguły z konfiguracji. Warstwa LLM jest opcjonalna — wyłącznie model open source ≤ 8B od dostawcy z serwerami w UE (konfiguracja w `.env`, temperatura 0, kasety odpowiedzi w testach).
 
 ## Ewaluacja
 
@@ -54,9 +81,22 @@ python -m eval.score --pred output --gt data/train
 ```
 F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
 
-| Wersja | Klasyfikacja (train) | F1 (train) |
-|---|---|---|
-| szkielet (stuby) | 190/194 | 0.000 (negatywy 14/14) |
+**Raport jakości do zgłoszenia** (F1 dev/holdout × tekst/skan, per typ i pole, czas na dokument): `python scripts/quality_report.py` → `docs/raport-jakosci.md` (`--source tekst` = szybko, bez OCR).
+
+Wyniki v0.4.0 (skany: aktualizacja po pomiarze skanów (v1.0), zob. [CHANGELOG](CHANGELOG.md); F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
+
+| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
+|---|---|---|---|---|---|---|
+| dev | 0,996 | 0,999 | 0,977 | 0,997 | 0,980 | 0,882 |
+| holdout | 0,988 | 0,997 | 0,912 | 1,000 | 0,833 (3 dok.) | 0,933 |
+
+Dokumenty z tekstem po v1.0 bez zmian (baseline 22.11: dev 0,999, holdout 0,997).
+
+Klasyfikacja: 0 błędów; dokumenty spoza typów odrzucone 15/15 (dev) i 13/13 (holdout), w tym skany.
+
+## Ocena na VM UZP
+
+Ocena na VM jury (22.11.2026) odbywa się komendą z [RUN.md](RUN.md) (obraz `jsonix:latest`, profil `config/app.jury.yaml`, w `output/` tylko pliki JSON). Wdrożenie i testy na VM: [docs/vm-jury.md](docs/vm-jury.md). Repozytorium: https://github.com/TybBla/jsonix.
 
 ## Praca zespołu
 

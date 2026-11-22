@@ -20,7 +20,7 @@ try {
     Invoke-Native 'python' @('-m', 'venv', (Join-Path $tmp 'venv'))
     $vbin = Join-Path $tmp 'venv\Scripts'
     $vpy = Join-Path $vbin 'python.exe'
-    Invoke-Native $vpy @('-m', 'pip', 'install', '--quiet', '--disable-pip-version-check', '-r', (Join-Path $repo 'requirements.txt'))
+    Invoke-Native $vpy @('-m', 'pip', 'install', '--quiet', '--disable-pip-version-check', '-r', (Join-Path $repo 'requirements.txt'), '-c', (Join-Path $repo 'requirements-lock.txt'))
 
     $in = Join-Path $tmp 'in'
     $out = Join-Path $tmp 'out'

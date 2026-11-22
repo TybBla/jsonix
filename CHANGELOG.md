@@ -2,50 +2,45 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
-## v1.0.0 — wydanie zgłoszeniowe (SZKIC, do uzupełnienia przy scaleniu)
+## v1.0.0 — wydanie zgłoszeniowe (⟨data do uzupełnienia⟩)
 
-> Szkic przygotowany 22.11.2026 przed scaleniem PR-ów. Właściciel repo: popraw listę według faktycznie scalonych
-> gałęzi, wpisz liczby z `python scripts/quality_report.py` po scaleniu E4 i usuń tę notkę. Notatki wydania dla
-> GitHub Release: [docs/wydanie-v1.0.md](docs/wydanie-v1.0.md).
+Notatki dla GitHub Release: [docs/wydanie-v1.0.md](docs/wydanie-v1.0.md). Zakres: wszystko scalone od v0.4.0.
 
-**E4+E5 — ekstrakcja** (`etap/E4-ekstrakcja`)
-- Silnik pól sterowany YAML (`fields`/`lists`, ekstraktory, normalizatory, walidatory w rejestrach), reguły dla
-  wszystkich pól 3 typów, imiona w mianowniku, trace (strona + fragment) dla GUI.
+- **Limit czasu UZP (#13):** `{}` dla każdego PDF przed przetwarzaniem, więc przerwany przebieg zostawia częściowe wyniki; zapis wyników atomowy (plik nigdy w połowie); dokumenty z tekstem przetwarzane przed skanami (OCR na końcu).
+- **Przelewy ze skanów (#21):** etykiety rozbite przez OCR, daty bez kropek; dev@skan F1 0,977 → 0,992, holdout@skan 0,912 → 0,922.
+- **Pełnomocnictwa ze skanów (#19):** dwa podpisy w jednej linii, konsolidacja wyników; holdout@skan 0,958. Uwaga: holdout@skan pełnomocnictw nie jest niezależny (poprawki dopasowano na tych samych skanach).
+- **Sonda odporności i poprawki YAML (#22):** synonimy etykiet i warianty sformułowań sprawdzane syntetycznie, poprawki wyłącznie w `config/doctypes/*.yaml`.
+- **Porządki testów (#20):** uporządkowane i ujednolicone testy.
+- **Raport jakości (#15):** `scripts/quality_report.py` → `docs/raport-jakosci.md` (wygenerowany po pomiarze skanów).
+- **Wdrożenie na VM jury (#23):** `RUN.md` dla oceniających, profil `config/app.jury.yaml` (wyniki tylko w katalogu wyjściowym), `scripts/deploy-vm.sh` z `--self-test`; instrukcja `docs/vm-jury.md`.
+- **Bez LLM (#12):** decyzja `docs/decyzje/E6-bez-llm.md` — reguły spełniają bramkę, 20/20 pkt za moc modelu, dane nie opuszczają maszyny.
+- **Dokumentacja (#10) i demo (#16):** `docs/architektura.md`, `docs/zgloszenie.md`, scenariusz demo, prezentacja.
+- **Repozytorium** publiczne: https://github.com/TybBla/jsonix.
 
-**E6 — bez LLM** (`etap/E6-bez-llm`)
-- Decyzja `docs/decyzje/E6-bez-llm.md`: reguły spełniają bramkę etapu, 20/20 pkt za moc modelu, limit czasu UZP;
-  warstwa LLM zostaje jako opcja (≤ 8B, dostawca z UE).
+| Bramka | F1 | odwołanie | pełnomocnictwo | przelew | negatywy |
+|---|---|---|---|---|---|
+| dev tekst | 0,999 | 0,998 | 1,000 | 1,000 | 12/12 |
+| holdout tekst | 0,997 | 0,997 | 1,000 | 0,994 | 10/10 |
+| dev skany | ⟨po aktualizacji baseline skanów — komputer B⟩ | | | | |
+| holdout skany | ⟨po aktualizacji baseline skanów — komputer B⟩ | | | | |
 
-**E10 — rozszerzalność** (`etap/E10-nowy-typ`)
-- Przykład 4. typu (orzeczenie KIO, 8 pól) wyłącznie konfiguracją w `examples/nowy-typ/`; test „0 linii kodu”,
-  nowe pole w istniejącym typie samą konfiguracją; typ nieaktywny w `config/` (UZP: orzeczenie = `{}`).
+Orientacyjnie z PR-ów (skany): dev@skan 0,977 → 0,992 (#21); holdout@skan 0,912 → 0,922 (#21) / 0,958 (#19); łączny wynik niezmierzony.
 
-**E11 — pakowanie i uruchomienie** (`etap/E11-docker`, `etap/E11-instalacja`, `etap/E11-limit-czasu`, `etap/E11-wydajnosc`)
-- Docker Compose bez wymaganego `.env`, healthcheck, `scripts/smoke_docker.py` (wynik w kontenerze = CLI, także skan z OCR).
-- `start.bat`/`start-gui.bat` same przygotowują środowisko (Python 3.13/3.14, `.venv`); instalacja działa też na
-  Pythonie 3.15 (bez OCR); przypięte wersje `requirements-lock.txt`; CI na 3.13 i 3.14; „test jury” (`docs/test-jury.md`).
-- Limit czasu UZP: `{}` dla każdego PDF przed przetwarzaniem, więc przerwany przebieg zostawia częściowe wyniki;
-  pomiar czasu `scripts/bench_cases.py` (99% czasu to OCR skanów).
+## v0.4.0 — E4+E5: ekstrakcja + E11: instalacja i Docker (2026-11-22)
 
-**E12 — dokumentacja i zgłoszenie** (`etap/E12-dokumentacja`, `etap/E12-raport-jakosci`, `etap/E12-demo`, `etap/kryteria-uzp-2111`)
-- `docs/architektura.md`, `docs/zgloszenie.md` (checklista regulaminu, licencje), ustalenia UZP z 21.11 wieczorem.
-- Raport jakości `scripts/quality_report.py` → `docs/raport-jakosci.md`.
-- Scenariusz demo, prezentacja `docs/prezentacja.html`, GIF z GUI (plan B).
+- Silnik ekstrakcji sterowany YAML (`odw2json/extract/engine.py`): pola i listy z `config/doctypes/*.yaml`, rejestry ekstraktorów/normalizatorów/walidatorów, trace z indeksami list, stroną i fragmentem źródła.
+- Reguły 3 typów (przelew, pełnomocnictwo, odwołanie), normalizatory (daty PL, kwoty, IBAN z „PL” jak w dokumencie, BZP/TED), mianownik imion (także wersaliki).
+- Odporność na inne sformułowania (synonimy etykiet, formaty kwot, nazwiska wersalikami) z testami wariantów.
+- Dane referencyjne: numery rachunków z „PL” zgodnie z ustaleniem UZP z 21.11.
+- Stabilność OCR pod obciążeniem (OpenBLAS 1 wątek, ponowienia, brak cache pustych wyników, slot międzyprocesowy).
+- Drugi członek zespołu: instalacja przez `start.bat` (venv, plik ograniczeń wersji), Docker Compose z healthcheckiem, pomiar wydajności, nowe ustalenia UZP w kryteriach, „Dlaczego ten typ?” w GUI.
 
-**GUI** (`etap/E9-dlaczego-typ`)
-- „Dlaczego ten typ?” zdaniami po polsku (surowe cechy w „Szczegółach technicznych”); poprawka kontrastu
-  podświetleń w PDF w trybie wysokiego kontrastu.
-
-**Dane** (`etap/dane-iban-pl`)
-- GT przelewów: numer rachunku z „PL”, gdy ma go dokument (96 pól) — ustalenie UZP; normalizator `iban` w E4 do zmiany.
-
-| Bramka (pomiar 21.11 na gałęzi E4, Docker, OCR) | dev | holdout |
-|---|---|---|
-| F1 — dokumenty z tekstem | 0,999 | 0,997 |
-| F1 — skany | 0,975 | 0,903 |
-| Błędy klasyfikacji | 0 | 0 |
-| Negatywy (tekst) | 12/12 | 10/10 |
-| Czas: dokument z tekstem / skan (średnio) | 0,01 s / 3,95 s | |
+| Bramka | F1 | odwołanie | pełnomocnictwo | przelew | negatywy |
+|---|---|---|---|---|---|
+| dev tekst | 0,999 | 0,998 | 1,000 | 1,000 | 12/12 |
+| holdout tekst | 0,997 | 0,997 | 1,000 | 0,994 | 10/10 |
+| dev skany | 0,977 | 0,997 | 0,980 | 0,882 | 3/3 |
+| holdout skany | 0,912 | 1,000 | 0,833 | 0,933 | 3/3 |
 
 ## v0.3.0 — E3: klasyfikacja + E8+E9: aplikacja (2026-11-21)
 

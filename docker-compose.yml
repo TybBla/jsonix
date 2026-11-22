@@ -1,10 +1,24 @@
+# jsonix: API + GUI w kontenerze (http://127.0.0.1:8000).
+#   docker compose up --build            # GUI i API
+#   docker compose run --rm app python -m odw2json run   # wsad: input/ -> output/ (bez GUI)
+# Plik .env jest opcjonalny: bez niego działa tryb bez LLM (domyślny). Port zmienisz przez JSONIX_PORT.
 services:
   app:
     build: .
-    env_file: .env
-    ports: ["8000:8000"]
+    image: jsonix:latest
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:${JSONIX_PORT:-8000}:8000"
     volumes:
       - ./input:/app/input
       - ./output:/app/output
       - ./config:/app/config
-  # Batch bez GUI: docker compose run --rm app python -m odw2json run
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped

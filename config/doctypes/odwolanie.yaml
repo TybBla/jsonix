@@ -26,9 +26,238 @@ classify:
     - 're:(wnosz[eay]|wnosimy|wnosi|sklad(am|amy|a))\s+(niniejsze\s+)?odwolanie'
   min_score: 8.0   # pojedyncze slowa domenowe (np. w wyroku KIO) nie wystarcza
   min_margin: 2.0
-# Sektor B: opis pol (metoda, normalizacja, zrodla). Format wolny do czasu ustalenia przez B.
+# Ekstrakcja pol (DSL silnika odw2json/extract/engine.py, opis: docs/nowy-typ-dokumentu.md).
+# Frazy/etykiety: male litery bez polskich znakow; 're:' = regex na takim tekscie. Regexy wartosci
+# (regex/value) dzialaja na oryginale. Kolejnosc ekstraktorow = priorytet; 'within' = okno ekstraktora
+# (lista okien zawezanych po kolei). Decyzje i wyniki: docs/decyzje/E4-ekstrakcja.md.
+#
+# Uklady w danych (oba warianty kolejnosci stron):
+#   A) [Miejscowosc, (dnia) DATA]  Prezes KIO  Odwolujacy:/Zamawiajacy:  dotyczy: pn. "TYTUL", nr referencyjny: X,
+#      BZP/TED  ODWOLANIE  Dzialajac w imieniu ...  "Zamawiajacy w dniu D <czynnosc>."  Zarzut nr 1 ...
+#   B) (skany) "Odwolujacy: Nazwa" w jednej linii, "reprezentowany przez pelnomocnika:" + lista, "wnosze odwolanie
+#      wobec: 1. <czynnosc> ... w dniu D; 2. ..."  (OCR: brak cudzyslowu otwierajacego, przestawione kolumny).
 fields:
+  # ---- naglowek: linia "Miejscowosc, (dnia) DATA" (w 1/4 GT brak -> null; nie zgadujemy z innych dat)
+  OdwolanieKIO.data:
+    type: date
+    extract:
+      - regex:
+          pattern: '^[ \t]*(?!(?:Zamawiając|Odwołując|Wykonawc))[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:[ -][A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż][a-ząćęłńóśźż]+){0,3},?[ \t]*(?:dnia[ \t]+)?(?P<v>\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[ \t]+[a-ząćęłńóśźż]+[ \t]+\d{4})'
+          case: true
+  OdwolanieKIO.miejscowosc:
+    type: str
+    extract:
+      - regex:
+          pattern: '^[ \t]*(?!(?:Zamawiając|Odwołując|Wykonawc))(?P<v>[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:[ -][A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż][a-ząćęłńóśźż]+){0,3}),?[ \t]*(?:dnia[ \t]+)?(?:\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[ \t]+[a-ząćęłńóśźż]+[ \t]+\d{4})'
+          case: true
+
+  # ---- zaskarzona czynnosc = pierwsza czynnosc (pierwszy zarzut): data i powod 1-12
+  OdwolanieKIO.czynnosc_dzien:
+    type: date
+    extract:
+      # A') szyk odwrocony "W dniu D Zamawiajacy ..." (poczatek linii albo zdania) - tylko przed zarzutami
+      - regex: '(?:^|(?<=[.;:])[ \t]+)[ \t]*w[ \t]+dniu[ \t]+(?P<v>\d{1,2}[ \t]+[a-ząćęłńóśźż]+[ \t]+\d{4}|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}|\d{4}-\d{2}-\d{2})(?:[ \t]+(?:roku|r\.))?[ \t]+Zamawiając'
+        within: {before: ['re:^[ \t]*zarzut', uzasadnienie]}
+      # A) "Zamawiajacy w dniu D ..." / "Zamawiajacy dnia D ..."
+      - label: ['re:zamawiajac[a-z]*\s+(?:w\s+dniu|dnia)']
+        max_chars: 40
+      # B) pierwsza data po "1." listy "wnosze odwolanie wobec:" (OCR przestawia kolumny, wiec do 400 znakow)
+      - near:
+          phrases: ['re:(?<![0-9.,])1[.)]\s']
+          direction: after
+          max_chars: 400
+        within: {after: 're:wnosz[a-z]*\s+odwolani[ea]', before: [zaskarzonym, 're:^[ \t]*zarzut', uzasadnienie]}
+  OdwolanieKIO.czynnosc_powod_id:
+    type: int
+    extract:
+      # A) zdanie o czynnosci (do "Uprzednio/Wczesniej/Nastepnie" - tam sa inne, wczesniejsze czynnosci)
+      - phrase_lookup: czynnosc_powod_frazy
+        within:
+          after:
+            - 're:zamawiajac[a-z]*\s+(?:w\s+dniu|dnia)'
+            # szyk odwrocony: "W dniu D Zamawiajacy <czynnosc>"
+            - 're:w\s+dniu\s+\d{1,2}(?:\s+[a-z]+\s+|[.\-/]\d{1,2}[.\-/])\d{4}(?:\s+roku|\s+r\.)?\s+zamawiajac[a-z]*'
+          before: [uprzednio, wczesniej, nastepnie, zaskarzonym, postepowanie prowadzi, 're:^[ \t]*zarzut']
+          max_chars: 400
+      # B) pierwszy punkt listy czynnosci: "wnosze odwolanie wobec: 1. ..." / "polegajacych na: 1) ..."
+      - phrase_lookup: czynnosc_powod_frazy
+        within:
+          - {after: ['re:wnosz[a-z]*\s+odwolani[ea]'], before: [zaskarzonym, 're:^[ \t]*zarzut', uzasadnienie]}
+          - {after: 're:(?<![0-9.,])1[.)]\s', before: ['re:(?<![0-9.,])2[.)]\s'], max_chars: 300}
+      # C) tytul pierwszego zarzutu
+      - phrase_lookup: czynnosc_powod_frazy
+        within: {after: 're:zarzut\s*(?:nr\s*)?1(?![0-9])', before: ['re:zarzut\s*(?:nr\s*)?2(?![0-9])'], max_chars: 200}
+    validate: {min: 1, max: 12}
   OdwolanieKIO.czynnosc_opis:
     derived: {lookup: czynnosc_powod, from: OdwolanieKIO.czynnosc_powod_id}
+
+  # ---- Odwolujacy (blok "Odwolujacy:"; konsorcjum -> Lider; CEIDG -> nazwa firmy)
+  # Nazwa konczy sie przed adresem/dopiskiem w tej samej linii (", ul.", " ul.", "reprezentowan", KRS/NIP/REGON,
+  # kod pocztowy) - wzorzec wartosci &name_line (wartosc = pierwsza linia po etykiecie).
+  Odwolujacy[].nazwa:
+    type: company
+    extract:
+      - label:
+          labels: ['re:^[ \t]*(?:\d+[).][ \t]*)?lider\s+konsorcjum[ \t]*:?[ \t]*$']
+          value: &name_line '[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*'
+          max_chars: 300
+      - regex: '^[ \t]*1[).][ \t]*(?P<v>[^\n(]{3,}?)[ \t]*\([ \t]*lider'
+      - label:
+          labels: ['re:pod\s+firma\s*:?[ \t]*$']
+          value: *name_line
+          max_chars: 300
+      # etykieta strony + synonimy: "Wykonawca wnoszacy odwolanie:", "Wykonawca (Odwolujacy):", "Odwolujacy sie:"
+      - label:
+          labels: ['re:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?|(?:wykonawca[ \t]+)?(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\)))[ \t]*:']
+          value: *name_line
+          max_chars: 300
+    normalize: [ws, ocr_fix]
+    validate: {regex: '^(?!(?i:konsorcjum|wykonawc))', min_len: 3}
+  Odwolujacy[].krs:
+    type: digits
+    extract:
+      - label: {labels: [krs], value: '(?<!\d)\d{10}(?!\d)', max_chars: 30}
+  Odwolujacy[].nip:
+    type: digits
+    extract:
+      - label: {labels: [nip], value: '(?<!\d)\d(?:[ -]?\d){9}(?!\d)', max_chars: 30}
+    normalize: [nip]
+  Odwolujacy[].regon:
+    type: digits
+    extract:
+      - label: {labels: [regon], value: '(?<!\d)(?:\d{14}|\d{9})(?!\d)', max_chars: 30}
+  Odwolujacy[].przez-pelnomocnika:
+    type: int
+    extract:
+      - flag: ['re:reprezentowan[a-z]*\s+przez', 're:pelnomocnik(?:iem|ami|a|ow|cy)?\b']
+      - const: 0
+  Odwolujacy[].pelnomocnik.imie_nazwisko:
+    type: name
+    extract:
+      # pierwszy z wymienionych pelnomocnikow; tytuly (r. pr., adw., radca prawny) pomija wzorzec (wielka litera)
+      - label:
+          labels: ['re:reprezentowan[a-z]*\s+przez(?:\W+pelnomocnik[a-z]*)?', 're:pelnomocni(?:k|cy)[a-z]*\s*:']
+          # slowo = "Nowak" albo WERSALIKI ("NOWAK"; bez tytulow pisanych wersalikami), opcjonalnie czlon po mysliniku
+          value: '(?<![A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|(?!(?:ADWOKAT|RADCA|RADCZYNI|PRAWNY|PRAWNA|PRAWNIK|PEŁNOMOCNIK|MECENAS|PAN|PANI)\b)[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?'
+          case: true
+          max_chars: 80
+    # wersaliki ("Jan NOWAK") -> "Jan Nowak" robi normalizator name (odw2json/extract/names.py)
+    normalize: [ws, name]
+  Odwolujacy[].pelnomocnik.nazwa:
+    type: company
+    extract:
+      # nazwa podmiotu = poczatek adresu do korespondencji: do przecinka albo do " ul."; zawiniecie nazwy
+      # ("Kancelaria Adwokacka Spolka z" + "ograniczona odpowiedzialnoscia, ul. ...") laczy nastepna linie,
+      # dopoki nie zaczyna sie od adresu (ul./al./pl./os.), kodu/cyfr, tel./e-mail/KRS/NIP albo naglowka strony
+      - label:
+          labels: ['re:adres\s+(?:do\s+(?:korespondenc|doreczen)[a-z]*|kancelarii)']
+          value: '[^,:\s](?:(?![ \t]+(?:ul|al|pl|os)\.\s)[^,\n]|\n(?![ \t]*(?:(?:ul|al|pl|os)\.|tel\b|e-?mail\b|krs\b|nip\b|regon\b|dotyczy|zamawiaj|odwo[lł]|instytucja|strona|podmiot|wykonawca|reprezentowan|\d|\S*@)))*'
+          max_chars: 250
+      # OCR przestawil adres przed nazwe: fragment z "Kancelaria" w oknie adresu
+      - regex: {pattern: '(?P<v>[^,\n]*\bKancelari[^,\n]*)'}
+        within: {after: 're:adres\s+(?:do\s+(?:korespondenc|doreczen)[a-z]*|kancelarii)', max_chars: 250}
+    normalize: [ws, ocr_fix]
+    validate: {regex: '^(?!(?i:ul|al|pl|os|tel)\.?\s)', min_len: 3}
+  Odwolujacy[].pelnomocnik.mail:
+    type: email
+    extract:
+      - near:
+          phrases: ['re:reprezentowan[a-z]*\s+przez', 're:adres\s+(?:do\s+(?:korespondenc|doreczen)[a-z]*|kancelarii)']
+          direction: after
+          max_chars: 400
+
+  # ---- Zamawiajacy (blok "Zamawiajacy:"; wielu: "1) Zamawiajacy - Lider, prowadzacy postepowanie:" albo
+  #      "1) Nazwa ... - Zamawiajacy prowadzacy postepowanie")
+  Zamawiajacy[].nazwa:
+    type: company
+    extract:
+      # nazwa = pierwsza linia po etykiecie (do przecinka / " ul." / kodu pocztowego / KRS / NIP) + ewentualnie
+      # jedna zawinieta linia (nie adres, nie linia z cyfra/@ ani tel./KRS/NIP/e-mail)
+      - label:
+          labels: ['re:^[ \t]*(?:\d+[).][ \t]*)?(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*[^:\n]{0,80}:']
+          value: &zam_name '[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*(?:\n[ \t]*(?!(?:ul|al|pl|os)\.|krs\b|nip\b|regon\b|e-?mail\b|tel\b|adres\b|siedziba\b|-|reprezentowan|\d|\S*@)[^\s,](?:(?![ \t]+(?:(?:ul|al|pl|os)\.|reprezentowan|krs\b|nip\b|regon\b|adres\b|e-?mail\b|tel\b)|[ \t]*\d{2}-\d{3})[^\n,])*)?'
+          max_chars: 300
+      - label:
+          labels: ['re:^[ \t]*\d+\)[ \t]*(?![ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac)']
+          value: *zam_name
+          max_chars: 300
+    normalize: [ws, ocr_fix]
+    validate: {regex: '^(?!(?i:zamawiaj))', min_len: 3}
+  Zamawiajacy[].krs:
+    type: digits
+    extract:
+      - label: {labels: [krs], value: '(?<!\d)\d{10}(?!\d)', max_chars: 30}
+  Zamawiajacy[].nip:
+    type: digits
+    extract:
+      - label: {labels: [nip], value: '(?<!\d)\d(?:[ -]?\d){9}(?!\d)', max_chars: 30}
+    normalize: [nip]
+  Zamawiajacy[].regon:
+    type: digits
+    extract:
+      - label: {labels: [regon], value: '(?<!\d)(?:\d{14}|\d{9})(?!\d)', max_chars: 30}
+  Zamawiajacy[].prowadzacy_postepowanie:
+    # tylko przy numerowanej liscie zamawiajacych (jeden zamawiajacy -> null)
+    type: int
+    extract:
+      - flag:
+          phrases: ['re:^[ \t]*\d+[).][^\n]{0,80}(?:prowadzac|lider)', 're:^[ \t]*-?[ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*\s+(?:prowadzac|lider)']
+          value: 1
+      - flag: {phrases: ['re:^[ \t]*\d+\)'], value: 0}
+
+  # ---- zamowienie: tylko naglowek (w uzasadnieniu sa numery innych postepowan)
+  ZamowieniePubliczne.tytul:
+    type: str
+    scope: {before: [dzialajac w imieniu, uzasadnienie, 're:^[ \t]*zarzut']}
+    extract:
+      # OCR gubi cudzyslow otwierajacy ("pn. Tytul",) - wtedy wystarcza zamykajacy
+      - regex: '(?:\bpn\.|\bpt\.|pod nazw[aą]|nazw[aą] zam[oó]wienia:?)\s*["„“”]?(?P<v>[^"„“”]{3,500}?)["”“]'
+    normalize: [ws, trim_quotes]
+    validate: {min_len: 5}
+  ZamowieniePubliczne.numer_postepowania:
+    type: str
+    scope: {before: [dzialajac w imieniu, uzasadnienie, 're:^[ \t]*zarzut']}
+    extract:
+      # token z cyfra; nie numer TED (NNNNNN-RRRR) ani BZP
+      - label:
+          labels: [nr referencyjny sprawy, numer referencyjny, nr referencyjny, nr ref., znak sprawy,
+                   znak postepowania, numer postepowania, nr postepowania, oznaczenie sprawy, numer sprawy,
+                   nr sprawy, sygnatura sprawy]
+          value: '(?<![A-Za-z0-9./\-_])(?!\d{6}-\d{4}(?!\d))(?!\d{4}\s*/\s*BZP)(?=[A-Za-z0-9./\-_]*\d)[A-Za-z0-9](?:[A-Za-z0-9./\-_]*[A-Za-z0-9])?'
+          max_chars: 160
+  ZamowieniePubliczne.numer_bzp:
+    type: str
+    scope: {before: [dzialajac w imieniu, uzasadnienie, 're:^[ \t]*zarzut']}
+    extract:
+      - regex: '(?<!\d)(?P<v>\d{4}\s*/\s*BZP\s*[0-9oO]{8}(?:\s*/\s*\d{2}(?!\d))?)'
+    normalize: [ocr_digits, bzp]
+  ZamowieniePubliczne.numer_ted:
+    type: str
+    scope: {before: [dzialajac w imieniu, uzasadnienie, 're:^[ \t]*zarzut']}
+    extract:
+      - label:
+          labels: [ted, dzienniku urzedowym unii europejskiej, dzienniku urzedowym ue, dz. urz. ue, dz.u. ue,
+                   tenders electronic daily]
+          value: '\d{4}\s*/\s*S\s*\d{1,3}\s*-\s*\d{6}|(?<![\d/])\d{6}-\d{4}(?!\d)'
+          max_chars: 80
+      - regex: '(?<!\d)\d{4}\s*/\s*S\s*\d{1,3}\s*-\s*\d{6}(?!\d)'
+      # OCR: numer stoi przed etykieta ("nr 209925-2026 ZP/107/2026, ogloszenie w Dzienniku ...")
+      - regex: '(?<![\d/\-])\d{6}-20\d{2}(?!\d)'
+    normalize: [ted]
+lists:
+  # Etykiety stron + synonimy (po foldzie): "Odwolujacy:" | "Odwolujacy sie:" | "Wykonawca wnoszacy odwolanie:" |
+  # "Wykonawca (Odwolujacy):"; "Zamawiajacy:" | "Instytucja/Strona/Podmiot zamawiajaca:" | "Zamawiajacy - nazwa:".
+  # Koniec bloku jednej strony = poczatek bloku drugiej (w dowolnej kolejnosci) albo "dotyczy"/tytul/uczestnicy.
+  Odwolujacy:
+    split:
+      start: 're:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?[ \t]*(?::|\()|(?:wykonawca[ \t]+)?(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\))[ \t]*(?::|\())'
+      end: 're:^[ \t]*(?:(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*(?:[ \t]+[-–—][^:\n]{0,40})?[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ \t]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
+    max_items: 1    # wg schematu UZP: konsorcjum -> tylko Lider
+  Zamawiajacy:
+    split:
+      start: 're:^[ \t]*(?:(?:instytucja|strona|podmiot)[ \t]+)?zamawiajac[a-z]*(?:[ \t]+[-–—][^:\n]{0,40})?[ \t]*(?::|\()'
+      end: 're:^[ \t]*(?:odwolujac[a-z]*(?:[ \t]+sie)?[ \t]*(?::|\()|(?:wykonawca[ \t]+)?(?:wnoszac[a-z]*[ \t]+odwolanie|\([ \t]*odwolujac[a-z]*[ \t]*\))[ \t]*(?::|\()|dotyczy|dot[a-z]{2,4}[ \t]*:|wykonawca wybrany|wykonawc[a-z]* przystepujac|przystepujac|uczestnik|odwolanie[ \t]*$|prezes krajowej|krajowa izba|dzialajac)'
+      item_sep: 're:^[ \t]*\d+\)[ \t]*\S'
+    max_items: 10
 llm:
   prompt: prompts/odwolanie.md

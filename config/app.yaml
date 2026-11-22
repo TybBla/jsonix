@@ -5,6 +5,7 @@
 unknown_output: empty_object
 write_trace: true          # output/.trace/<case>/<plik>.trace.json
 llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
+log_dir: null              # logi CLI i podsumowanie przebiegu; null = <output>/.logs (profil jury: poza output)
 
 # Ingest PDF (sektor A). Backendy wybierane tu, bez zmian kodu.
 ingest:
@@ -33,5 +34,7 @@ ingest:
       Global.use_cls: false                     # strony skanow nie sa obrocone: klasyfikator kata ok. 2x wolniej
       Rec.rec_batch_num: 1                      # brak dopelniania wsadu szerokimi wierszami: ok. 1,5x szybciej
       EngineConfig.onnxruntime.intra_op_num_threads: 4   # wiecej watkow nie przyspiesza (mierzone)
+    max_concurrent_processes: 1                 # procesy OCR-ujace naraz na maszynie (0 = bez limitu); E2b "Stabilnosc"
+    slot_timeout_s: 900                         # po tym czasie czekania na slot OCR rusza mimo wszystko
     postprocess: [ocr_artifacts]                # kroki clean.py tylko dla tekstu z OCR (nie dla warstwy tekstowej)
     cache_dir: output/.cache/ocr                # cache wynikow OCR po hashu pliku (gitignored); decyzja E2-T5

@@ -11,13 +11,19 @@ dołączonego do paczki (bez pobierania modeli w czasie działania), który obs�
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import logging
 import os
+import tempfile
+import threading
+import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -31,6 +37,111 @@ OCR_CACHE_VERSION = (
     "2"  # podbić przy zmianie renderowania/składania wierszy/parametrów, żeby unieważnić stary cache
 )
 MEMO_MAX = 256
+
+# Stabilność pod obciążeniem (docs/decyzje/E2b-ocr-wydajnosc.md, „Stabilność pod obciążeniem”): przy braku
+# pamięci onnxruntime rzuca ``bad allocation``, a numpy ``MemoryError``. Strona jest wtedy ponawiana po
+# przerwie (szczyt pamięci innych procesów mija). Mniej wątków ORT NIE obniża szczytu (zmierzone: 990 MB
+# przy 1 i 4 wątkach), a osobna instancja silnika kosztowałaby kolejne ok. 600 MB, więc ponowienia
+# używają tej samej konfiguracji.
+OCR_ATTEMPTS = 5
+RETRY_DELAYS_S = (2.0, 5.0, 10.0, 20.0)  # przerwa przed kolejnymi próbami (razem maks. 37 s na stronę)
+
+log = logging.getLogger(__name__)
+
+# Silnik sam wątkuje (intra_op_num_threads), więc równoległe wywołania w jednym procesie tylko mnożą
+# szczytowe zużycie pamięci i nadsubskrybują CPU; RapidOCR nie deklaruje też bezpieczeństwa wątkowego.
+_ENGINE_LOCK = threading.Lock()
+
+
+# Limit procesów OCR-ujących naraz na maszynie (``ingest.ocr.max_concurrent_processes``; 0 = bez limitu).
+# Każdy proces z silnikiem trzyma ok. 600 MB, a przy stronie dochodzi ok. 400 MB szczytu; równoległe szczyty
+# kilku procesów wyczerpywały limit pamięci (commit). Slot = blokada pliku w katalogu tymczasowym systemu,
+# zwalniana przez system także po awarii procesu.
+DEFAULT_SLOT_TIMEOUT_S = 900.0
+SLOT_DIR = Path(tempfile.gettempdir()) / "odw2json-ocr-slots"
+
+
+def _lock_fd(fd: int) -> bool:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+def _try_acquire_slot(lock_dir: Path, slots: int) -> int | None:
+    """Deskryptor zablokowanego pliku slotu albo ``None``, gdy wszystkie ``slots`` są zajęte."""
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    for k in range(slots):
+        fd = os.open(lock_dir / f"slot-{k}.lock", os.O_RDWR | os.O_CREAT, 0o644)
+        if _lock_fd(fd):
+            return fd
+        os.close(fd)
+    return None
+
+
+def _release_slot(fd: int) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _ocr_slot(cfg: dict, lock_dir: Path | None = None, poll_s: float = 0.2) -> Iterator[None]:
+    """Czeka na wolny slot OCR na maszynie; po ``slot_timeout_s`` przetwarza mimo wszystko (z logiem)."""
+    slots = cfg.get("max_concurrent_processes") or 0  # brak klucza = bez limitu; produkcyjnie 1 w app.yaml
+    if not slots:
+        yield
+        return
+    timeout = float(cfg.get("slot_timeout_s") or DEFAULT_SLOT_TIMEOUT_S)
+    lock_dir = lock_dir or SLOT_DIR
+    deadline = time.monotonic() + timeout
+    fd = None
+    try:
+        fd = _try_acquire_slot(lock_dir, int(slots))
+        while fd is None and time.monotonic() < deadline:
+            time.sleep(poll_s)
+            fd = _try_acquire_slot(lock_dir, int(slots))
+    except OSError as e:  # brak dostępu do katalogu blokad nie może zatrzymać OCR
+        log.warning("OCR: slot międzyprocesowy niedostępny (%s), przetwarzam bez limitu", short_error(e))
+    if fd is None:
+        log.warning("OCR: brak wolnego slotu po %.0f s, przetwarzam bez limitu", timeout)
+    try:
+        yield
+    finally:
+        if fd is not None:
+            _release_slot(fd)
+
+
+class OcrError(RuntimeError):
+    """OCR strony nie powiódł się mimo ponowień (komunikat jednowierszowy, po polsku)."""
+
+
+def short_error(e: BaseException, limit: int = 200) -> str:
+    """``Typ: ostatni niepusty wiersz komunikatu`` (bez tracebacku ORT), przycięte do ``limit`` znaków."""
+    lines = [ln.strip() for ln in str(e).splitlines() if ln.strip()]
+    msg = lines[-1] if lines else ""
+    out = f"{type(e).__name__}: {msg}" if msg else type(e).__name__
+    return out if len(out) <= limit else out[: limit - 1] + "…"
 
 
 @dataclass(frozen=True)
@@ -242,8 +353,37 @@ def ocr_page(path: Path, page_index: int, cfg: dict | None = None) -> str:
         if cached is not None:
             _memo_put(key, cached)
             return cached
-    text = engine.run(render_page(Path(path), page_index, dpi), cfg)
-    _memo_put(key, text)
-    if cache is not None:
-        _write_cache(cache, text)
+    with _ENGINE_LOCK:
+        hit = _memo_get(key)  # inny wątek mógł policzyć tę stronę, gdy czekaliśmy na blokadę
+        if hit is not None:
+            return hit
+        text = _run_with_retries(engine, Path(path), page_index, dpi, cfg)
+    if text.strip():  # pusty wynik nie trafia do pamięci ani cache: kolejne wywołanie spróbuje ponownie
+        _memo_put(key, text)
+        if cache is not None:
+            _write_cache(cache, text)
     return text
+
+
+def _run_with_retries(engine: OcrEngine, path: Path, page_index: int, dpi: int, cfg: dict) -> str:
+    """Render + silnik z ponowieniami; po ``OCR_ATTEMPTS`` nieudanych próbach rzuca ``OcrError``."""
+    last: BaseException | None = None
+    for attempt in range(OCR_ATTEMPTS):
+        try:
+            with _ocr_slot(cfg):
+                return engine.run(render_page(path, page_index, dpi), cfg)
+        except Exception as e:  # bad allocation (ORT), MemoryError (numpy) i inne błędy przejściowe
+            last = e
+            log.warning(
+                "OCR %s strona %d: próba %d/%d nieudana (%s)",
+                path.name,
+                page_index + 1,
+                attempt + 1,
+                OCR_ATTEMPTS,
+                short_error(e),
+            )
+            if attempt < OCR_ATTEMPTS - 1:
+                gc.collect()
+                time.sleep(RETRY_DELAYS_S[min(attempt, len(RETRY_DELAYS_S) - 1)])
+    assert last is not None
+    raise OcrError(f"{OCR_ATTEMPTS} próby, ostatni błąd {short_error(last)}") from last

@@ -204,14 +204,19 @@ def _node(script: str, payload) -> object:
         f"const output = (v) => process.stdout.write(JSON.stringify(v));"
         f"const js = (name) => import({json.dumps((JS).as_uri())} + '/' + name);"
     )
-    r = subprocess.run(
-        ["node", "--input-type=module", "-e", prelude + script],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        env={**os.environ, "O2J_INPUT": json.dumps(payload, ensure_ascii=False)},
-        timeout=60,
-    )
+    timeout = float(os.environ.get("O2J_NODE_TIMEOUT", "120"))  # start Node bywa wolny pod obciążeniem
+    kwargs = {
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "env": {**os.environ, "O2J_INPUT": json.dumps(payload, ensure_ascii=False)},
+        "timeout": timeout,
+    }
+    cmd = ["node", "--input-type=module", "-e", prelude + script]
+    try:
+        r = subprocess.run(cmd, **kwargs)
+    except subprocess.TimeoutExpired:  # jedno ponowienie; błędy skryptu (returncode != 0) nie są maskowane
+        r = subprocess.run(cmd, **kwargs)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
@@ -529,3 +534,123 @@ def test_gui_limits_number_of_files_like_api(client):
     js = client.get("/static/js/app.js").text
     assert re.search(r"MAX_FILES\s*=\s*50\b", js)
     assert api.MAX_FILES == 50
+
+
+# --- czytelne „Dlaczego ten typ?” (evidence z klasyfikatora E3) ---
+
+EVIDENCE_ODWOLANIE = [
+    "strong: 'odwolanie' (+2)",
+    "strong: 'odwolujacy' (+2)",
+    "strong: 'zarzut' (+2)",
+    "weak: 'zamawiajacy' (+1)",
+    "weak: 'wnosze o' (+1)",
+    "negative: 'ogloszenie o zamowieniu' (-3)",
+    "title: 'odwolanie' (+4)",
+    "pattern: 'odwolujacy:' (+3)",
+    "pattern: 'zarzut nr \\d+' (+3)",
+]
+
+
+@needs_node
+def test_evidence_is_explained_in_plain_polish():
+    out = _node(
+        """const e = await js('evidence.js');
+        const label = (id) => ({odwolanie: 'Odwołanie', pelnomocnictwo: 'Pełnomocnictwo'})[id] || id;
+        const no = (ev) => e.explainEvidence(ev, {known: false, label});
+        const best = (b) => `(najlepszy: ${b})`;
+        output({
+          known: e.explainEvidence(input.ev, {known: true, label}),
+          low: no([`odrzucono: wynik 3 < min_score 5 ${best('pelnomocnictwo')}`, "strong: 'udzielam' (+2)"]),
+          zero: no([`odrzucono: wynik 0 < min_score 5 ${best('pelnomocnictwo')}`]),
+          margin: no([`odrzucono: margines 0.5 < min_margin 1 ${best('odwolanie')}`]),
+          required: no(['odrzucono: odwolanie: brak wymaganej cechy (required_any: zarzut); '
+                        + 'przelew: brak wymaganej cechy (required_any: kwota)']),
+          foreign: no(["foreign title: 'wyrok' (-10)"]),
+          negScore: no([`odrzucono: wynik -11 < min_score 5 ${best('pelnomocnictwo')}`,
+                        "strong: 'udzielaja' (+2)", "foreign title: 'ogloszenie o' (-10)"]),
+          empty: no([]),
+          odd: e.explainEvidence(['nowy format cechy'], {known: true, label}),
+        });""",
+        {"ev": EVIDENCE_ODWOLANIE},
+    )
+    known = [s["text"] for s in out["known"]]
+    assert known[0] == "Tytuł w nagłówku dokumentu: „odwolanie”."
+    assert "Słowa kluczowe tego typu: „odwolanie”, „odwolujacy”, „zarzut”." in known
+    assert "Słowa pomocnicze: „zamawiajacy”, „wnosze o”." in known
+    assert "Pasujące wzorce tekstu: 2." in known
+    assert "Słowa typowe dla innego dokumentu (obniżają wynik): „ogloszenie o zamowieniu”." in known
+    assert all("(+" not in t and "strong" not in t for t in known), "bez technicznych etykiet i punktów"
+    assert {s["tone"] for s in out["known"]} <= {"plus", "minus", "info"}
+
+    low = [s["text"] for s in out["low"]]
+    assert low[0] == "Za mało cech, żeby rozpoznać typ. Najbliżej było: Pełnomocnictwo."
+    assert "Słowa kluczowe typu Pełnomocnictwo: „udzielam”." in low
+    zero = [s["text"] for s in out["zero"]]
+    assert zero == ["Nie znaleziono cech żadnego z obsługiwanych typów dokumentów."]
+    assert out["margin"][0]["text"].startswith("Dokument pasuje do kilku typów podobnie")
+    assert "Odwołanie" in out["margin"][0]["text"]
+    req = out["required"][0]["text"]
+    assert req.startswith("Brak cechy wymaganej dla typów:") and "Odwołanie" in req and "przelew" in req
+    assert out["foreign"][0]["text"] == "Nagłówek innego rodzaju pisma (obniża wynik): „wyrok”."
+    nothing = "Nie znaleziono cech żadnego z obsługiwanych typów dokumentów."
+    assert [s["text"] for s in out["empty"]] == [nothing]
+    neg = [s["text"] for s in out["negScore"]]
+    closest = "Za mało cech, żeby rozpoznać typ. Najbliżej było: Pełnomocnictwo."
+    assert neg[0] == closest, "cechy są, więc nie „nic”"
+    assert "Słowa kluczowe typu Pełnomocnictwo: „udzielaja”." in neg
+    assert out["odd"][0]["text"] == "nowy format cechy", "nieznany format: pokaż bez zmian"
+
+
+def test_results_show_readable_reasons_and_raw_details(client):
+    js = client.get("/static/js/app.js").text
+    assert "explainEvidence" in js
+    assert "Szczegóły techniczne" in js
+
+
+def test_pdf_highlights_keep_contrast_on_white_page_in_high_contrast_mode(client):
+    """Strona PDF zostaje biała: obramowania nie mogą brać koloru motywu (#ff0 na bieli ≈ 1,1:1)."""
+    css = client.get("/static/css/app.css").text
+    rules = re.findall(r"([^{}]*\.hl-box[^{}]*)\{([^}]*)\}", css)
+    assert rules
+    for selector, body in rules:
+        if "border" in body:
+            assert "var(--" not in body.split("background")[0], f"kolor z motywu w {selector.strip()}"
+            assert "#ff0" not in body.lower(), f"żółte obramowanie na białej stronie: {selector.strip()}"
+    high = [b for s, b in rules if 'data-contrast="high"' in s and ".is-preview" in s]
+    assert high and "#000" in high[0]
+
+
+def test_node_helper_retries_once_on_timeout(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(kw["timeout"])
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+        return subprocess.CompletedProcess(cmd, 0, stdout="[1]", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert _node("output(input)", [1]) == [1]
+    assert len(calls) == 2
+
+
+def test_node_helper_does_not_mask_real_errors(monkeypatch):
+    def fake_run(cmd, **kw):
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="blad skryptu")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(AssertionError, match="blad skryptu"):
+        _node("output(1)", None)
+
+
+def test_node_helper_timeout_from_env(monkeypatch):
+    seen = []
+
+    def fake_run(cmd, **kw):
+        seen.append(kw["timeout"])
+        return subprocess.CompletedProcess(cmd, 0, stdout="1", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setenv("O2J_NODE_TIMEOUT", "7")
+    _node("output(1)", None)
+    assert seen == [7.0]

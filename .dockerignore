@@ -1,14 +1,18 @@
+# Profil jury: RUN.md, config/app.jury.yaml i scripts/ MUSZA trafiac do obrazu (nie dopisuj ich tutaj).
 .env
 .env.*
 !.env.example
 .git
+.github
+.venv
+venv
+.claude
 output/
 input/
+data/
+tests/
+docs/img/
 .pytest_cache
 .ruff_cache
 **/__pycache__
 web/node_modules
-.claude/
-fundament/
-*.log
-.cache/
