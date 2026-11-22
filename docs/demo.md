@@ -5,7 +5,7 @@ Materiał dla zespołu na prezentację finałową. Ocena w finale to 50% F1 i 50
 - łatwość dodawania typów i pól bez przebudowy: 20 pkt;
 - inne funkcje, np. GUI: 10 pkt.
 
-Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1: v0.4.0 (`eval/baseline.json`); pełny raport per pole i czas: `python scripts/quality_report.py`. Do uzupełnienia zostaje skład zespołu (⟨…⟩).
+Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1: v0.4.0 (`eval/baseline.json`); pełny raport per pole i czas: `python scripts/quality_report.py`.
 
 ## Przygotowanie (15 minut przed)
 
@@ -73,7 +73,7 @@ Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otw
    - Docker Compose z healthcheckiem, CLI `start.bat`;
    - testy i bramka F1 w CI, smoke testy;
    - działa offline na CPU (i7 / 16 GB, bez GPU).
-10. **Zespół i rozwiązania zewnętrzne:** lista komponentów open source z licencjami (z [zgloszenie.md](zgloszenie.md)), zgodnie z §4 regulaminu.
+10. **Zespół i rozwiązania zewnętrzne:** Aleksander Czajkowski, Tyberiusz Błażewicz, Damian Beldegrin; lista komponentów open source z licencjami (z [zgloszenie.md](zgloszenie.md)), zgodnie z §4 regulaminu.
 
 ## Pytania jury: przygotowane odpowiedzi
 

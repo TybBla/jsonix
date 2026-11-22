@@ -22,4 +22,4 @@ Zmiany tylko w dokumentacji. `ruff`: czysto. Testy GUI i `test_tooling`: zielone
 ### Po review (v0.4.0)
 - Liczby z `eval/baseline.json`: skany rozbite na typy (przelew osobno), negatywy 15/15 i 13/13.
 - Uzupełnione ⟨…⟩: wyniki testów odporności z E4. Dodane zdanie o limicie czasu UZP w scenariuszu i na slajdzie 9. Demo E10 tylko na kopii konfiguracji.
-- Zostaje do wpisania: skład zespołu.
+- Wpisany skład zespołu (slajd 10 i `docs/demo.md`): Aleksander Czajkowski, Tyberiusz Błażewicz, Damian Beldegrin.
