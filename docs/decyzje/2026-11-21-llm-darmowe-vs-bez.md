@@ -26,7 +26,19 @@ limitem tokenów (sprawdzone na przyklad_01).
 
 ## Wyniki (dev, w próbie)
 
-WYNIKI_SKANY
+**Skany (dev@skan), pełny przebieg:**
+
+| Wariant | F1 | Precyzja | Pełność | TP | TN | FP | FN | Czas przebiegu |
+|---|---|---|---|---|---|---|---|---|
+| same reguły | **0,9919** | 0,9839 | 1,0000 | 244 | 66 | 4 | 0 | 10,6 s |
+| reguły + LLM dla pól null | 0,9899 | 0,9799 | 1,0000 | 244 | 65 | 5 | 0 | 583,9 s |
+
+- LLM pytany w 17 skanach o 30 pól (wycinki: 20 tys. znaków z 154 tys., ok. 1/8 tekstu); 16 odpowiedzi,
+  1 odpowiedź ucięta na limicie tokenów (rozumowanie modelu), ok. 47 tys. tokenów.
+- Uzupełnienia: **0 poprawnych, 0 błędnych, 1 zmyślone**: `skany/odwolania/0007`, `Zamawiajacy[0].krs` =
+  9997788146, w GT `null` (numer jest w tekście, ale nie przy Zamawiającym, więc kontrola „jest w tekście” go
+  przepuściła). Efekt: TN → FP, **F1 spada o 0,002**.
+- Czas: 582 s samego LLM na 17 dokumentów (ok. 34 s na dokument przy limicie 2 zapytania/min).
 
 **Dokumenty z tekstem (dev@tekst):** reguły F1 **0,9990** (TP 1547, TN 216, FP 3, **FN 0**). LLM byłby pytany
 w 56 dokumentach o 77 pól. Przez limit 2 zapytania/min pełny przebieg to ok. 45 min, więc odpowiedzi mamy dla
