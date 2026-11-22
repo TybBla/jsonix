@@ -9,16 +9,12 @@ Gałąź `etap/E11-limit-czasu` → `main`. UZP (21.11, 21:13): każde rozwiąza
 - `unknown_output: none` działa jak dotąd, bez plików zastępczych.
 - Testy `tests/test_cli_limit_czasu.py`: przerwanie po pierwszym pliku (pozostałe mają `{}`), pełny przebieg nadpisuje pliki zastępcze, zgodność z `unknown_output`.
 
-### Czego nie ruszyłem (do decyzji właściciela `pipeline.py`)
-Uprawnienia zablokowały mi edycję `odw2json/pipeline.py` (plik chroniony), więc dwie rzeczy zostają propozycją:
-1. **Najtańsze dokumenty najpierw.** `pipeline.run` przetwarza pliki alfabetycznie. Sortowanie po rozmiarze (małe PDF-y z tekstem ~0,01 s, na końcu duże skany 4–12 s) sprawia, że przerwanie zabiera najmniej gotowych wyników:
-   ```python
-   pdfs = sorted(
-       (p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf"),
-       key=lambda p: (p.stat().st_size, str(p)),
-   )
-   ```
-2. **Timeout na dokument.** Bez osobnego procesu na dokument nie da się bezpiecznie przerwać OCR w trakcie, a osobny proces to ładowanie modeli OCR za każdym razem. Pomiar (`docs/decyzje/E11-wydajnosc.md`, PR `etap/E11-wydajnosc`): najwolniejszy skan to 12,6 s, więc timeout nie jest dziś potrzebny. Bezpieczniejszy byłby limit stron OCR na dokument w `ingest/ocr.py`, czyli obszar OCR.
+### Po review (zmiany w `odw2json/pipeline.py`, na prośbę właściciela)
+- **Zapis atomowy** (`write_text_atomic`): plik `.tmp` w tym samym katalogu, potem `os.replace`. Dotyczy wyniku JSON, `{}`, pustego pliku, trace i placeholderów z CLI. Przerwanie nie zostawi pustego ani uciętego JSON-a.
+- **`pipeline.list_inputs(input_dir)`**: jedna lista wejść dla CLI (placeholdery) i `pipeline.run`.
+- **Kolejność:** najpierw PDF-y z warstwą tekstu, skany na końcu, według liczby stron z mniej niż `min_chars_per_page` (30) znakami. Sprawdzam to przez pypdfium2, bez OCR. Nieczytelny PDF idzie na początek, żeby błąd wyszedł od razu.
+- **Timeout na dokument:** bez zmian. Pomiar pokazał najwolniejszy skan 12,6 s, a przerwanie OCR w trakcie wymaga osobnego procesu.
+- Testy: kolejność, nieczytelny PDF, kolejność w `run`, atomowość zapisu, CLI korzysta z `list_inputs`.
 
 ### Bramka
 `ruff`: czysto. `smoke_gui.py` i `eval.gate --split dev --source tekst`: exit 0. `pytest` lokalnie (3.15): tylko 5 testów OCR, jak na `main`.
