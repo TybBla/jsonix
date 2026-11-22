@@ -1,0 +1,105 @@
+"""Raport jakości (scripts/quality_report.py): tabela F1 per zbiór/typ/pole i czas na dokument."""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+_spec = importlib.util.spec_from_file_location("quality_report", ROOT / "scripts" / "quality_report.py")
+qr = importlib.util.module_from_spec(_spec)
+sys.modules["quality_report"] = qr  # @dataclass (Python 3.14) szuka modułu w sys.modules
+_spec.loader.exec_module(qr)
+
+
+def _metrics(f1: float, field_f1: float) -> dict:
+    return {
+        "f1": f1,
+        "precision": 0.9,
+        "recall": 0.8,
+        "f1_by_type": {"odwolanie": f1, "przelew": 1.0},
+        "f1_by_field": {"OdwolanieKIO.data": 1.0, "przelew_bankowy.na_rachunek": field_f1},
+        "neg_correct": 12,
+        "neg_total": 12,
+        "classification_errors": 1,
+        "classification_error_files": ["case/x.pdf"],
+    }
+
+
+def test_render_has_summary_types_fields_and_time():
+    runs = [
+        qr.Run("dev", "tekst", _metrics(0.999, 0.95), docs=40, seconds=20.0, exit_code=0),
+        qr.Run("holdout", "skan", _metrics(0.9, 0.5), docs=10, seconds=50.0, exit_code=0),
+    ]
+    md = qr.render(runs, {"python": "3.13.1"}, "zimny (pusty `output/.cache/ocr`)")
+    assert "| dev | tekst | **99.9%** |" in md
+    assert "0.50 s" in md and "5.00 s" in md, "czas na dokument"
+    assert "| odwolanie | 99.9% | 90.0% |" in md
+    assert "**przelew_bankowy.na_rachunek**" in md, "pole z F1 < 0.85 wyróżnione"
+    assert "| OdwolanieKIO.data |" in md
+    assert "`case/x.pdf`" in md
+    assert "zimny" in md and "python: 3.13.1" in md
+
+
+def test_render_without_documents_or_fields():
+    md = qr.render(
+        [qr.Run("dev", "skan", {"f1": None}, docs=0, seconds=0.0, exit_code=2)], {}, "brak cache OCR"
+    )
+    assert "| dev | skan | **—** |" in md
+    assert "F1 per pole" not in md
+
+
+def test_report_runs_on_real_gate_for_one_section(tmp_path):
+    out = tmp_path / "raport.md"
+    assert qr.main(["--split", "dev", "--source", "tekst", "--out", str(out)]) == 0
+    md = out.read_text(encoding="utf-8")
+    assert "| dev | tekst |" in md
+    assert out.with_suffix(".json").is_file()
+
+
+def test_render_warns_when_gate_exit_code_is_not_zero():
+    runs = [
+        qr.Run("dev", "tekst", _metrics(0.999, 0.95), docs=40, seconds=20.0, exit_code=0),
+        qr.Run("holdout", "tekst", _metrics(0.9, 0.9), docs=10, seconds=5.0, exit_code=1),
+    ]
+    md = qr.render(runs, {}, "brak cache OCR")
+    assert "| Bramka |" in md or "Bramka (kod)" in md
+    assert "⚠" in md and "holdout tekst: kod 1" in md
+    ok = qr.render(runs[:1], {}, "brak cache OCR")
+    assert "⚠" not in ok
+
+
+def test_main_returns_nonzero_when_any_gate_fails(tmp_path, monkeypatch):
+    codes = {("dev", "tekst"): 0, ("holdout", "tekst"): 1}
+
+    def fake_section(split, source, gate_dir):
+        return qr.Run(
+            split, source, _metrics(0.99, 0.9), docs=1, seconds=1.0, exit_code=codes[(split, source)]
+        )
+
+    monkeypatch.setattr(qr, "run_section", fake_section)
+    monkeypatch.setattr(qr, "ocr_cache_state", lambda: "brak cache OCR")
+    out = tmp_path / "r.md"
+    assert qr.main(["--source", "tekst", "--out", str(out)]) == 1
+    codes[("holdout", "tekst")] = 0
+    assert qr.main(["--source", "tekst", "--out", str(out)]) == 0
+
+
+def test_pliki_polish_plural():
+    assert [qr._pliki(n) for n in (1, 2, 5, 12, 22, 25, 104, 112)] == [
+        "1 plik",
+        "2 pliki",
+        "5 plików",
+        "12 plików",
+        "22 pliki",
+        "25 plików",
+        "104 pliki",
+        "112 plików",
+    ]
+
+
+def test_render_does_not_claim_holdout_untouched():
+    md = qr.render([], {}, "brak cache OCR")
+    assert "Holdout nie był używany" not in md
+    assert "nie jest niezależną oceną" in md

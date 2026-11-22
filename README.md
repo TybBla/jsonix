@@ -80,6 +80,8 @@ python -m eval.score --pred output --gt data/train
 ```
 F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
 
+**Raport jakości do zgłoszenia** (F1 dev/holdout × tekst/skan, per typ i pole, czas na dokument): `python scripts/quality_report.py` → `docs/raport-jakosci.md` (`--source tekst` = szybko, bez OCR).
+
 Aktualne wyniki v0.4.0 (F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
 
 | Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
