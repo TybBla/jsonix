@@ -11,7 +11,8 @@
 set -euo pipefail
 
 SOLUTION_DIR="${SOLUTION_DIR:-/opt/solution}"
-REPO_URL="${REPO_URL:-https://github.com/TybBla/HackNation-Project.git}"
+# domyślnie: klon, z którego uruchomiono skrypt (repo jest prywatne - bez ponownego logowania do GitHuba)
+REPO_URL="${REPO_URL:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BRANCH="${BRANCH:-main}"
 IMAGE="jsonix:latest"
 REPO_DIR="$SOLUTION_DIR/repo"
@@ -62,21 +63,21 @@ run_timed() { # run_timed <komenda> -> wypisuje czas, zwraca kod wyjścia komend
 
 deploy() {
     say "Repo: $REPO_URL ($BRANCH) -> $REPO_DIR"
-    $SUDO mkdir -p "$SOLUTION_DIR"
+    mkdir -p "$SOLUTION_DIR"
     if [ -d "$REPO_DIR/.git" ]; then
-        $SUDO git -C "$REPO_DIR" fetch --prune origin
-        $SUDO git -C "$REPO_DIR" checkout "$BRANCH"
-        $SUDO git -C "$REPO_DIR" reset --hard "origin/$BRANCH"
+        git -C "$REPO_DIR" fetch --prune origin
+        git -C "$REPO_DIR" checkout "$BRANCH"
+        git -C "$REPO_DIR" reset --hard "origin/$BRANCH"
     else
-        $SUDO git clone --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+        git clone --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
     fi
-    $SUDO git -C "$REPO_DIR" log --oneline -1
+    git -C "$REPO_DIR" log --oneline -1
 
     say "docker build -t $IMAGE"
     $SUDO docker build -t "$IMAGE" "$REPO_DIR"
 
     say "RUN.md -> $SOLUTION_DIR/RUN.md"
-    $SUDO cp "$REPO_DIR/RUN.md" "$SOLUTION_DIR/RUN.md"
+    cp "$REPO_DIR/RUN.md" "$SOLUTION_DIR/RUN.md"
     $SUDO mkdir -p "$SOLUTION_DIR/input" "$SOLUTION_DIR/output"  # nic nie kasujemy
     echo "Komenda jury: $(run_command "$SOLUTION_DIR/RUN.md")"
 }

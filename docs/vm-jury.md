@@ -18,10 +18,12 @@ na `config/app.yaml`: `write_trace: false`, `log_dir` i `ingest.ocr.cache_dir` w
 1. Zaloguj się: `ssh <użytkownik>@<adres VM>`.
 2. Pobierz repo i wdróż (klon do `/opt/solution/repo`, `docker build -t jsonix:latest`, kopia `RUN.md` do `/opt/solution/RUN.md`):
    ```bash
-   git clone https://github.com/TybBla/HackNation-Project.git ~/jsonix
+   git clone https://github.com/TybBla/jsonix.git ~/jsonix
    cd ~/jsonix
-   bash scripts/deploy-vm.sh                 # inna gałąź/repo: --branch NAZWA, --repo URL
+   bash scripts/deploy-vm.sh                 # inna gałąź: --branch NAZWA; inne źródło: --repo URL
    ```
+   Repo jest publiczne. Skrypt klonuje `/opt/solution/repo` z lokalnego `~/jsonix` (bez `sudo`; `/opt/solution` należy
+   do konta zespołu). Aktualizacja: `git -C ~/jsonix pull`, potem ponownie `bash scripts/deploy-vm.sh`.
    Build trwa kilka minut (pobiera obraz `python:3.13-slim` i zależności; VM ma internet). Skrypt **nie kasuje**
    `/opt/solution/input` ani `output`.
 3. Self-test (katalogi tymczasowe, PDF-y z `data/train`: dokumenty z tekstem, negatyw i skan z OCR):
