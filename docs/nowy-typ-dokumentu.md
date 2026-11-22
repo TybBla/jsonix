@@ -11,7 +11,8 @@
      weak: [...]                                # +1 pkt
      negative: [...]                            # -3 pkt
      min_score: 3.0
-   fields: {}        # reguły pól (format ustala sektor B)
+   fields: {...}     # reguły pól - patrz sekcja „Sekcje fields/lists”
+   lists: {...}      # podział na elementy list (opcjonalnie)
    llm:
      prompt: prompts/<typ>.md
    ```
@@ -114,3 +115,79 @@ Wskazówki: wyniki ogólnych słów trzymaj nisko (`weak`), a typ opieraj na tyt
 dokumenty spoza puli (ogłoszenia BZP/TED, wyroki KIO, broszury) mają dawać `None`, więc ustaw `min_score`
 powyżej tego, co zdobywa pojedyncze trafienie słów domenowych. Strojenie rób na splicie `dev`
 (`python -m eval.gate --split dev --source tekst`), `holdout` tylko do końcowej kontroli.
+
+## Sekcje `fields:` i `lists:` — ekstrakcja pól (bez zmian w kodzie)
+
+Silnik `odw2json/extract/engine.py` interpretuje te sekcje; kod nie zna nazw pól. Wynik ma **dokładnie**
+kształt szablonu `config/schemas/<typ>.json`; pole bez reguły albo bez wyniku = `null`. Błąd w konfiguracji
+(literówka w kluczu, nieznany ekstraktor/normalizator/walidator, zły regex, ścieżka spoza szablonu) kończy
+się czytelnym błędem przy ładowaniu (`python -m odw2json doctypes`).
+
+Klucz pola = ścieżka w szablonie (`przelew_bankowy.kwota`; element listy: `Odwolujacy[].nip`, zagnieżdżone:
+`mocodawca[].podpisujacy[].imie_nazwisko`). W trace (`output/.trace/`) ścieżki list mają konkretne indeksy
+(`Odwolujacy[0].nip`) oraz `page` (0-based) i `source_snippet` (linia źródłowa) — do podglądu w GUI.
+
+```yaml
+fields:
+  przelew_bankowy.kwota:
+    type: amount              # str|int|amount|date|iban|digits|email|name|company|enum|lookup (domyślnie str)
+    scope: {after: 're:kwota', before: 'tytul', max_chars: 400}   # opcjonalny zakres szukania
+    extract:                  # ekstraktory po kolei; wygrywa pierwszy kandydat poprawny po normalize+validate
+      - label: [kwota przelewu, kwota operacji, kwota]
+        max_chars: 60
+      - regex: '(?P<v>\d[\d ]*[,.]\d{2})\s*(pln|zl)'
+    normalize: [amount]       # opcjonalnie; domyślnie normalizator typu
+    validate: {min: 0.01}     # niepoprawna wartość -> kandydat odrzucony (ostatecznie null)
+  przelew_bankowy.tytul:
+    extract:
+      - label: {labels: [tytul przelewu, tytulem, tytul, opis], line_start: true, multiline: true,
+                stop: [nr ref, kwota, data, status]}
+    normalize: [ws, trim_quotes]
+  OdwolanieKIO.czynnosc_opis:
+    derived: {lookup: czynnosc_powod, from: OdwolanieKIO.czynnosc_powod_id}
+lists:
+  Odwolujacy:
+    split: {start: 're:^odwolujac', end: 're:^zamawiajac', item_sep: 're:^\s*\d+\)'}
+    max_items: 5
+```
+
+Frazy (etykiety, `scope`, `stop`, `split`) porównywane są na tekście **bez polskich znaków i małymi literami**
+z granicami słów (`tytul` nie trafi w „tytułu”); prefiks `re:` = regex na tym tekście. Wartości wycinane są
+z oryginału (z ogonkami). Regexy wartości (`regex`, `value`) działają na oryginale, bez rozróżniania wielkości
+liter (chyba że `case: true`); grupa nazwana `v` = wartość.
+
+| Ekstraktor | Zapis skrócony | Opcje | Działanie |
+|---|---|---|---|
+| `label` | `label: [etykiety]` | `max_chars` (120), `value`, `case`, `line_start`, `multiline`, `stop`, `max_lines` (8) | wartość po etykiecie (`:`/kropki pomijane). Gdy typ ma wzorzec (amount/date/iban/digits/email/int) albo podano `value` — pierwsze trafienie wzorca w oknie `max_chars` (także w kolejnych liniach). Inaczej reszta linii albo następna niepusta linia; `multiline` dokleja linie do pustej linii lub linii zaczynającej się frazą ze `stop` |
+| `regex` | `regex: 'wzorzec'` | `nth` (od 1), `case`, `fold` | trafienia regexu po kolei (albo tylko `nth`-te) |
+| `section_line` | `section_line: nagłówek` | `n` (1; 0 = linia nagłówka), `line_start` | `n`-ta niepusta linia po linii nagłówka |
+| `near` | `near: [frazy]` | `direction` (after/before/both), `max_chars` (200), `value`, `case` | wartość typu pola najbliżej frazy |
+| `const` | `const: 7` | — | stała |
+| `if_match` | `if_match: [frazy]` | `then` | stała `then`, gdy w zakresie jest któraś fraza (np. `{phrases: [ceidg], then: osoba_fizyczna}`, a dalej `const: osoba_prawna`) |
+| `flag` | `flag: [frazy]` | `value` (1) | `value`, gdy w zakresie jest któraś z fraz (np. `przez-pelnomocnika`: `- flag: [reprezentowany przez]` + `- const: 0`) |
+| `phrase_lookup` | `phrase_lookup: słownik` | — | klasyfikacja fragmentu słownikiem `config/lookups/<słownik>.yaml` = lista `{id, phrases}`; **kolejność wpisów = priorytet** (np. `czynnosc_powod_frazy.yaml` → `czynnosc_powod_id`) |
+| `derived` | (klucz pola) | `lookup`, `from` | wartość z innego pola przez słownik `config/lookups/<lookup>.yaml` (bez `lookup` — kopia) |
+
+`scope`: `after` (brak frazy = pole `null`), `before`, `max_chars`. Każdy ekstraktor przyjmuje też opcję
+**`within`** — okno w zakresie pola o tych samych kluczach albo lista okien zawężanych po kolei (brak frazy
+`after` = ten ekstraktor pomijany, następny próbuje dalej), np.
+`- phrase_lookup: czynnosc_powod_frazy` + `within: [{after: 'wnosze odwolanie', before: zaskarzonym}, {after: 're:1\.\s', before: 're:2\.\s'}]`.
+Normalizator `ocr_digits` zamienia `o`/`O` w ciągach cyfr na `0` (OCR). Normalizatory (`normalize`, łańcuch po
+kolei; `None` = odrzut): `ws`, `date` (→ ISO), `amount` (→ liczba), `iban` (26 cyfr), `digits`, `int`, `email`,
+`company`, `name` (mianownik), `trim_quotes`, `upper`, `lower` oraz z `odw2json/extract/normalize.py`
+(`bzp`, `ted`, `ocr_fix`, `nip`…). Walidatory (`validate`): `regex`, `min_len`, `max_len`, `min`, `max`, `one_of`.
+
+`lists`: blok listy od frazy `start` do `end` (brak `start` = jeden pusty element z szablonu), elementy
+zaczynają się od `item_sep` (brak — cały blok to jeden element), `max_items`. Lista niezadeklarowana w `lists`
+= jeden element szukany w całym zakresie nadrzędnym. Pola elementu szukane są tylko w jego fragmencie tekstu.
+Dodatkowo (przykład: `config/doctypes/pelnomocnictwo.yaml`):
+- `split.item_regex` — zamiast `item_sep`: elementy zaczynają się od trafień regexu na **oryginale** z rozróżnianiem
+  wielkości liter (np. „Imię Nazwisko” po tytule `adw.`), czego nie da się wyrazić na tekście złożonym;
+- `groups` (lista zagnieżdżona) — podział **całego dokumentu** jak `split`; `i`-ty element rodzica szuka swojej
+  listy w `i`-tym bloku (np. podpisy „W imieniu X:” konsorcjum leżą daleko od danych mocodawców). Brak bloków =
+  zwykły fragment rodzica;
+- `unique: true` — pomija elementy puste i duplikaty (ta sama osoba w treści i pod podpisem); trace ma kolejne indeksy.
+
+Nowy ekstraktor/normalizator/walidator w Pythonie (gdy konfiguracja nie wystarcza): dekoratory
+`register_extractor(name, primary=..., options=(...))`, `register_normalizer(name)`, `register_validator(name)`
+z `odw2json.extract.engine` — i od razu jest dostępny w YAML. Strojenie reguł tylko na splicie `dev`.

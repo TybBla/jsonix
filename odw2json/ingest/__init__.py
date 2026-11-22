@@ -65,6 +65,19 @@ def _validate_ocr_cfg(ocr_cfg: object) -> None:
             raise ValueError(
                 f"Błąd konfiguracji ingest: ocr.{key} musi być dodatnią liczbą całkowitą (jest {val!r})"
             )
+    procs = ocr_cfg.get("max_concurrent_processes")
+    if procs is not None and (isinstance(procs, bool) or not isinstance(procs, int) or procs < 0):
+        raise ValueError(
+            "Błąd konfiguracji ingest: ocr.max_concurrent_processes musi być liczbą całkowitą >= 0 "
+            f"(0 = bez limitu; jest {procs!r})"
+        )
+    timeout = ocr_cfg.get("slot_timeout_s")
+    if timeout is not None and (
+        isinstance(timeout, bool) or not isinstance(timeout, int | float) or timeout <= 0
+    ):
+        raise ValueError(
+            f"Błąd konfiguracji ingest: ocr.slot_timeout_s musi być dodatnią liczbą sekund (jest {timeout!r})"
+        )
     params = ocr_cfg.get("engine_params")
     if params is not None:
         if not isinstance(params, dict):
@@ -217,8 +230,8 @@ def _apply_ocr(
     for i in todo:
         try:
             text = ocr.ocr_page(path, i, ocr_cfg)
-        except Exception as e:  # błąd OCR jednej strony nie przerywa wczytywania dokumentu
-            warnings.append(f"OCR strony {i + 1} nieudany ({type(e).__name__}: {e})")
+        except Exception as e:  # błąd OCR jednej strony (już po ponowieniach) nie przerywa wczytywania
+            warnings.append(f"OCR nieudany – strona {i + 1} ({ocr.short_error(e)})")
             continue
         if post:
             text = clean.clean_text(text, post)

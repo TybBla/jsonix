@@ -2,6 +2,22 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v0.4.0 — E4+E5: ekstrakcja + E11: instalacja i Docker (2026-11-22)
+
+- Silnik ekstrakcji sterowany YAML (`odw2json/extract/engine.py`): pola i listy z `config/doctypes/*.yaml`, rejestry ekstraktorów/normalizatorów/walidatorów, trace z indeksami list, stroną i fragmentem źródła.
+- Reguły 3 typów (przelew, pełnomocnictwo, odwołanie), normalizatory (daty PL, kwoty, IBAN z „PL” jak w dokumencie, BZP/TED), mianownik imion (także wersaliki).
+- Odporność na inne sformułowania (synonimy etykiet, formaty kwot, nazwiska wersalikami) z testami wariantów.
+- Dane referencyjne: numery rachunków z „PL” zgodnie z ustaleniem UZP z 21.11.
+- Stabilność OCR pod obciążeniem (OpenBLAS 1 wątek, ponowienia, brak cache pustych wyników, slot międzyprocesowy).
+- Drugi członek zespołu: instalacja przez `start.bat` (venv, plik ograniczeń wersji), Docker Compose z healthcheckiem, pomiar wydajności, nowe ustalenia UZP w kryteriach, „Dlaczego ten typ?” w GUI.
+
+| Bramka | F1 | odwołanie | pełnomocnictwo | przelew | negatywy |
+|---|---|---|---|---|---|
+| dev tekst | 0,999 | 0,998 | 1,000 | 1,000 | 12/12 |
+| holdout tekst | 0,997 | 0,997 | 1,000 | 0,994 | 10/10 |
+| dev skany | 0,977 | 0,997 | 0,980 | 0,882 | 3/3 |
+| holdout skany | 0,912 | 1,000 | 0,833 | 0,933 | 3/3 |
+
 ## v0.3.0 — E3: klasyfikacja + E8+E9: aplikacja (2026-11-21)
 
 - Klasyfikacja sterowana YAML: tytuł jako linia nagłówka (z rozstrzelonymi literami), wzorce strukturalne, `required_any`, `min_score`/`min_margin`, pewność z marginesu, uzasadnienie (`evidence`) w trace.
