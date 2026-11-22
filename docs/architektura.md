@@ -45,9 +45,9 @@ Sekcje `fields` i `lists` typu dokumentu opisują każde pole wyniku:
 - **jak znormalizować wartość:** daty ISO, kwoty, numery BZP i TED, poprawki OCR, imiona i nazwiska w mianowniku;
 - **jak ją sprawdzić:** walidatory.
 
-Pola wyliczane (np. `czynnosc_opis` ze słownika według `czynnosc_powod_id`) mają metodę `derived`. Nowy ekstraktor, normalizator lub walidator rejestruje się w kodzie raz i od tej pory jest dostępny dla każdego typu z YAML. Opis składni i decyzje dla trzech typów: [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md) oraz `docs/decyzje/E4-ekstrakcja.md` (etap E4).
+Pola wyliczane (np. `czynnosc_opis` ze słownika według `czynnosc_powod_id`) mają metodę `derived`. Nowy ekstraktor, normalizator lub walidator rejestruje się w kodzie raz i od tej pory jest dostępny dla każdego typu z YAML. Opis składni (DSL pól: ekstraktory, `within`, `lists`, normalizatory, walidatory): [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md); decyzje dla trzech typów: [decyzje/E4-ekstrakcja.md](decyzje/E4-ekstrakcja.md).
 
-Gdy ekstrakcja nie znajdzie wartości, zwraca `null`. Wartości nie są zmyślane.
+Gdy ekstrakcja nie znajdzie wartości, zwraca `null`. Wartości nie są zmyślane. Zgodnie z ustaleniami UZP ([kryteria-uzp.md](kryteria-uzp.md), pkt 5a) wartości zapisujemy tak, jak są w dokumencie — np. numer rachunku z prefiksem „PL”, jeśli dokument go ma (normalizator `iban`), nazwa firmy bez „poprawiania” do CEIDG.
 
 ## Kontrakty (`odw2json/contracts.py`)
 Etapy łączą wspólne struktury danych, które zmieniają się tylko za zgodą właściciela projektu:
@@ -71,10 +71,16 @@ Trace jest podstawą transparentności. CLI zapisuje go obok wyniku (`output/.tr
 
 **Nowy typ dokumentu** to nowy plik `doctypes/<typ>.yaml` i szablon `schemas/<typ>.json`, bez zmian w kodzie. Instrukcja krok po kroku: [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md). W Dockerze katalog `config/` jest montowany z repo, więc zmiana konfiguracji nie wymaga przebudowy obrazu.
 
-## LLM (opcjonalny, domyślnie wyłączony)
-Domyślnie jsonix działa **bez LLM** (`app.yaml: llm_enabled: false`): klasyfikacja i ekstrakcja opierają się na regułach z konfiguracji. Klient LLM (`odw2json/llm.py`) obsługuje dowolne API zgodne z OpenAI, z kluczem w `.env`, temperaturą 0 i kasetami odpowiedzi do testów bez sieci.
+## LLM — decyzja: bez LLM
+jsonix działa **bez LLM** (`app.yaml: llm_enabled: false`): klasyfikacja i ekstrakcja opierają się na regułach z konfiguracji. Uzasadnienie: [decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md) — **bez LLM = 20/20 pkt** za moc modelu (model ≤ 8B też daje 20 pkt, więc decyzja wynika z F1 reguł i z czasu przetwarzania), reguły dają F1 0,999 / 0,997 na dokumentach z tekstem. Klient LLM (`odw2json/llm.py`) obsługuje dowolne API zgodne z OpenAI, z kluczem w `.env`, temperaturą 0 i kasetami odpowiedzi do testów bez sieci.
 
 Zgodnie z ustaleniami UZP dopuszczamy wyłącznie model open source od firmy z serwerami w UE/EOG i polityką prywatności, która określa zakres i miejsce przetwarzania danych. Bierzemy pod uwagę tylko modele do 8B parametrów, bo tyle nie obniża punktacji za rozmiar modelu. Kryteria: [kryteria-uzp.md](kryteria-uzp.md).
+
+## Ograniczony czas na rozwiązanie (UZP)
+UZP ogranicza czas działania każdego rozwiązania ([kryteria-uzp.md](kryteria-uzp.md), pkt 5a). Dlatego:
+- **`{}` dla każdego PDF-a przed przetwarzaniem**, a zapis każdego wyniku jest **atomowy** (plik `.tmp` + `os.replace`) — przerwany przebieg zostawia pełne wyniki dla gotowych dokumentów i `{}` dla reszty, bez uciętych plików;
+- **najpierw dokumenty z warstwą tekstu (~0,01 s), na końcu skany** — kolejność z `pipeline.list_inputs` (strony z mniej niż `min_chars_per_page` znakami = OCR);
+- **99% czasu to OCR skanów** (~4 s na skan, ok. 2 s na stronę; klasyfikacja i ekstrakcja < 1%) — pomiar i decyzje: [decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md), narzędzie `scripts/bench_cases.py`.
 
 ## Aplikacja: API i GUI
 - **API** (FastAPI, `python -m odw2json serve`, opis OpenAPI pod `/docs`):

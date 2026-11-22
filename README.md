@@ -80,14 +80,14 @@ python -m eval.score --pred output --gt data/train
 ```
 F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progiem podobieństwa 80%) — szczegóły w [eval/README.md](eval/README.md).
 
-Aktualne wyniki (F1 wg reguł UZP, pomiar 21.11 z ekstrakcją E4; pełny raport: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
+Aktualne wyniki v0.4.0 (F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
 
-| Zbiór | Dokumenty z tekstem | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
-|---|---|---|---|---|
-| dev | 0,999 | 0,997 | 0,980 | 0,866 |
-| holdout | 0,997 | 1,000 | 0,833 | 0,897 |
+| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
+|---|---|---|---|---|---|---|
+| dev | 0,996 | 0,999 | 0,977 | 0,997 | 0,980 | 0,882 |
+| holdout | 0,988 | 0,997 | 0,912 | 1,000 | 0,833 (3 dok.) | 0,933 |
 
-Klasyfikacja: 0 błędów na dev i holdout; dokumenty spoza typów odrzucone 12/12 (dev) i 10/10 (holdout).
+Klasyfikacja: 0 błędów; dokumenty spoza typów odrzucone 15/15 (dev) i 13/13 (holdout), w tym skany.
 
 ## Praca zespołu
 
