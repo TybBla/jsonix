@@ -46,6 +46,9 @@ fields:
   OrzeczenieKIO.zamawiajacy:
     type: company
     extract:
+      # 1) uzasadnienie: "Gmina Cieszyn z siedziba w Cieszynie (dalej: „Zamawiajacy”)" - nazwa w mianowniku
+      - regex: '(?:^|\n)(?:[^\n]*?KIO\s+\d+/\d{2}\s+)?(?P<v>[^\n,(]+?)\s+z\s+siedzib\w*\s+w\s+\S+\s*\(dalej:?\s*[„"]?Zamawiaj'
+      # 2) komparycja: "w postepowaniu prowadzonym przez Gmine Cieszyn" - forma z dokumentu (tu biernik)
       - regex: 'prowadzonym\s+przez\s+(?:zamawiaj\w+:?\s+)?(?P<v>[^\n,(]+?(?:\n[^\n,(]+?)?)\s+z\s+siedzib'
   OrzeczenieKIO.rozstrzygniecie:
     extract:

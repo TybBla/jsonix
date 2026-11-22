@@ -31,7 +31,7 @@ Wynik dla postanowienia KIO 2617/21:
     "data": "2021-09-20",
     "przewodniczacy": "Ewa Kisiel",
     "odwolujacy": "TAMEXOBIEKTY SPORTOWE S.A.",
-    "zamawiajacy": "Gminę Cieszyn",
+    "zamawiajacy": "Gmina Cieszyn",
     "rozstrzygniecie": "odrzuca",
     "kwota_wpisu": 10000.0
   }
@@ -39,9 +39,11 @@ Wynik dla postanowienia KIO 2617/21:
 ```
 
 Trace (`output\.trace\`) i GUI (podświetlenie źródła w PDF) działają dla nowego typu tak samo jak dla trzech
-podstawowych, bo korzystają z tych samych danych. Nazwy stron są zapisane tak jak w dokumencie (np. „Gminę Cieszyn”).
+podstawowych, bo korzystają z tych samych danych. Zamawiający jest brany najpierw z uzasadnienia
+(„Gmina Cieszyn z siedzibą w Cieszynie (dalej: „Zamawiający”)” — mianownik), a dopiero gdy go brak, z komparycji
+(„prowadzonym przez …”), gdzie forma jest taka jak w dokumencie (zwykle biernik). Silnik nie odmienia nazw firm.
 
-**Po pokazie usuń te trzy pliki z `config/`.** Według zadania UZP orzeczenia KIO są dokumentami spoza typów i
+**Po pokazie usuń te trzy pliki z `config/`** i sprawdź: `python -m odw2json doctypes` pokazuje **3 typy**, a `python -m eval.gate --split dev --source tekst` ma negatywy **12/12** (exit 0). Według zadania UZP orzeczenia KIO są dokumentami spoza typów i
 mają dawać `{}`. Pilnuje tego test `tests/test_nowy_typ_konfiguracja.py::test_new_type_is_not_active_in_delivered_config`.
 
 ## Jak to jest sprawdzane

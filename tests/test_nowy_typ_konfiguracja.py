@@ -65,7 +65,7 @@ def test_new_type_from_configuration_end_to_end(tmp_path, config_with_new_type):
             "data": "2021-09-20",
             "przewodniczacy": "Ewa Kisiel",
             "odwolujacy": "TAMEXOBIEKTY SPORTOWE S.A.",
-            "zamawiajacy": "Gminę Cieszyn",
+            "zamawiajacy": "Gmina Cieszyn",
             "rozstrzygniecie": "odrzuca",
             "kwota_wpisu": 10000.0,
         }
