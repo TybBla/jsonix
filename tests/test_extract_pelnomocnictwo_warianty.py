@@ -1,4 +1,7 @@
-"""E7: warianty pełnomocnictw ze skanów — dwa podpisy w jednej linii, konsorcjum po przecinku."""
+"""E7: warianty pełnomocnictw ze skanów — dwa podpisy w jednej linii, konsorcjum po przecinku.
+
+Wszystkie nazwy, nazwiska i numery są wymyślone (nie pochodzą z data/, w tym z holdoutu).
+"""
 
 from __future__ import annotations
 
@@ -11,8 +14,8 @@ from odw2json.contracts import Document
 BASE = (
     "Warszawa, dnia 10 marca 2026 roku\nPEŁNOMOCNICTWO\n"
     "Nordex Serwis Sp. z o.o. z siedzibą w Opolu (45-037), ul. Polna 15, wpisana do rejestru przedsiębiorców "
-    "Krajowego Rejestru Sądowego pod numerem KRS: 9997873010, NIP: 9991785572,\n"
-    "REGON: 999885921, reprezentowana przez: Anna Lis – Prezes Zarządu, Jan Kos – Członek\n"
+    "Krajowego Rejestru Sądowego pod numerem KRS: 9991234560, NIP: 9994567812,\n"
+    "REGON: 999123453, reprezentowana przez: Anna Lis – Prezes Zarządu, Jan Kos – Członek\n"
     "Zarządu (dalej: „Mocodawca”), niniejszym udziela pełnomocnictwa:\n"
     "1. Ewa Nowak – adwokat, nr wpisu KR-10969, do reprezentowania Mocodawcy w sprawie.\n"
     "Za Mocodawcę:\n"
@@ -46,21 +49,33 @@ def test_signatures_in_separate_lines_unchanged():
 
 def test_consortium_members_separated_by_comma():
     text = (
-        "Gdynia, dnia 19 marca 2026 roku\nPELNOMOCNICTWO\n"
+        "Kielce, dnia 19 marca 2026 roku\nPELNOMOCNICTWO\n"
         "Wykonawcy wspólnie ubiegający się o udzielenie zamówienia (Konsorcjum):\n"
-        "1) Tervana Systemy sp. k. z siedzibą w Katowicach (40-031), ul. Długa 14, wpisana do rejestru "
-        "przedsiębiorców Krajowego Rejestru Sądowego pod numerem KRS: 9998767758,\n"
-        "NIP: 999-343-70-59, REGON: 999211631, reprezentowana przez: Dorota Grabowska – Prezes Zarządu\n"
+        "1) Orlimex Systemy sp. k. z siedzibą w Kielcach (25-001), ul. Klonowa 8, wpisana do rejestru "
+        "przedsiębiorców Krajowego Rejestru Sądowego pod numerem KRS: 9995551203,\n"
+        "NIP: 999-876-54-37, REGON: 999654328, reprezentowana przez: Marta Wierzbicka – Prezes Zarządu\n"
         "– Lider Konsorcjum,\n"
-        "2) Lumidor Budownictwo spółka z ograniczoną odpowiedzialnością z siedzibą w Opolu (45-873), ul.\n"
-        "Sienkiewicza 44, wpisana do rejestru przedsiębiorców Krajowego Rejestru Sądowego pod numerem\n"
-        "KRS: 9990349003, NIP: 999-98-82-984, REGON: 999376332, reprezentowana przez: Łukasz\n"
-        "Sosnowski – Prezes Zarządu – Partner Konsorcjum,\n"
+        "2) Brzozan Budownictwo spółka z ograniczoną odpowiedzialnością z siedzibą w Lublinie (20-002), ul.\n"
+        "Jaworowa 31, wpisana do rejestru przedsiębiorców Krajowego Rejestru Sądowego pod numerem\n"
+        "KRS: 9994420817, NIP: 999-30-01-126, REGON: 999471205, reprezentowana przez: Paweł\n"
+        "Zieliński – Prezes Zarządu – Partner Konsorcjum,\n"
         "(dalej łącznie: „Mocodawca”), niniejszym udzielają pełnomocnictwa:\n"
-        "1. Dorota Kubiak – radca prawny, nr wpisu AT-17255, do reprezentowania Mocodawcy.\n"
+        "1. Joanna Mazur – radca prawny, nr wpisu LU-40112, do reprezentowania Mocodawcy.\n"
     )
     data = _data(text)
     assert len(data["mocodawca"]) == 2
     second = data["mocodawca"][1]["data"]
-    assert second["krs"] == "9990349003" and second["nip"] == "9999882984"
-    assert second["nazwa"].startswith("Lumidor Budownictwo")
+    assert second["krs"] == "9994420817" and second["nip"] == "9993001126"
+    assert second["nazwa"].startswith("Brzozan Budownictwo")
+
+
+def test_company_name_after_zarzadu_is_not_a_signer():
+    """Po „Zarządu” stoi nazwa firmy, nie druga osoba: „Anna Lis - Prezes Zarządu Nordex Serwis”."""
+    # bez „(dalej” blok podpisujących obejmuje też linię podpisów pod „Za Mocodawcę:”
+    base = BASE.replace("(dalej: „Mocodawca”)", "zwana Mocodawcą")
+    for line in (
+        "Anna Lis - Prezes Zarządu Nordex Serwis",
+        "Anna Lis - Prezes Zarządu Nordex Serwis Sp. z o.o.",
+        "Anna Lis - Prezes Zarządu Nordex Serwis S.A.",
+    ):
+        assert _signers(_data(base.format(podpisy=line))) == {"Anna Lis", "Jan Kos"}, line

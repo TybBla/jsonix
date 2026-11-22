@@ -83,9 +83,11 @@ fields:
   mocodawca[].podpisujacy[].imie_nazwisko:
     type: name
     extract:
-      # imie i nazwisko w osobnej linii (pod kropkami) albo po "przez:" / przecinku, przed funkcja "- Prezes"
+      # imie i nazwisko w osobnej linii (pod kropkami) albo po "przez:" / przecinku, przed funkcja "- Prezes";
+      # po "Zarzadu " (sklejone kolumny podpisow) tylko z funkcja "- Prezes/Czlonek ..." zaraz po nazwisku,
+      # inaczej nazwa firmy ("Prezes Zarzadu Nordex Serwis") bylaby brana za osobe
       - regex:
-          pattern: '(?:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*|(?i:zarządu|zarzadu)[ \t]+)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?P<v>(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?)(?=[ \t]*(?:$|[-–(]))'
+          pattern: '(?:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*|(?P<z>(?i:zarządu|zarzadu))[ \t]+)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?P<v>(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?)(?(z)(?=[ \t]*[-–][ \t]*(?i:Prezes|Wiceprezes|Członek|Prokurent|Dyrektor|Wspólnik|Komplementariusz|Właściciel|Pełnomocni\w*)\b)|(?=[ \t]*(?:$|[-–(])))'
           case: true
   # ---------------------------------------------------------------- pelnomocnicy
   pelnomocnicy[].imie_nazwisko:
@@ -117,7 +119,7 @@ lists:
     split:
       start: 're:^[ \t]*\.{5,}|repre\w{0,2}entowan\w*\s+przez\s*:|podpisany\s+przez|^[ \t]*za\s+mocod'
       end: 're:pelnomocnictwo\s+przyjmuj|\(dalej'
-      item_regex: '(?m:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*|(?i:zarządu|zarzadu)[ \t]+)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?(?=[ \t]*(?:$|[-–(]))'
+      item_regex: '(?m:^[ \t]*|(?i:przez):?[ \t]+|,[ \t]*|(?P<z>(?i:zarządu|zarzadu))[ \t]+)(?!(?i:Prezes|Wiceprezes|Członek|Dyrektor|Prokurent|Pełnomocni\w*|Mocodaw\w*|Zarząd\w*|Wspólnik|Właściciel|Komplementariusz|Kierownik|Główn\w*|Data|Signature|Dokument|Kancelaria|Za|Miejsce|Podpis)\b)(?<![A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż])(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})[ \t]+(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,})(?:-(?:[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+|[A-ZĄĆĘŁŃÓŚŹŻ]{2,}))?(?(z)(?=[ \t]*[-–][ \t]*(?i:Prezes|Wiceprezes|Członek|Prokurent|Dyrektor|Wspólnik|Komplementariusz|Właściciel|Pełnomocni\w*)\b)|(?=[ \t]*(?:$|[-–(])))'
     groups:
       start: 're:^[ \t]*w\s+imieniu[^\n]{3,120}:[ \t]*$'
       end: 're:pelnomocnictwo\s+przyjmuj'

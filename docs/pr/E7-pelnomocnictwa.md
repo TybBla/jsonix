@@ -8,9 +8,9 @@ Gałąź `etap/E7-pelnomocnictwa` → `main`. Niezależna od `etap/E7-skany` (pr
 - **0004 — OCR.** „spółkaakcyjna” bez spacji. Tego nie poprawiam, bo to błąd rozpoznania tekstu.
 
 ### Zmiany (`config/doctypes/pelnomocnictwo.yaml`, tylko reguły)
-- Podpisujący: nazwisko może też zaczynać się po „Zarządu ” (sklejone kolumny). Start bloku toleruje „repre?entowan…”.
+- Podpisujący: nazwisko może też zaczynać się po „Zarządu ” (sklejone kolumny), ale tylko gdy zaraz po nim stoi funkcja „- Prezes/Członek/…”. Bez tego nazwa firmy po „Prezes Zarządu” („Anna Lis - Prezes Zarządu Nordex Serwis”) była brana za drugą osobę (poprawka z review). Start bloku toleruje „repre?entowan…”.
 - Konsorcjum: separator pozycji „;” albo „,” na końcu linii, ale tylko przed pozycją „N) … z siedzibą”. Bez tego zawężenia psuła się numerowana lista uprawnień w zwykłym pełnomocnictwie (`przyklad_05`, złapane przez test GT).
-- Testy: `tests/test_extract_pelnomocnictwo_warianty.py` (syntetyczne warianty, nie teksty z holdoutu): sklejone podpisy (także przy przekręconym „reprezentowana”), podpisy w osobnych liniach bez zmian, konsorcjum po przecinku.
+- Testy: `tests/test_extract_pelnomocnictwo_warianty.py`: sklejone podpisy (także przy przekręconym „reprezentowana”), podpisy w osobnych liniach bez zmian, konsorcjum po przecinku, nazwa firmy po „Zarządu” nie jest osobą. Wszystkie nazwy, nazwiska i numery w testach są wymyślone; pierwsza wersja testu konsorcjum zawierała dane z holdoutu (`skany/pelnomocnictwa/0007`, a tekst bazowy numery z `0006`), co poprawiono po review.
 
 ### Wyniki (Docker, Python 3.13, OCR)
 | Sekcja | przed | po |
@@ -20,7 +20,7 @@ Gałąź `etap/E7-pelnomocnictwa` → `main`. Niezależna od `etap/E7-skany` (pr
 | dev@skan, F1 | 0,977 | 0,977 (bez zmian) |
 | dev@tekst / holdout@tekst | 0,999 / 0,997 | bez zmian |
 
-Uwaga o metodzie: błędy znalazłem na holdoucie, bo plan kazał je zbadać. Poprawki są jednak ogólne (warianty układu, nie konkretne nazwiska) i sprawdzone na syntetycznych tekstach oraz na wszystkich pełnomocnictwach dev (testy GT i odporności, 51 passed).
+**Uwaga o metodzie: holdout@skan dla pełnomocnictw nie jest tu niezależną oceną.** Błędy znalazłem, analizując dokumenty holdoutu (plan kazał je zbadać), więc wynik 0,833 → 0,943 jest mierzony na danych użytych przy strojeniu i zawyża rzeczywistą skuteczność. Poprawki są ogólne (warianty układu, nie konkretne nazwiska) i sprawdzone na syntetycznych tekstach oraz na wszystkich pełnomocnictwach dev (testy GT i odporności), ale niezależną miarą zostaje tylko dev.
 
 ### Do zrobienia przez właściciela
 `--update-baseline` dla sekcji skanów (zablokowane dla mnie uprawnieniami), po scaleniu razem z `etap/E7-skany`.
