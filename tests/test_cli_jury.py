@@ -72,3 +72,26 @@ def test_resolve_log_dir():
     assert pipeline.resolve_log_dir({"log_dir": None}, out) == out / ".logs"
     assert pipeline.resolve_log_dir({"log_dir": "logi"}, out) == ROOT / "logi"
     assert pipeline.resolve_log_dir({"log_dir": str(ROOT / "x")}, out) == ROOT / "x"
+
+
+def test_dockerignore_keeps_jury_files_in_image():
+    """RUN.md, config/app.jury.yaml i scripts/ są potrzebne w obrazie (docker run bez montowania config)."""
+    patterns = [
+        ln.strip().rstrip("/")
+        for ln in (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        if ln.strip() and not ln.startswith("#")
+    ]
+    for needed in ("RUN.md", "config", "config/app.jury.yaml", "scripts"):
+        assert needed not in patterns, f"{needed} wykluczone z obrazu przez .dockerignore"
+    assert (ROOT / "RUN.md").is_file() and (ROOT / "config" / "app.jury.yaml").is_file()
+
+
+def test_run_md_command_is_single_noninteractive_docker_run():
+    text = (ROOT / "RUN.md").read_text(encoding="utf-8")
+    block = text.split("```")[1].removeprefix("bash").strip()
+    assert "\n" not in block, "jedna komenda w jednej linii"
+    assert block.startswith("docker run --rm ")
+    for bad in (" -it", " -i ", " -t ", " -p ", " -d "):
+        assert bad not in block
+    assert "JSONIX_APP_CONFIG=config/app.jury.yaml" in block
+    assert "-v /opt/solution/input:/app/input" in block and "-v /opt/solution/output:/app/output" in block
