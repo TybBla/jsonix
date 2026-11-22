@@ -256,6 +256,13 @@ html[data-contrast="high"] .tag-unknown { background: #000; color: #ff0; }
 .why { margin-top: .5rem; font-size: .875rem; }
 .why summary { cursor: pointer; color: var(--link); text-decoration: underline; text-underline-offset: .15em; width: fit-content; }
 .why ul { margin: .25rem 0 0; padding-left: 1.1rem; }
+.why-list { list-style: none; padding-left: 0 !important; }
+.why-list li { display: flex; gap: .375rem; align-items: baseline; }
+.why-icon { flex: none; width: 1rem; text-align: center; font-weight: 700; }
+.why-plus .why-icon { color: var(--green-text); }
+.why-minus .why-icon { color: var(--red-dark); }
+.why-raw { margin-top: .375rem; }
+.why-raw code { font-size: .8125rem; overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
 
 /* --- ekran „Sprawdź dane”: pola obok dokumentu --- */
@@ -304,15 +311,20 @@ html[data-contrast="high"] .field.is-selected { background: #000; border-color: 
 .pdf-page { position: relative; margin: 0 auto 12px; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
 .pdf-page canvas { display: block; }
 .hl-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+/* Strona PDF jest zawsze biała (także w trybie wysokiego kontrastu), więc kolory podświetleń są stałe,
+   a nie ze zmiennych motywu: w wysokim kontraście --blue-dark = #ff0, co na bieli daje ok. 1,1:1. */
 .hl-box {
   position: absolute; pointer-events: auto; cursor: pointer;
-  border: 2px dashed var(--blue-dark); border-radius: 2px; background: rgba(0, 108, 215, .06);
+  border: 2px dashed #0052a5; border-radius: 2px; background: rgba(0, 108, 215, .06);
 }
-.hl-box:hover { border-style: solid; border-color: var(--blue-dark); }
+.hl-box:hover { border-style: solid; border-color: #0052a5; }
 /* podgląd: pełne obramowanie 3px (#0052a5 na białym 7,8:1) + etykieta pola; bez żółtego tła zaznaczenia */
-.hl-box.is-preview { border: 3px solid var(--blue-dark); background: rgba(0, 108, 215, .14); }
-html[data-contrast="high"] .hl-box.is-preview { border-color: #ff0; background: rgba(0, 0, 0, .25); }
-.hl-box.is-active { border: 3px solid var(--black); background: rgba(235, 168, 40, .35); box-shadow: 0 0 0 2px var(--yellow); }
+.hl-box.is-preview { border: 3px solid #0052a5; background: rgba(0, 108, 215, .14); }
+.hl-box.is-active { border: 3px solid #1b1b1b; background: rgba(235, 168, 40, .35); box-shadow: 0 0 0 2px #eba828; }
+/* wysoki kontrast: czarne obramowania na białej stronie (21:1), zaznaczenie dodatkowo grubsze */
+html[data-contrast="high"] .hl-box { border-color: #000; }
+html[data-contrast="high"] .hl-box.is-preview { border-color: #000; background: rgba(0, 0, 0, .12); }
+html[data-contrast="high"] .hl-box.is-active { border-width: 4px; border-color: #000; }
 .hl-label {
   position: absolute; left: -3px; bottom: 100%; margin-bottom: 3px; white-space: nowrap;
   font: 600 .75rem/1.2 var(--font); color: var(--black); background: var(--yellow);

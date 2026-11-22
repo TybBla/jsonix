@@ -12,6 +12,7 @@ import {
   showScreen,
   setTitle,
 } from "./ui.js";
+import { explainEvidence } from "./evidence.js";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILE_LABEL = "25 MB";
@@ -293,13 +294,34 @@ function confidenceCell(cls) {
   return el("td", { text: pct });
 }
 
-/** Rozwijane uzasadnienie klasyfikacji (classification.evidence); brak uzasadnienia → nic. */
+const WHY_ICON = { plus: "+", minus: "−", info: "•" };
+
+/**
+ * Rozwijane uzasadnienie klasyfikacji: zdania po polsku (evidence.js) i surowe cechy klasyfikatora
+ * w „Szczegółach technicznych” (transparentność). Brak uzasadnienia dla rozpoznanego typu → nic.
+ */
 function whyDetails(cls, title) {
-  const evidence = Array.isArray(cls.evidence) ? cls.evidence.filter((e) => typeof e === "string" && e) : [];
-  if (!evidence.length) return null;
+  const raw = Array.isArray(cls.evidence) ? cls.evidence.filter((e) => typeof e === "string" && e) : [];
+  const reasons = explainEvidence(raw, { known: Boolean(cls.doc_type), label: doctypeLabel });
+  if (!reasons.length) return null;
   return el("details", { class: "why" }, [
     el("summary", { text: title }),
-    el("ul", {}, evidence.map((e) => el("li", { text: e }))),
+    el(
+      "ul",
+      { class: "why-list" },
+      reasons.map((r) =>
+        el("li", { class: `why-${r.tone}` }, [
+          el("span", { class: "why-icon", "aria-hidden": "true", text: WHY_ICON[r.tone] || "•" }),
+          el("span", { text: r.text }),
+        ]),
+      ),
+    ),
+    raw.length
+      ? el("details", { class: "why-raw" }, [
+          el("summary", { text: "Szczegóły techniczne" }),
+          el("ul", {}, raw.map((e) => el("li", {}, [el("code", { text: e })]))),
+        ])
+      : null,
   ]);
 }
 
