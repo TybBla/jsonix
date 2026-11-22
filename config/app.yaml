@@ -5,6 +5,7 @@
 unknown_output: empty_object
 write_trace: true          # output/.trace/<case>/<plik>.trace.json
 llm_enabled: false         # wlacza sektor B, gdy klient LLM jest gotowy
+log_dir: null              # logi CLI i podsumowanie przebiegu; null = <output>/.logs (profil jury: poza output)
 
 # Ingest PDF (sektor A). Backendy wybierane tu, bez zmian kodu.
 ingest:

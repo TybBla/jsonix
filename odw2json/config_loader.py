@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 from functools import cache
 from pathlib import Path
@@ -321,8 +322,39 @@ def load_lookup(name: str, config_dir: Path = CONFIG_DIR) -> dict:
     return _read_yaml(config_dir / "lookups" / f"{name}.yaml")
 
 
+APP_CONFIG_ENV = "JSONIX_APP_CONFIG"  # ścieżka do YAML nakładanego na app.yaml (profil jury: app.jury.yaml)
+
+
+def deep_merge(base: dict, override: dict) -> dict:
+    """Nowy słownik: ``override`` głęboko scalony na ``base`` (słowniki rekurencyjnie, reszta nadpisuje)."""
+    out = copy.deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = deep_merge(out[key], value)
+        else:
+            out[key] = copy.deepcopy(value)
+    return out
+
+
 def load_app_config(config_dir: Path = CONFIG_DIR) -> dict:
-    return _read_yaml(config_dir / "app.yaml")
+    """``config/app.yaml``; gdy ustawiona ``JSONIX_APP_CONFIG``, jej YAML jest głęboko scalany na wierzch.
+
+    Ścieżka względna jest liczona od korzenia repo (katalog nadrzędny ``config_dir``, w kontenerze ``/app``),
+    nie od cwd - ``JSONIX_APP_CONFIG=config/app.jury.yaml`` działa z każdego katalogu.
+    """
+    cfg = _read_yaml(config_dir / "app.yaml")
+    raw = os.environ.get(APP_CONFIG_ENV, "").strip()
+    if not raw:
+        return cfg
+    path = Path(raw)
+    if not path.is_absolute():
+        path = config_dir.parent / path
+    if not path.is_file():
+        raise FileNotFoundError(f"{APP_CONFIG_ENV}={raw!r}: brak pliku konfiguracji {path}")
+    overlay = _read_yaml(path)
+    if not isinstance(overlay, dict):
+        raise ValueError(f"{APP_CONFIG_ENV}={raw!r}: oczekiwano słownika YAML w {path}")
+    return deep_merge(cfg, overlay)
 
 
 def load_classify_settings(config_dir: Path = CONFIG_DIR) -> ClassifySettings:

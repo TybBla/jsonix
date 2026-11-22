@@ -47,6 +47,7 @@ python scripts/smoke_docker.py                         # test: build, healthchec
 - Port zmienisz zmienną `JSONIX_PORT` (np. `$env:JSONIX_PORT=8080; docker compose up`). Serwer nasłuchuje tylko na `127.0.0.1`.
 - Kontener ma healthcheck (`/api/health`); `docker compose ps` pokazuje stan `healthy`.
 - `scripts/smoke_docker.py` uruchamia osobny projekt `jsonix-smoke`, sprawdza GUI/API, przetwarza w kontenerze `przyklad_01` i skan (OCR), porównuje JSON-y z CLI na hoście i sprząta po sobie (kod wyjścia 0/1, 2 = brak Dockera).
+- **VM jury (Azure, 22.11.2026):** ocena odbywa się komendą z `/opt/solution/RUN.md` (obraz Dockera `jsonix:latest`, profil `config/app.jury.yaml`, w `output/` tylko pliki JSON). Wdrożenie i testy na VM: [docs/vm-jury.md](docs/vm-jury.md), `scripts/deploy-vm.sh`.
 
 ## GUI
 

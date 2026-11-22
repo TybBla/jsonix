@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from odw2json import classify, extract, ingest
-from odw2json.config_loader import DocTypeConfig, load_app_config, load_registry
+from odw2json.config_loader import ROOT_DIR, DocTypeConfig, load_app_config, load_registry
 from odw2json.contracts import Classification, Document, ExtractionResult
 from odw2json.logging_setup import new_run_id
 
@@ -85,6 +85,16 @@ def _ocr_pages(pdf: Path, min_chars: int) -> int:
             doc.close()
     except Exception:
         return 0
+
+
+def resolve_log_dir(app_cfg: dict, output_dir: Path) -> Path:
+    """Katalog logów i podsumowań przebiegu: ``log_dir`` z app.yaml (względny od korzenia repo),
+    domyślnie ``<output>/.logs``. Profil jury wynosi go poza output (tam mają być tylko wyniki)."""
+    log_dir = app_cfg.get("log_dir")
+    if not log_dir:
+        return Path(output_dir) / ".logs"
+    p = Path(log_dir)
+    return p if p.is_absolute() else ROOT_DIR / p
 
 
 def list_inputs(input_dir: Path, min_chars: int | None = None) -> list[Path]:
@@ -209,7 +219,7 @@ def run(
         "unknown": report.unknown,
         "errors": [{"file": str(e.path), "error": e.error} for e in report.errors],
     }
-    logs = Path(output_dir) / ".logs"
+    logs = resolve_log_dir(app_cfg, Path(output_dir))
     logs.mkdir(parents=True, exist_ok=True)
     (logs / f"{run_id}.summary.json").write_text(_dump(summary), encoding="utf-8")
     return report

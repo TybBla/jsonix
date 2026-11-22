@@ -44,7 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("input", nargs="?", default=str(ROOT_DIR / "input"))
     r.add_argument("output", nargs="?", default=str(ROOT_DIR / "output"))
     r.add_argument("-v", "--verbose", action="store_true")
-    r.add_argument("--log-file", default=None, help="domyślnie <output>/.logs/<run_id>.jsonl")
+    r.add_argument(
+        "--log-file",
+        default=None,
+        help="domyślnie <log_dir z app.yaml, a bez niego <output>/.logs>/<run_id>.jsonl",
+    )
     sub.add_parser("doctypes", help="lista skonfigurowanych typów dokumentów")
     s = sub.add_parser("serve", help="uruchom API + GUI")
     s.add_argument("--host", default="127.0.0.1")
@@ -62,11 +66,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     out = Path(a.output)
     run_id = new_run_id()
-    log_file = Path(a.log_file) if a.log_file else out / ".logs" / f"{run_id}.jsonl"
+    app_cfg = load_app_config()
+    log_file = Path(a.log_file) if a.log_file else pipeline.resolve_log_dir(app_cfg, out) / f"{run_id}.jsonl"
     setup_logging(a.verbose, log_file, run_id=run_id)
     inp = Path(a.input)
-    write_placeholders(pipeline.list_inputs(inp), inp, out, load_app_config())
-    rep = pipeline.run(inp, out, run_id=run_id)
+    write_placeholders(pipeline.list_inputs(inp), inp, out, app_cfg)
+    rep = pipeline.run(inp, out, app_cfg=app_cfg, run_id=run_id)
     print(f"Przebieg: {run_id}")
     print(
         f"Przetworzono: {rep.processed}, typy: {rep.by_type}, błędy: {len(rep.errors)}, "
