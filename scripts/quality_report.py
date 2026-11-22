@@ -114,17 +114,26 @@ def render(runs: list[Run], env: dict[str, str], cache: str) -> str:
     out += ["## Podsumowanie", ""]
     out.append(
         "| Zbiór | Źródło | F1 | Precyzja | Pełność | Dokumenty | Negatywy | Błędy klasyfikacji "
-        "| Czas / dokument |"
+        "| Czas / dokument | Bramka (kod) |"
     )
-    out.append("|---|---|---|---|---|---|---|---|---|")
+    out.append("|---|---|---|---|---|---|---|---|---|---|")
     for r in runs:
         m = r.metrics
         neg = f"{m.get('neg_correct', 0)}/{m.get('neg_total', 0)}"
         out.append(
             f"| {r.split} | {r.source} | **{_pct(m.get('f1'))}** | {_pct(m.get('precision'))} | "
             f"{_pct(m.get('recall'))} | {r.docs} | {neg} | {m.get('classification_errors', 0)} "
-            f"| {_sec(r.per_doc)} |"
+            f"| {_sec(r.per_doc)} | {r.exit_code} |"
         )
+    failed = [r for r in runs if r.exit_code != 0]
+    if failed:
+        out += [
+            "",
+            "> ⚠ Bramka F1 zakończyła się kodem różnym od 0 (1 = regresja względem `eval/baseline.json`, "
+            "2 = brak sekcji w baseline): "
+            + ", ".join(f"{r.split} {r.source}: kod {r.exit_code}" for r in failed)
+            + ". Sprawdź `python -m eval.gate --split <zbiór> --source <źródło>` przed użyciem liczb.",
+        ]
 
     types = sorted({t for r in runs for t in (r.metrics.get("f1_by_type") or {})})
     if types:
@@ -188,7 +197,13 @@ def main(argv: list[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render(runs, environment(), cache), encoding="utf-8")
     raw = {
-        f"{r.split}@{r.source}": {"metrics": r.metrics, "docs": r.docs, "seconds": r.seconds} for r in runs
+        f"{r.split}@{r.source}": {
+            "metrics": r.metrics,
+            "docs": r.docs,
+            "seconds": r.seconds,
+            "exit_code": r.exit_code,
+        }
+        for r in runs
     }
     out.with_suffix(".json").write_text(
         json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -198,6 +213,9 @@ def main(argv: list[str] | None = None) -> int:
             f"[raport] {r.split}/{r.source}: F1={_pct(r.metrics.get('f1'))}, "
             f"{r.docs} dok., {_sec(r.per_doc)}/dok."
         )
+    for r in runs:
+        if r.exit_code != 0:
+            print(f"[raport] UWAGA: bramka {r.split}/{r.source} zwróciła kod {r.exit_code}", file=sys.stderr)
     print(f"[raport] zapisano {out}")
     return 0
 

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location("quality_report", ROOT / "scripts" / "quality_report.py")
 qr = importlib.util.module_from_spec(_spec)
+sys.modules["quality_report"] = qr  # @dataclass (Python 3.14) szuka modułu w sys.modules
 _spec.loader.exec_module(qr)
 
 
@@ -54,3 +56,15 @@ def test_report_runs_on_real_gate_for_one_section(tmp_path):
     md = out.read_text(encoding="utf-8")
     assert "| dev | tekst |" in md
     assert out.with_suffix(".json").is_file()
+
+
+def test_render_warns_when_gate_exit_code_is_not_zero():
+    runs = [
+        qr.Run("dev", "tekst", _metrics(0.999, 0.95), docs=40, seconds=20.0, exit_code=0),
+        qr.Run("holdout", "tekst", _metrics(0.9, 0.9), docs=10, seconds=5.0, exit_code=1),
+    ]
+    md = qr.render(runs, {}, "brak cache OCR")
+    assert "| Bramka |" in md or "Bramka (kod)" in md
+    assert "⚠" in md and "holdout tekst: kod 1" in md
+    ok = qr.render(runs[:1], {}, "brak cache OCR")
+    assert "⚠" not in ok
