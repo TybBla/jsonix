@@ -42,6 +42,18 @@ def test_render_has_summary_types_fields_and_time():
     assert "zimny" in md and "python: 3.13.1" in md
 
 
+def test_field_with_only_true_negatives_is_not_zero_and_not_flagged():
+    # pole nieobecne w GT i poprawnie null w każdym dokumencie: same TN, F1 niezdefiniowane (nie 0%)
+    m = _metrics(0.97, 0.95)
+    m["f1_by_field"]["Zamawiajacy[].krs"] = 0.0
+    score = {"fields": {"Zamawiajacy[].krs": {"tp": 0, "tn": 3, "fp": 0, "fn": 0, "f1": 0.0}}}
+    runs = [qr.Run("holdout", "skan", m, docs=3, seconds=6.0, exit_code=0, score=score)]
+    md = qr.render(runs, {}, "brak cache OCR")
+    assert "| Zamawiajacy[].krs | — |" in md
+    assert "**Zamawiajacy[].krs**" not in md
+    assert "same TN" in md, "objaśnienie znaku —"
+
+
 def test_render_without_documents_or_fields():
     md = qr.render(
         [qr.Run("dev", "skan", {"f1": None}, docs=0, seconds=0.0, exit_code=2)], {}, "brak cache OCR"
