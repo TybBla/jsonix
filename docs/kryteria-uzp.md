@@ -51,6 +51,13 @@ Zebrane z: regulaminu zadania „Odwołania2json” (HackNation 2026), pełnej t
 - Nazwa firmy (`company`) bierze tekst z dokumentu (np. „pod firmą …”) bez rozwijania skrótów — zgodnie z ustaleniem.
 - Czas: raport jakości ma podawać czas na sprawę (CPU, z OCR i bez); aplikacja nie powinna wykonywać zbędnej pracy (cache OCR, LLM domyślnie wyłączony).
 
+### 5b. VM do oceny (VM.md, 22.11.2026)
+- Każdy zespół dostaje VM Azure: **Ubuntu 24.04, 2 vCPU / 16 GB RAM, bez GPU**, Docker + Compose v2, git, **Python 3.12** (za stary dla nas, więc rozwiązanie działa w Dockerze, obraz `python:3.13-slim`). Internet jest.
+- **Dostęp zespołów zostanie odcięty 22.11.2026 o 11:00**, potem ocena odbywa się bez nas: obrazy i zależności muszą być pobrane/zbudowane wcześniej.
+- Ocena: jury wgrywa tajny zbiór do **`/opt/solution/input`**, w katalogu **`/opt/solution`** uruchamia z `sudo` **komendę z pliku `/opt/solution/RUN.md`** i zabiera pliki z **`/opt/solution/output`**. Komenda ma działać bez interakcji i sama się zakończyć po przetworzeniu wszystkich plików; usługa w tle jest niepotrzebna.
+- Katalogi `input/` i `output/` już istnieją i mogą zostać wyczyszczone przed oceną. Cały projekt leży w `/opt/solution` (u nas klon w `/opt/solution/repo`). Klucze API (my: bez LLM) byłyby w `/opt/solution/.env`.
+- Wpływ na projekt: w `output/` mają być **wyłącznie** `<sprawa>/<nazwa_jak_pdf>.json`, dlatego profil `config/app.jury.yaml` (`JSONIX_APP_CONFIG`) wyłącza trace i wynosi logi oraz cache OCR poza output. `RUN.md` w repo = wzorzec pliku jury, wdrożenie i testy: `scripts/deploy-vm.sh`, [vm-jury.md](vm-jury.md).
+
 ## 6. Gdzie to jest w projekcie
 - Architektura i decyzje: `docs/superpowers/specs/2026-11-21-odwolania2json-design.md`, `docs/decyzje/`.
 - Roadmapa i zakres v1.0: `docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md` (sekcja „Aktualizacja zakresu”).
