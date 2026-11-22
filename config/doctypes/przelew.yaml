@@ -79,10 +79,11 @@ fields:
     extract:
       # tytul bywa zawiniety: doklejamy kolejne linie do pustej linii albo nastepnej etykiety
       - label:
-          labels: [tytul przelewu, tytulem, tytul, opis operacji, opis]
+          labels: [tytul platnosci, tytul przelewu, tytul operacji, opis operacji, tytulem, tytul, opis]
           line_start: true
           multiline: true
           max_lines: 6
+          blank_lines: 1   # jedna pusta linia wewnatrz tytulu (zawiniecie), o ile dalej nie ma etykiety
           stop: [nr ref, nr klienta, numer, identyfikator, kwota, wartosc, data, status, waluta, kanal, typ operacji,
                  tryb, oplata, zrealizowano, wykonano, nadawca, odbiorca, platnik, zleceniodawca, adresat, beneficjent,
                  dane nadawcy, dane odbiorcy, rachunek, z rachunku, na rachunek, z powazaniem, bank, potwierdzenie,

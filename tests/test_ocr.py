@@ -134,7 +134,7 @@ def test_blad_ocr_to_ostrzezenie(monkeypatch, ocr_calls):
     monkeypatch.setattr(ocr, "ocr_page", boom)
     doc = load(_scan("Decyzja-Ministra-Sportu-i-Turystyki1.pdf"), cfg=_cfg(OCR_ON))
     assert doc.ocr_used is False
-    assert any(w.startswith("OCR strony 1 nieudany") and "model uszkodzony" in w for w in doc.warnings)
+    assert any(w.startswith("OCR nieudany – strona 1") and "model uszkodzony" in w for w in doc.warnings)
 
 
 def test_ocr_nie_zastepuje_dluzszego_tekstu(monkeypatch, ocr_calls):
@@ -507,3 +507,228 @@ def test_validate_postprocess_poprawne():
 
     ingest.validate_ingest_cfg({"ocr": {"postprocess": ["ocr_artifacts", "collapse_spaces"]}})
     ingest.validate_ingest_cfg({"ocr": {"postprocess": []}})
+
+
+# --- stabilność pod obciążeniem: ponowienia, brak cache pustych wyników, blokada silnika ----------
+
+
+def _flaky_engine(monkeypatch, outcomes, seen_cfgs=None):
+    """Silnik ``fake``: wywołania wg ``outcomes`` (wyjątek = rzuć, tekst = zwróć; ostatni się powtarza)."""
+    calls: list[int] = []
+
+    def fake_run(image, cfg):
+        calls.append(1)
+        if seen_cfgs is not None:
+            seen_cfgs.append(cfg)
+        out = outcomes[min(len(calls), len(outcomes)) - 1]
+        if isinstance(out, BaseException):
+            raise out
+        return out
+
+    monkeypatch.setitem(ocr.OCR_ENGINES, "fake", ocr.OcrEngine(available=lambda: True, run=fake_run))
+    monkeypatch.setattr(ocr, "render_page", lambda path, i, dpi=200: object())
+    monkeypatch.setattr(ocr.time, "sleep", lambda s: None)
+    ocr._MEMO.clear()
+    ocr._file_digest.cache_clear()
+    return calls
+
+
+def _pdf(tmp_path) -> Path:
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    return pdf
+
+
+def test_blad_silnika_co_drugie_wywolanie_jest_ponawiany(tmp_path, monkeypatch):
+    bad = RuntimeError("[ONNXRuntimeError] : 1 : FAIL : bad allocation")
+    calls = _flaky_engine(monkeypatch, [bad, "tekst 1", bad, "tekst 2"])
+    cfg = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    pdf = _pdf(tmp_path)
+    assert ocr.ocr_page(pdf, 0, cfg) == "tekst 1"
+    assert ocr.ocr_page(pdf, 1, cfg) == "tekst 2"
+    assert len(calls) == 4
+    assert len(list((tmp_path / "c").glob("*.txt"))) == 2
+
+
+def test_ponowienie_po_przerwie(tmp_path, monkeypatch):
+    calls = _flaky_engine(monkeypatch, [MemoryError("Unable to allocate"), "ok"])
+    slept: list[float] = []
+    monkeypatch.setattr(ocr.time, "sleep", slept.append)
+    assert ocr.ocr_page(_pdf(tmp_path), 0, {"engine": "fake"}) == "ok"
+    assert len(calls) == 2
+    assert slept and all(s > 0 for s in slept)
+
+
+def test_ponowienia_ta_sama_konfiguracja_az_do_sukcesu(tmp_path, monkeypatch):
+    """Mniej wątków ORT nie obniża szczytu pamięci (pomiar E2b), więc ponowienia nie tworzą nowego silnika."""
+    seen: list[dict] = []
+    bad = RuntimeError("bad allocation")
+    calls = _flaky_engine(monkeypatch, [bad] * (ocr.OCR_ATTEMPTS - 1) + ["ok"], seen)
+    params = {"EngineConfig.onnxruntime.intra_op_num_threads": 4, "Global.use_cls": False}
+    cfg = {"engine": "fake", "engine_params": params}
+    assert ocr.ocr_page(_pdf(tmp_path), 0, cfg) == "ok"
+    assert len(calls) == ocr.OCR_ATTEMPTS
+    assert all(c["engine_params"] == params for c in seen)
+
+
+def test_nieudany_po_ponowieniach_nie_trafia_do_cache(tmp_path, monkeypatch):
+    calls = _flaky_engine(monkeypatch, [RuntimeError("bad allocation")])
+    cfg = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    pdf = _pdf(tmp_path)
+    with pytest.raises(ocr.OcrError, match="bad allocation"):
+        ocr.ocr_page(pdf, 2, cfg)
+    assert len(calls) == ocr.OCR_ATTEMPTS
+    assert not list((tmp_path / "c").glob("*.txt"))
+    assert not list((tmp_path / "c").glob("*.tmp"))
+    assert not ocr._MEMO
+    with pytest.raises(ocr.OcrError):  # kolejne wywołanie znów próbuje silnika, nie serwuje porażki
+        ocr.ocr_page(pdf, 2, cfg)
+    assert len(calls) == 2 * ocr.OCR_ATTEMPTS
+
+
+def test_pusty_wynik_nie_trafia_do_cache_ani_pamieci(tmp_path, monkeypatch):
+    calls = _flaky_engine(monkeypatch, ["  \n", "tekst"])
+    cfg = {"engine": "fake", "cache_dir": str(tmp_path / "c")}
+    pdf = _pdf(tmp_path)
+    assert ocr.ocr_page(pdf, 0, cfg).strip() == ""
+    assert not list((tmp_path / "c").glob("*.txt"))
+    assert not ocr._MEMO
+    assert ocr.ocr_page(pdf, 0, cfg) == "tekst"
+    assert len(calls) == 2
+
+
+def test_apply_ocr_ostrzezenie_nieudany_krotkie(monkeypatch, ocr_calls):
+    def boom(path, i, cfg=None):
+        raise ocr.OcrError("Traceback (most recent call last):\n  File x\nFail: bad allocation\n")
+
+    monkeypatch.setattr(ocr, "ocr_page", boom)
+    warnings: list[str] = []
+    text_page = "dość długi tekst strony z warstwą tekstową, ponad próg"
+    pages, engine = _apply_ocr(Path("x.pdf"), ["", text_page], OCR_ON, warnings)
+    assert engine is None and pages[0] == ""
+    (w,) = [w for w in warnings if "nieudany" in w]
+    assert w.startswith("OCR nieudany – strona 1")
+    assert "bad allocation" in w and "\n" not in w and "Traceback" not in w
+
+
+@pytest.mark.parametrize(("preset", "expected"), [(None, "1"), ("4", "4")])
+def test_import_pakietu_ogranicza_watki_openblas(preset, expected):
+    """numpy z 16 wątkami OpenBLAS rezerwuje ok. 490 MB przy imporcie (zmierzone), a pod brakiem pamięci
+    przerywa interpreter. Import odw2json ustawia 1 wątek (setdefault: wartość użytkownika wygrywa)."""
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "OPENBLAS_NUM_THREADS"}
+    if preset is not None:
+        env["OPENBLAS_NUM_THREADS"] = preset
+    code = "import os, odw2json; print(os.environ.get('OPENBLAS_NUM_THREADS'))"
+    out = subprocess.run(
+        [sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, check=True
+    )
+    assert out.stdout.strip() == expected
+
+
+def test_slot_miedzyprocesowy_wylacznosc_i_zwolnienie(tmp_path):
+    first = ocr._try_acquire_slot(tmp_path, 1)
+    assert first is not None
+    assert ocr._try_acquire_slot(tmp_path, 1) is None  # jedyny slot zajęty (inny uchwyt = inny proces)
+    two = ocr._try_acquire_slot(tmp_path, 2)  # drugi slot wolny
+    assert two is not None
+    ocr._release_slot(first)
+    again = ocr._try_acquire_slot(tmp_path, 1)
+    assert again is not None
+    ocr._release_slot(again)
+    ocr._release_slot(two)
+
+
+def test_slot_czeka_az_sie_zwolni(tmp_path, monkeypatch):
+    import threading
+
+    held = ocr._try_acquire_slot(tmp_path, 1)
+    got: list[bool] = []
+
+    def worker():
+        with ocr._ocr_slot({"max_concurrent_processes": 1}, lock_dir=tmp_path, poll_s=0.01):
+            got.append(True)
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join(0.2)
+    assert got == []  # czeka na slot
+    ocr._release_slot(held)
+    t.join(5)
+    assert got == [True]
+
+
+def test_slot_po_limicie_czasu_przetwarza_mimo_wszystko(tmp_path):
+    held = ocr._try_acquire_slot(tmp_path, 1)
+    try:
+        with ocr._ocr_slot(
+            {"max_concurrent_processes": 1, "slot_timeout_s": 0.05}, lock_dir=tmp_path, poll_s=0.01
+        ):
+            pass  # nie wisi w nieskończoność
+    finally:
+        ocr._release_slot(held)
+
+
+def test_slot_wylaczony_zerem(tmp_path):
+    held = ocr._try_acquire_slot(tmp_path, 1)
+    try:
+        with ocr._ocr_slot({"max_concurrent_processes": 0}, lock_dir=tmp_path, poll_s=0.01):
+            pass
+    finally:
+        ocr._release_slot(held)
+
+
+@pytest.mark.parametrize(
+    "ocr_cfg",
+    [
+        {"max_concurrent_processes": -1},
+        {"max_concurrent_processes": "1"},
+        {"max_concurrent_processes": True},
+        {"slot_timeout_s": 0},
+        {"slot_timeout_s": "x"},
+    ],
+)
+def test_validate_limit_procesow_odrzucony(ocr_cfg):
+    from odw2json import ingest
+
+    with pytest.raises(ValueError, match="ocr\\."):
+        ingest.validate_ingest_cfg({"ocr": ocr_cfg})
+
+
+def test_konfiguracja_ma_limit_procesow_ocr():
+    from odw2json.config_loader import load_app_config
+
+    cfg = load_app_config()["ingest"]["ocr"]
+    assert cfg["max_concurrent_processes"] == 1
+
+
+def test_blokada_silnika_jedno_wywolanie_naraz(tmp_path, monkeypatch):
+    import threading
+    import time as _time
+
+    active = [0]
+    peak = [0]
+    guard = threading.Lock()
+
+    def fake_run(image, cfg):
+        with guard:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        _time.sleep(0.02)
+        with guard:
+            active[0] -= 1
+        return "tekst"
+
+    monkeypatch.setitem(ocr.OCR_ENGINES, "fake", ocr.OcrEngine(available=lambda: True, run=fake_run))
+    monkeypatch.setattr(ocr, "render_page", lambda path, i, dpi=200: object())
+    ocr._MEMO.clear()
+    pdf = _pdf(tmp_path)
+    threads = [threading.Thread(target=ocr.ocr_page, args=(pdf, i, {"engine": "fake"})) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak[0] == 1

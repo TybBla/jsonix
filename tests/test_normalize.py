@@ -155,13 +155,20 @@ def test_date_nieprawidlowe_z_mysnikiem_lub_ukosnikiem_zwraca_none(raw: str) -> 
         ("1.234,56 zł", 1234.56),
         ("200,00 zł", 200.0),
         ("0,00", 0.0),
+        ("10.000,00 zł", 10000.0),
+        ("10.000 zł", 10000.0),
+        ("1.234.567,89 PLN", 1234567.89),
+        ("10 000 PLN", 10000.0),
+        ("17 zł", 17.0),
+        ("17", 17.0),
+        ("PLN 17,00", 17.0),
     ],
 )
 def test_amount_formaty(raw: str, expected: float) -> None:
     assert amount(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["abc", "", "zł", "12,34,56"])
+@pytest.mark.parametrize("raw", ["abc", "", "zł", "12,34,56", "11.09.2026"])
 def test_amount_nieprawidlowa_zwraca_none(raw: str) -> None:
     assert amount(raw) is None
 
@@ -175,13 +182,30 @@ IBAN_CYFRY = "68438223049992295262834736"
     "raw",
     [
         "PL68 4382 2304 9992 2952 6283 4736",
-        "68-4382-2304-9992-2952-6283-4736",
+        "PL 68 4382 2304 9992 2952 6283 4736",
+        "PL 68 4382 2304 9992 2952 6283 4736",
+        "PL68-4382-2304-9992-2952-6283-4736",
         "PL68438223049992295262834736",
+    ],
+)
+def test_iban_zachowuje_prefiks_pl(raw: str) -> None:
+    assert iban(raw) == "PL" + IBAN_CYFRY
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "68-4382-2304-9992-2952-6283-4736",
+        "68 4382 2304 9992 2952 6283 4736",
         IBAN_CYFRY,
     ],
 )
-def test_iban_normalizuje_do_26_cyfr(raw: str) -> None:
+def test_iban_bez_prefiksu_zwraca_26_cyfr(raw: str) -> None:
     assert iban(raw) == IBAN_CYFRY
+
+
+def test_iban_nie_dopasowuje_malego_pl() -> None:
+    assert iban("pl68438223049992295262834736") is None
 
 
 @pytest.mark.parametrize(

@@ -110,6 +110,32 @@ def test_amount_pattern_skips_dates(make_cfg):
     assert res.data["a"]["x"] == 7500.0
 
 
+@pytest.mark.parametrize(
+    ("tekst", "oczekiwana"),
+    [
+        ("Kwota 10.000,00 zł", 10000.0),
+        ("Kwota 10 000 PLN", 10000.0),
+        ("Kwota 17 zł", 17.0),
+        ("Kwota PLN 17,00", 17.0),
+        ("Kwota 1.234.567,89 PLN", 1234567.89),
+        ("Kwota 10 000,00 PLN", 10000.0),
+        ("Kwota 7 500,00 PLN", 7500.0),
+    ],
+)
+def test_amount_pattern_formy(make_cfg, tekst, oczekiwana):
+    cfg = make_cfg(T, {"a.x": {"type": "amount", "extract": [{"label": ["kwota"]}]}})
+    assert extract(_doc(tekst), cfg).data["a"]["x"] == oczekiwana
+
+
+@pytest.mark.parametrize(
+    "tekst",
+    ["Kwota 11.09.2026", "Kwota 2026-09-11", "Kwota 61 1090 1014 0000 0712 1981 2874", "Kwota ZP.1.2026"],
+)
+def test_amount_pattern_nie_lapie_dat_i_numerow(make_cfg, tekst):
+    cfg = make_cfg(T, {"a.x": {"type": "amount", "extract": [{"label": ["kwota"]}]}})
+    assert extract(_doc(tekst), cfg).data["a"]["x"] is None
+
+
 def test_label_multiline_until_stop(make_cfg):
     fields = {
         "a.x": {
@@ -399,3 +425,35 @@ def test_unknown_field_path_rejected_by_registry(tmp_path):
 def test_shipped_registry_loads():
     reg = load_registry()
     assert "przelew_bankowy.kwota" in reg["przelew"].fields
+
+
+def test_label_multiline_przepuszcza_jedna_pusta_linie(make_cfg):
+    fields = {
+        "a.x": {
+            "extract": [
+                {
+                    "label": {
+                        "labels": ["tytul platnosci"],
+                        "multiline": True,
+                        "blank_lines": 1,
+                        "stop": ["status"],
+                    }
+                }
+            ]
+        }
+    }
+    cfg = make_cfg(T, fields)
+    text = "Tytuł płatności: opłata za\n\nodwołanie KIO\n\n\nStatus wykonany"
+    assert extract(_doc(text), cfg).data["a"]["x"] == "opłata za odwołanie KIO"
+    # pusta linia przed etykietą (stop) nadal kończy wartość
+    text2 = "Tytuł płatności: opłata\n\nStatus wykonany"
+    assert extract(_doc(text2), cfg).data["a"]["x"] == "opłata"
+
+
+def test_trim_quotes_niesparowany_cudzyslow():
+    f = NORMALIZERS["trim_quotes"]
+    assert f('"opłata za KIO') == "opłata za KIO"
+    assert f('opłata za KIO"') == "opłata za KIO"
+    assert f("„opłata za KIO") == "opłata za KIO"
+    assert f("„opłata za KIO”.") == "opłata za KIO"
+    assert f('opłata "specjalna" KIO') == 'opłata "specjalna" KIO'

@@ -242,7 +242,12 @@ DATE_PATTERN = (
     + _MONTHS
     + r"\s+\d{4})(?!\d)"
 )
-AMOUNT_PATTERN = r"(?<![\d,.])(?:\d{1,3}(?:[ \u00a0]\d{3})+|\d+)[,.]\d{2}(?!\d|[.,]\d)"
+# Kwota: z groszami (1 234,56 / 10.000,00 / 34.00) albo całkowita, ale wtedy tylko z walutą po niej
+# (17 zł, 10 000 PLN). Tysiące: spacja, twarda spacja lub kropka. Daty (11.09.2026) i numery nie pasują.
+_TYS = r"\d{1,3}(?:[ \u00a0.]\d{3})+|\d+"
+AMOUNT_PATTERN = (
+    rf"(?<![\d,.])(?:(?:{_TYS})[,.]\d{{2}}(?!\d|[.,]\d)|(?:{_TYS})(?=[ \u00a0]*(?i:z[łl]|pln)(?!\w)))"
+)
 IBAN_PATTERN = r"(?<![\dA-Za-z])(?:PL\s?)?\d{2}(?:\s?\d{4}){6}(?!\d)"
 EMAIL_PATTERN = r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
 
@@ -286,11 +291,19 @@ def _line_value(ctx: Ctx, pos: int, opts: dict) -> Hit | None:
     if opts.get("multiline"):
         stops = [phrase_pattern(s, True) for s in _as_list(opts.get("stop"))]
         max_lines = int(opts.get("max_lines", 8))
-        while len(parts) < max_lines and vend + 1 < end:
-            ns = vend + 1
+        blanks_left = int(opts.get("blank_lines", 0))  # ile pustych linii wolno przeskoczyć wewnątrz wartości
+
+        def next_line(after: int) -> tuple[int, int, str]:
+            ns = after + 1
             ne = text.find("\n", ns)
             ne = min(end, len(text) if ne < 0 else ne)
-            line = text[ns:ne]
+            return ns, ne, text[ns:ne]
+
+        while len(parts) < max_lines and vend + 1 < end:
+            ns, ne, line = next_line(vend)
+            if not line.strip() and blanks_left > 0 and ne + 1 < end:
+                ns, ne, line = next_line(ne)  # pusta linia, a za nią ciąg dalszy (o ile to nie etykieta)
+                blanks_left -= 1
             if not line.strip() or any(p.match(ctx.folded, ns, ne) for p in stops):
                 break
             parts.append(line)
@@ -311,7 +324,7 @@ def _pattern_after(ctx: Ctx, pos: int, opts: dict, pattern: str, case: bool) -> 
 @register_extractor(
     "label",
     primary="labels",
-    options=("max_chars", "value", "case", "multiline", "stop", "max_lines", "line_start"),
+    options=("max_chars", "value", "case", "multiline", "stop", "max_lines", "blank_lines", "line_start"),
 )
 def ex_label(ctx: Ctx, opts: dict) -> Iterator[Hit]:
     """Wartość po etykiecie (kolejność etykiet = priorytet). ``:``/kropki prowadzące pomijane.
@@ -598,6 +611,12 @@ def n_name(value: str) -> str | None:
 def n_trim_quotes(value: str) -> str | None:
     """Zdejmuje otaczające cudzysłowy i końcową kropkę/przecinek (np. ``"tytuł".`` -> ``tytuł``)."""
     s = str(value).strip().rstrip(".,;").strip()
+    for a, b in [('"', '"'), ("„", "”"), ("„", '"'), ("“", "”"), ("'", "'"), ("«", "»")]:
+        if s.startswith(a) and not s.endswith(b) and s.count(a) == 1:
+            s = s[len(a) :].strip()  # niesparowany cudzysłów otwierający
+        elif s.endswith(b) and not s.startswith(a) and s.count(b) == 1:
+            s = s[: -len(b)].strip()  # niesparowany cudzysłów zamykający
+    s = s.rstrip(".,;").strip()
     pairs = [('"', '"'), ("„", "”"), ("„", '"'), ("“", "”"), ("'", "'"), ("«", "»")]
     for a, b in pairs:
         if len(s) >= 2 and s.startswith(a) and s.endswith(b):

@@ -85,6 +85,41 @@ Pól z F1 < 0,8 brak. Uwagi do pól < 1:
   (dwa odwołania, jedno potwierdzenie przelewu, w tym typ nietknięty w T4); ponowny przebieg: 0 błędów.
   Wygląda na niedeterminizm OCR pod obciążeniem — do zbadania w E2b/T6.
 
+### Odporność — odwołanie
+Recenzja odporności (warianty tekstu dev w pamięci, F1 wg reguł UZP) wykazała, że reguły trzymały się dosłownych
+etykiet i układu linii z danych. Poprawki są wyłącznie w `config/doctypes/odwolanie.yaml` (sekcja `classify` bez
+zmian); testy: `tests/test_extract_robustness_odwolanie.py` (warianty na 46 dev PDF-ach z warstwą tekstu, próg F1 ≥ 0,97,
+`MIN_DOCS` = 10) oraz `test_party_label_synonyms_and_name_boundaries` w `tests/test_extract_odwolanie.py`.
+
+| Wariant (dev, odwołania) | n | F1 przed | F1 po |
+|---|---|---|---|
+| `Odwołujący:` → `Wykonawca wnoszący odwołanie:` | 46 | 0,726 | 0,998 |
+| `Zamawiający:` → `Instytucja zamawiająca:` | 45 | 0,888 | 0,998 |
+| zamiana kolejności stron (Zamawiający przed Odwołującym) | 46 | 0,998 | 0,998 |
+| zawinięcie całego tekstu do 55 znaków (nazwa kancelarii) | 46 | 0,985 | 0,998 |
+| odwinięcie linii (adres „doklejony” do nazwy) | 46 | 0,993 | 0,998 |
+
+Holdout (kontrola, bez strojenia): te same warianty 0,996–0,997 (= bazowy F1 typu).
+
+- **Etykiety stron — synonimy:** `Odwołujący się`, `Wykonawca wnoszący odwołanie`, `Wykonawca (Odwołujący)`;
+  `Instytucja/Strona/Podmiot zamawiająca/-y`, `Zamawiający – nazwa`. Obsługa w `lists.*.split.start/end`
+  (początek bloku jednej strony = koniec bloku drugiej, w dowolnej kolejności — wcześniej blok Zamawiającego po
+  zamianie „połykał” dane Odwołującego, bo nie widział własnego końca) oraz w etykietach `nazwa`.
+- **Nazwa strony ucinana przed dopiskami w tej samej linii:** przecinek, ` ul.`/` al.`/` pl.`/` os.`,
+  `reprezentowan…`, `KRS/NIP/REGON/tel./e-mail/adres`, kod pocztowy `\d\d-\d\d\d` (wzorzec wartości `&name_line`,
+  współdzielony przez Lidera konsorcjum, „pod firmą” i etykietę Odwołującego; dla Zamawiającego dodatkowo jedna
+  zawinięta linia).
+- **Nazwa kancelarii pełnomocnika:** do przecinka lub ` ul.`, ale kontynuuje w następnych liniach (dowolne
+  zawinięcie), dopóki linia nie zaczyna się od adresu (`ul./al./pl./os.`), cyfry, `tel.`/`e-mail`/`KRS`/`NIP`/`@`
+  ani nagłówka kolejnej sekcji (`dotyczy`, `Zamawiający`, `Odwołujący`, …). Wcześniej linia wyłącznie do końca wiersza
+  („Kancelaria Adwokacka Spółka z”).
+- **Nazwisko pełnomocnika wersalikami:** wzorzec przyjmuje `Jan NOWAK` / `JAN NOWAK` (z pominięciem tytułów
+  `ADWOKAT`, `RADCA PRAWNY`, …), pole ma jawne `normalize: [ws, name]`; zamiana na `Jan Nowak` należy do `names.py`
+  (osobna zmiana). Test końcowy dopasowania `Jan Nowak` ma `xfail(strict=False)` do czasu jej scalenia.
+- **Poza zakresem tej poprawki (zostaje):** `b12` (numer BZP z przyrostkiem `/01` wg GT bez przyrostka — zgodne
+  z `bzp` w `normalize.py`), `d1` (brak numeru TED → pojedyncze FP przy innych liczbach), `d3` (brak linii
+  „Miejscowość, data” → `null`; zamierzone).
+
 ## pełnomocnictwo (E4-T5)
 
 Reguły: `config/doctypes/pelnomocnictwo.yaml`, testy: `tests/test_extract_pelnomocnictwo.py`.
@@ -146,3 +181,44 @@ z kolejnymi indeksami), ekstraktor `if_match` (stała, gdy fraza występuje). Zm
 - Skan `0008`: OCR „Zawadżki” w „reprezentowana przez:” — podpisujący ze złą literą (FP + FN).
 - Nazwisko jednoczłonowe z małą literą po myślniku, imiona trzyczłonowe i nazwiska z apostrofem nie są
   rozpoznawane (brak w danych).
+
+### Odporność — pełnomocnictwo
+
+Testy: `tests/test_extract_robustness_pelnomocnictwo.py` (warianty prawdziwych tekstów dev w pamięci, każdy na
+≥ 10 dokumentach, próg F1 ≥ 0,97). Wyniki F1 typu (46 dokumentów dev z warstwą tekstową):
+
+| wariant | n | przed | po |
+|---|---|---|---|
+| bez zmian | 46 | 1,000 | 1,000 |
+| wstęp: „umocowuję” | 40 | 0,901 | 1,000 |
+| wstęp: „udzielam umocowania” | 25 | 0,873 | 1,000 |
+| wstęp: „ustanawiam pełnomocnikami” | 25 | 1,000 | 1,000 |
+| wstęp: „upoważniam do reprezentowania” | 25 | 0,886 | 1,000 |
+| wstęp: „niniejszym umocowujemy” | 25 | 0,870 | 1,000 |
+| nazwiska WIELKIMI (całe imię i nazwisko) | 46 | 0,736 | 1,000 |
+| nazwiska WIELKIMI (samo nazwisko) | 46 | 0,736 | 1,000 |
+| etykieta „MOCODAWCA” wersalikami | 21 | 0,983 | 1,000 |
+| puste linie podwojone | 46 | 0,978 | 1,000 |
+
+**Decyzje.**
+- **Wersaliki.** `normalize_name` zamienia człon zapisany w całości wielkimi literami (≥ 2 litery) na postać
+  tytułową („JAN NOWAK-JEZIORAŃSKI” → „Jan Nowak-Jeziorański”) **przed** odmianą; GT UZP ma zawsze postać
+  tytułową, więc dawny wynik „JAN KOWALSKI” dla „JANA KOWALSKIEGO” był błędny (test zmieniony świadomie).
+  Wzorce imion w YAML dopuszczają człon tytułowy albo wersalikowy; linie funkcji („PREZES ZARZĄDU”) odrzuca
+  lookahead bez rozróżniania wielkości liter. Wersalikowy człon musi zaczynać się na granicy wyrazu
+  (inaczej `[A-Z]{2,}` zaczynałby w środku „NOWAK”).
+- **Wstęp pełnomocników.** Zapowiedź: „udziel* pełnomocnictw*/umocowan*”, „ustanawia* pełnomocnik*”,
+  „upoważniam/-my/-ją/-a” (bez „upoważniona do reprezentacji”) z opcjonalnym „do reprezentowania (mnie|nas|…)”
+  zjadanym w całości, „umocowuj*”, „niniejszym …”. Koniec bloku „do reprezentowania” nie ucina po
+  „upoważniam”, „niniejszym” nie ucina przed czasownikiem nadania, a goła linia „Mocodawca:” (blok podpisu)
+  kończy listę pełnomocników.
+- **Mocodawca.** Etykieta „Mocodawca/MOCODAWCA” w dowolnej wielkości liter nie wchodzi do `nazwa`
+  (opcjonalna etykieta przed wartością we wzorcach „X z siedzibą”, „X, ul.”, „X⏎ul.”); adres w następnej linii
+  i nazwa zawinięta na 2 linie tolerują puste linie (`\n{1,2}`, `(?:[ \t]*\n)*`).
+- **`typ`.** `const: osoba_prawna` zastąpiony `if_match` na frazach opisujących stronę (NIP/KRS/REGON,
+  „siedzib”, „mocodawc”, forma prawna, gmina/powiat); pusty lub bezładny tekst daje `null`. DSL nie ma
+  warunku „wypełnij tylko, gdy inne pole mocodawcy niepuste” (ekstraktory nie widzą wartości innych pól),
+  więc to przybliżenie; ścisły warunek wymagałby zmiany silnika (`engine.py`) — poza zakresem tego zadania.
+
+**Ograniczenia.** Imię i nazwisko z członem jednoliterowym wersalikiem („J. KOWALSKI”) nie jest wzorcem
+imienia; warianty „Mocodawca”/„MOCODAWCA” jako goły nagłówek nad nazwą rozpoznaje tylko forma wersalikowa.

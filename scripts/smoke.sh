@@ -14,7 +14,7 @@ PYBIN="${PYTHON:-python3}"
 "$PYBIN" -m venv "$TMP/venv"
 VBIN="$TMP/venv/bin"
 [ -x "$VBIN/python" ] || VBIN="$TMP/venv/Scripts"
-"$VBIN/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements.txt"
+"$VBIN/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements.txt" -c "$REPO/requirements-lock.txt"
 
 IN="$TMP/in"
 OUT="$TMP/out"

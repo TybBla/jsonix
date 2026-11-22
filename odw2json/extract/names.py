@@ -4,6 +4,9 @@
 
 Algorytm:
 1. Usuń tytuły z początku (adw., r. pr., radca prawny, mec., Pan/Pani, dr, ...).
+1a. Człon zapisany w całości WIELKIMI literami (JAN NOWAK, NOWAK-JEZIORAŃSKI, „Anna KOWALSKA”) -> postać
+   tytułowa („Jan Nowak”) PRZED odmianą; dane UZP mają imiona zawsze w postaci tytułowej. Pojedyncze
+   inicjały („J.”) zostają bez zmian.
 2. Kolejne słowa rozpoznane w słowniku imion (`config/lookups/imiona.yaml`, formy przypadków
    generowane regułami) wyznaczają rodzaj i przypadek. Imię nieznane -> wejście bez zmian.
 3. Imię w mianowniku -> całość bez zmian (także gdy rodzaj nazwiska nie zgadza się z imieniem,
@@ -223,9 +226,21 @@ def _recase(orig: str, low: str) -> str:
     return "-".join(out)
 
 
+_LETTER_RUN = re.compile(r"[^\W\d_]+")
+
+
+def _title_case_if_upper(token: str) -> str:
+    """Człon w całości wielkimi literami (>= 2 litery) -> „Jan”, „Nowak-Jeziorański”; reszta bez zmian."""
+    letters = _LETTER_RUN.findall(token)
+    if sum(len(x) for x in letters) < 2 or not token.isupper():
+        return token
+    return _LETTER_RUN.sub(lambda m: m[0][:1] + m[0][1:].lower(), token)
+
+
 def normalize_name(text: str) -> str:
     """Imię i nazwisko w dowolnym przypadku (z tytułami) -> mianownik."""
     s = strip_titles(text)
+    s = " ".join(_title_case_if_upper(t) for t in s.split(" ")) if s else s
     tokens = s.split(" ") if s else []
     index = _name_index()
     firsts: list[list[tuple[str, str, frozenset[str]]]] = []
