@@ -33,7 +33,7 @@ def write_placeholders(pdfs: list[Path], input_dir: Path, output_dir: Path, app_
     for pdf in pdfs:
         target = output_dir / pdf.relative_to(input_dir).with_suffix(".json")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        pipeline.write_text_atomic(target, content)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,8 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     log_file = Path(a.log_file) if a.log_file else out / ".logs" / f"{run_id}.jsonl"
     setup_logging(a.verbose, log_file, run_id=run_id)
     inp = Path(a.input)
-    pdfs = [p for p in inp.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf"]
-    write_placeholders(pdfs, inp, out, load_app_config())
+    write_placeholders(pipeline.list_inputs(inp), inp, out, load_app_config())
     rep = pipeline.run(inp, out, run_id=run_id)
     print(f"Przebieg: {run_id}")
     print(

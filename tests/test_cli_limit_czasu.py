@@ -55,3 +55,17 @@ def test_placeholders_follow_unknown_output_setting(tmp_path):
     assert not list(out.rglob("*.json")), "tryb 'none': nieprzetworzony plik nie dostaje wyniku"
     cli.write_placeholders(pdfs, inp, out, {"unknown_output": "empty_file"})
     assert all(p.read_text("utf-8") == "" for p in out.rglob("*.json"))
+
+
+def test_cli_uses_pipeline_list_inputs(tmp_path, monkeypatch):
+    inp, out = _input(tmp_path)
+    calls = []
+    real = pipeline.list_inputs
+
+    def spy(*a, **k):
+        calls.append(a[0])
+        return real(*a, **k)
+
+    monkeypatch.setattr(pipeline, "list_inputs", spy)
+    assert cli.main(["run", str(inp), str(out)]) == 0
+    assert len(calls) == 2, "lista wejść z jednej funkcji: placeholdery w CLI i przebieg w pipeline.run"
