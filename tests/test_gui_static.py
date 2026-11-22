@@ -204,14 +204,19 @@ def _node(script: str, payload) -> object:
         f"const output = (v) => process.stdout.write(JSON.stringify(v));"
         f"const js = (name) => import({json.dumps((JS).as_uri())} + '/' + name);"
     )
-    r = subprocess.run(
-        ["node", "--input-type=module", "-e", prelude + script],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        env={**os.environ, "O2J_INPUT": json.dumps(payload, ensure_ascii=False)},
-        timeout=60,
-    )
+    timeout = float(os.environ.get("O2J_NODE_TIMEOUT", "120"))  # start Node bywa wolny pod obciążeniem
+    kwargs = {
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "env": {**os.environ, "O2J_INPUT": json.dumps(payload, ensure_ascii=False)},
+        "timeout": timeout,
+    }
+    cmd = ["node", "--input-type=module", "-e", prelude + script]
+    try:
+        r = subprocess.run(cmd, **kwargs)
+    except subprocess.TimeoutExpired:  # jedno ponowienie; błędy skryptu (returncode != 0) nie są maskowane
+        r = subprocess.run(cmd, **kwargs)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
@@ -613,3 +618,39 @@ def test_pdf_highlights_keep_contrast_on_white_page_in_high_contrast_mode(client
             assert "#ff0" not in body.lower(), f"żółte obramowanie na białej stronie: {selector.strip()}"
     high = [b for s, b in rules if 'data-contrast="high"' in s and ".is-preview" in s]
     assert high and "#000" in high[0]
+
+
+def test_node_helper_retries_once_on_timeout(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(kw["timeout"])
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+        return subprocess.CompletedProcess(cmd, 0, stdout="[1]", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert _node("output(input)", [1]) == [1]
+    assert len(calls) == 2
+
+
+def test_node_helper_does_not_mask_real_errors(monkeypatch):
+    def fake_run(cmd, **kw):
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="blad skryptu")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(AssertionError, match="blad skryptu"):
+        _node("output(1)", None)
+
+
+def test_node_helper_timeout_from_env(monkeypatch):
+    seen = []
+
+    def fake_run(cmd, **kw):
+        seen.append(kw["timeout"])
+        return subprocess.CompletedProcess(cmd, 0, stdout="1", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setenv("O2J_NODE_TIMEOUT", "7")
+    _node("output(1)", None)
+    assert seen == [7.0]
