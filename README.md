@@ -83,14 +83,14 @@ F1 liczone wg reguł organizatora (TP/TN/FP/FN per pole, długie napisy z progie
 
 **Raport jakości do zgłoszenia** (F1 dev/holdout × tekst/skan, per typ i pole, czas na dokument): `python scripts/quality_report.py` → `docs/raport-jakosci.md` (`--source tekst` = szybko, bez OCR).
 
-Wyniki v0.4.0 (skany: aktualizacja po pomiarze skanów (v1.0), zob. [CHANGELOG](CHANGELOG.md); F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
+Wyniki v1.0.0 (F1 wg reguł UZP, `eval/baseline.json`; pełny raport per pole i czas: `python scripts/quality_report.py` → `docs/raport-jakosci.md`):
 
 | Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) | Skany: odwołanie | Skany: pełnomocnictwo | Skany: przelew |
 |---|---|---|---|---|---|---|
-| dev | 0,996 | 0,999 | 0,977 | 0,997 | 0,980 | 0,882 |
-| holdout | 0,988 | 0,997 | 0,912 | 1,000 | 0,833 (3 dok.) | 0,933 |
+| dev | 0,998 | 0,999 | 0,992 | 0,997 | 0,980 | 0,987 |
+| holdout | 0,994 | 0,997 | 0,967 | 1,000 | 0,943 (3 dok.)* | 0,968 |
 
-Dokumenty z tekstem po v1.0 bez zmian (baseline 22.11: dev 0,999, holdout 0,997).
+\* Holdout skanów pełnomocnictw nie jest niezależną oceną (błędy diagnozowano na tych dokumentach). Czas przy zimnym cache OCR: dokument z tekstem 0,04 s, skan 3–8 s ([raport jakości](docs/raport-jakosci.md)).
 
 Klasyfikacja: 0 błędów; dokumenty spoza typów odrzucone 15/15 (dev) i 13/13 (holdout), w tym skany.
 
