@@ -245,10 +245,6 @@ def test_labels_synonyms_with_address_in_name_line(cfg, corpus):
     assert n >= MIN_DOCS and f1 >= MIN_F1, f"F1={f1:.3f}"
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="zależy od names.py: wersaliki „Jan NOWAK” -> „Jan Nowak” (równoległa zmiana innego agenta)",
-)
 def test_pelnomocnik_surname_uppercase(cfg, corpus):
     ok = total = 0
     for _case, text, gt in corpus:
