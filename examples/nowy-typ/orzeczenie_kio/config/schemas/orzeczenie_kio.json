@@ -1,0 +1,12 @@
+{
+  "OrzeczenieKIO": {
+    "sygnatura": null,
+    "rodzaj": null,
+    "data": null,
+    "przewodniczacy": null,
+    "odwolujacy": null,
+    "zamawiajacy": null,
+    "rozstrzygniecie": null,
+    "kwota_wpisu": null
+  }
+}

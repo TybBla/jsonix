@@ -1,0 +1,10 @@
+# Rozstrzygniecie orzeczenia KIO z sentencji ("orzeka: 1. ..."); kolejnosc wpisow = priorytet.
+# Frazy bez polskich znakow, male litery (tak dziala phrase_lookup).
+- id: uwzglednia
+  phrases: [uwzglednia odwolanie, uwzglednia w czesci odwolanie]
+- id: oddala
+  phrases: [oddala odwolanie]
+- id: odrzuca
+  phrases: [odrzuca odwolanie]
+- id: umarza
+  phrases: [umarza postepowanie odwolawcze, umarza postepowanie]

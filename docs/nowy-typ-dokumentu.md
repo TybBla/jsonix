@@ -1,5 +1,7 @@
 # Jak dodać nowy typ dokumentu (bez zmian w kodzie)
 
+> **Gotowy przykład:** [examples/nowy-typ/orzeczenie_kio](../examples/nowy-typ/orzeczenie_kio/README.md) — 4. typ (orzeczenie KIO) z 8 polami, dodany wyłącznie konfiguracją, z testem „0 linii kodu” (`tests/test_nowy_typ_konfiguracja.py`).
+
 1. Szablon wyniku: `config/schemas/<typ>.json` — dokładny kształt JSON, wszystkie wartości `null`.
 2. Opis typu: `config/doctypes/<typ>.yaml`:
    ```yaml
