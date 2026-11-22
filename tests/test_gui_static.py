@@ -937,21 +937,28 @@ def test_popover_dom_binding_hover_click_escape_outside_and_single_open():
     assert out["activated"] == 3, "każde kliknięcie ikonki może zaznaczyć pole"
 
 
+def _latest_version() -> str:
+    """Najnowsza wersja = pierwszy nagłówek ``## vX.Y.Z`` w CHANGELOG.md."""
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    return re.search(r"^## v(\d+\.\d+\.\d+)\b", changelog, re.M).group(1)
+
+
 def test_footer_has_version_and_required_links(client, page):
     footer = page.raw[page.raw.index("<footer") : page.raw.index("</footer>")]
     text = " ".join(re.sub(r"<[^>]+>", " ", footer).split())
-    assert "jsonix v1.0.0 · projekt HackNation 2026 (zadanie UZP)" in text
+    ver = _latest_version()
+    assert f"jsonix v{ver} · projekt HackNation 2026 (zadanie UZP)" in text, (
+        "stopka = najnowsza wersja z CHANGELOG"
+    )
     hrefs = {h: t.strip() for h, t in re.findall(r'<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>', footer)}
     assert hrefs.get("/static/deklaracja-dostepnosci.html") == "Deklaracja dostępności"
     assert hrefs.get("/docs") == "Dokumentacja API"
     assert hrefs.get("https://github.com/TybBla/jsonix") == "Kod źródłowy"
     assert "Urzędu Zamówień Publicznych" not in footer, "nie sugerujemy oficjalnego serwisu UZP"
-    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert re.search(r"^## v1\.0\.0\b", changelog, re.M), "wersja w stopce zgodna z CHANGELOG"
     assert client.get("/docs").status_code == 200
 
 
 def test_accessibility_statement_repeats_header_and_footer():
     html = DECLARATION_PATH.read_text(encoding="utf-8")
-    assert "brand-mark" not in html and "jsonix v1.0.0" in html
+    assert "brand-mark" not in html and f"jsonix v{_latest_version()}" in html
     assert "Dokumentacja API" in html and "Kod źródłowy" in html
