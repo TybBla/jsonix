@@ -55,7 +55,7 @@ Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otw
 3. **Jak działa:** diagram potoku z [architektura.md](architektura.md) (PDF → ingest/OCR → klasyfikacja → ekstrakcja → JSON + trace).
 4. **Jakość (F1 wg reguł UZP):**
    - dokumenty z tekstem: dev 0,999, holdout 0,997;
-   - skany z OCR: dev 0,977, holdout 0,912 — odwołania 0,997 / 1,000, pełnomocnictwa 0,980 / 0,833 (3 dok.), przelewy 0,882 / 0,933;
+   - skany z OCR: dev 0,992, holdout 0,967 — odwołania 0,997 / 1,000, pełnomocnictwa 0,980 / 0,943 (3 dok.; holdout użyty przy diagnozie), przelewy 0,987 / 0,968;
    - klasyfikacja: 0 błędów na dev i holdout, dokumenty spoza typów 15/15 i 13/13 (z OCR);
    - czas: UZP ogranicza czas na rozwiązanie — dokument z tekstem 0,01 s, skan ~4 s; najpierw dokumenty z tekstem, `{}` zapisywane przed przetwarzaniem, więc nawet przerwany przebieg zostawia wyniki;
    - jak liczymy: `eval/score.py` wg reguł UZP, bramka regresji w CI.

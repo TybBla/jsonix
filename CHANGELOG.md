@@ -2,6 +2,30 @@
 
 Format: etapy z roadmapy (`docs/superpowers/plans/2026-11-21-roadmap-produkcyjna.md`). Każdy wpis zawiera wynik bramki F1.
 
+## v1.0.0 — wydanie zgłoszeniowe (2026-11-22)
+
+Notatki dla GitHub Release: [docs/wydanie-v1.0.md](docs/wydanie-v1.0.md). Zakres: wszystko scalone od v0.4.0.
+
+- **Limit czasu UZP (#13):** `{}` dla każdego PDF przed przetwarzaniem, więc przerwany przebieg zostawia częściowe wyniki; zapis wyników atomowy (plik nigdy w połowie); dokumenty z tekstem przetwarzane przed skanami (OCR na końcu).
+- **Przelewy ze skanów (#21):** etykiety rozbite przez OCR, daty bez kropek; dev@skan F1 0,977 → 0,992, holdout@skan 0,912 → 0,922.
+- **Pełnomocnictwa ze skanów (#19):** dwa podpisy w jednej linii, konsolidacja wyników; holdout@skan 0,958. Uwaga: holdout@skan pełnomocnictw nie jest niezależny (poprawki dopasowano na tych samych skanach).
+- **Sonda odporności i poprawki YAML (#22):** synonimy etykiet i warianty sformułowań sprawdzane syntetycznie, poprawki wyłącznie w `config/doctypes/*.yaml`.
+- **Porządki testów (#20):** uporządkowane i ujednolicone testy.
+- **Raport jakości (#15):** `scripts/quality_report.py` → `docs/raport-jakosci.md` (wygenerowany po pomiarze skanów).
+- **Wdrożenie na VM jury (#23):** `RUN.md` dla oceniających, profil `config/app.jury.yaml` (wyniki tylko w katalogu wyjściowym), `scripts/deploy-vm.sh` z `--self-test`; instrukcja `docs/vm-jury.md`.
+- **Bez LLM (#12):** decyzja `docs/decyzje/E6-bez-llm.md` — reguły spełniają bramkę, 20/20 pkt za moc modelu, dane nie opuszczają maszyny.
+- **Dokumentacja (#10) i demo (#16):** `docs/architektura.md`, `docs/zgloszenie.md`, scenariusz demo, prezentacja.
+- **Repozytorium** publiczne: https://github.com/TybBla/jsonix.
+
+| Bramka | F1 | odwołanie | pełnomocnictwo | przelew | negatywy |
+|---|---|---|---|---|---|
+| dev tekst | 0,999 | 0,998 | 1,000 | 1,000 | 12/12 |
+| holdout tekst | 0,997 | 0,997 | 1,000 | 0,994 | 10/10 |
+| dev skany | 0,992 | 0,997 | 0,980 | 0,987 | 3/3 |
+| holdout skany | 0,967 | 1,000 | 0,943* | 0,968 | 3/3 |
+
+Skany przed → po (baseline po #19, #21, #22 w #25): dev 0,977 → 0,992, holdout 0,912 → 0,967. \* Holdout@skan pełnomocnictw nie jest niezależną oceną (błędy diagnozowano na holdoucie, #19). Razem (tekst + skany): dev 0,998 (negatywy 15/15), holdout 0,994 (13/13). Czas przy zimnym cache OCR: dokument z tekstem 0,04 s, skan 3–8 s (`docs/raport-jakosci.md`, #27).
+
 ## v0.4.0 — E4+E5: ekstrakcja + E11: instalacja i Docker (2026-11-22)
 
 - Silnik ekstrakcji sterowany YAML (`odw2json/extract/engine.py`): pola i listy z `config/doctypes/*.yaml`, rejestry ekstraktorów/normalizatorów/walidatorów, trace z indeksami list, stroną i fragmentem źródła.

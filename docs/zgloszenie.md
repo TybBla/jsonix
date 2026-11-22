@@ -1,6 +1,6 @@
 # Zgłoszenie — checklista zgodności z regulaminem i README UZP
 
-Źródło wymagań: [kryteria-uzp.md](kryteria-uzp.md) (regulamin, treść zadania, FAQ, README organizatora, ustalenia z Discorda). Stan na 22.11.2026 (po v0.4.0). Legenda: ✅ spełnione (z dowodem), 🟡 w toku, ⬜ do zrobienia przed zgłoszeniem.
+Źródło wymagań: [kryteria-uzp.md](kryteria-uzp.md) (regulamin, treść zadania, FAQ, README organizatora, ustalenia z Discorda). Stan na 22.11.2026 (po v0.4.0 i scaleniu PR #13–#23). Legenda: ✅ spełnione (z dowodem), 🟡 w toku, ⬜ do zrobienia przed zgłoszeniem.
 
 ## Wymagania techniczne
 
@@ -12,8 +12,8 @@
 | Typ rozpoznawany z treści, nie z nazwy pliku | ✅ | `odw2json/classify/` (nazwa pliku nieużywana), [decyzje/E3-klasyfikacja.md](decyzje/E3-klasyfikacja.md) |
 | Dokument nieznany → `<nazwa>.json` z `{}` | ✅ | `config/app.yaml: unknown_output: empty_object` |
 | JSON ściśle wg schematu (kolejność kluczy, `null` gdy brak) | ✅ | szablony `config/schemas/*.json`, test kształtu w bramce (`schema_errors = 0`) |
-| Skany bez warstwy tekstowej (OCR) | ✅ | RapidOCR w `requirements.txt` i w obrazie Dockera; F1 skanów dev 0,977, holdout 0,912 |
-| **Ograniczony czas na rozwiązanie** (UZP, pkt 5a) | ✅ / 🟡 | dokument z tekstem 0,01 s, skan ~4 s ([decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md)); `{}` przed przetwarzaniem, zapis atomowy, najpierw dokumenty z tekstem — PR #13 |
+| Skany bez warstwy tekstowej (OCR) | ✅ | RapidOCR w `requirements.txt` i w obrazie Dockera; F1 skanów: dev 0,992, holdout 0,967 (`docs/raport-jakosci.md`) |
+| **Ograniczony czas na rozwiązanie** (UZP, pkt 5a) | ✅ | dokument z tekstem 0,01 s, skan ~4 s ([decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md)); `{}` przed przetwarzaniem, zapis atomowy, najpierw dokumenty z tekstem — PR #13 (scalony) |
 | Wyłącznie open source; laptop i7 / 16 GB / bez GPU | ✅ | licencje niżej; OCR na CPU (onnxruntime) |
 | LLM opcjonalny: open source, firma z serwerami w UE/EOG i polityką prywatności (zakres i miejsce przetwarzania) | ✅ | **decyzja: bez LLM** (`llm_enabled: false`) — 20/20 pkt za moc modelu, F1 z reguł 0,999 / 0,997 ([decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md)); wymogi dostawcy nie dotyczą |
 
@@ -21,11 +21,19 @@
 
 | Element | Stan | Uwagi |
 |---|---|---|
-| Tytuł projektu | 🟡 | roboczo **jsonix**; zespół potwierdza przed wysyłką |
-| Link do repozytorium GitHub z działającym prototypem | ⬜ | repo musi być dostępne dla jury (publiczne albo z dostępem); sprawdzić w ustawieniach repo |
+| Tytuł projektu | ✅ | **jsonix** |
+| Link do repozytorium GitHub z działającym prototypem | ✅ | repozytorium publiczne: https://github.com/TybBla/jsonix |
 | Prototyp: wgranie dokumentów i odczyt wyników | ✅ | GUI (`start-gui.bat`, Docker) i CLI; [gui.md](gui.md) |
 | Dokumentacja techniczna, w tym opis użytego LLM | ✅ | [architektura.md](architektura.md) (sekcja „LLM — decyzja: bez LLM”) |
-| Wyniki testów jakości | 🟡 | v0.4.0: tekst 0,999 / 0,997, skany 0,977 / 0,912 (README, `eval/baseline.json`); pełny raport `docs/raport-jakosci.md` ze `scripts/quality_report.py` (PR #15) na finalnym kodzie — plan v1.0, pkt 15 |
+| Wyniki testów jakości | ✅ | [raport-jakosci.md](raport-jakosci.md) (zimny cache OCR): tekst 0,999 / 0,997, skany 0,992 / 0,967 (dev / holdout), czas: tekst 0,04 s/dok., skan 3–8 s/dok.; `eval/baseline.json` |
+
+## Ocena na VM UZP (VM.md)
+
+| Element | Stan | Dowód |
+|---|---|---|
+| `RUN.md` w repo (komenda oceny, obraz `jsonix:latest`) | ✅ | [RUN.md](../RUN.md) |
+| Profil jury (w `output/` tylko pliki JSON, bez trace) | ✅ | `config/app.jury.yaml`, PR #23 |
+| Wdrożenie na VM | ⬜ | instrukcja [vm-jury.md](vm-jury.md), `scripts/deploy-vm.sh`; dostęp do VM odcięty 22.11 o 11:00 |
 
 ## Warunek wypłaty nagrody (regulamin §3.5)
 
@@ -56,11 +64,15 @@
 | Design System Gov.pl | wzorce interfejsu (kolory, komunikaty) | wzorzec stylu, bez kodu w repo |
 
 ## Przed wysłaniem
-- [ ] `main` zielony w CI (testy, bramka dev i holdout, smoke, `docker build`).
+- [x] `main` zielony w CI (testy, bramka dev i holdout, smoke, `docker build`) — ostatnie przebiegi na `main` (55fcf98, 013819f, a06a422): success.
 - [ ] `python scripts/smoke_docker.py` i `python scripts/smoke_gui.py` zwracają 0 na czystym klonie.
 - [ ] Tag wydania (`v1.0.0`) i CHANGELOG.
 - [ ] `python -m odw2json doctypes` pokazuje **dokładnie 3 typy** (przykład 4. typu z `examples/` nie może zostać w `config/`) i bramka `python -m eval.gate --split dev` ma negatywy 15/15.
 - [ ] Pełny przebieg `start.bat` na wszystkich sprawach treningowych mieści się w rozsądnym czasie (plan v1.0, pkt 11).
-- [ ] Raport jakości F1 w repo i w zgłoszeniu.
-- [ ] Repo dostępne dla jury; link sprawdzony w oknie prywatnym.
+- [x] Raport jakości F1 w repo i w zgłoszeniu — `docs/raport-jakosci.md` (#27).
+- [x] Repo dostępne dla jury — `gh repo view`: PUBLIC, https://github.com/TybBla/jsonix (okno prywatne: do sprawdzenia przez człowieka).
 - [ ] Prezentacja: demo GUI, transparentność ekstrakcji (podświetlenie źródła), nowy typ bez kodu, uzasadnienie „bez LLM”, lista rozwiązań zewnętrznych.
+
+## Tekst opisu do formularza zgłoszenia
+
+jsonix zamienia dokumenty PDF ze spraw odwoławczych KIO na dane JSON zgodne ze schematami UZP. Rozpoznaje z treści (nie z nazwy pliku) odwołanie, pełnomocnictwo i potwierdzenie przelewu, wyodrębnia pola, a dokument spoza tych typów zwraca jako `{}`. Rozwiązanie działa bez LLM: reguły z konfiguracji dają F1 0,999 (dev) i 0,997 (holdout) na dokumentach z tekstem, bez kosztów, bez wysyłania danych i z maksymalną liczbą punktów za moc modelu (20/20). Typy dokumentów i pola opisuje konfiguracja YAML zamiast kodu, więc nowy typ dodaje się bez zmian w programie (przykład 4. typu: orzeczenie KIO). Dla każdej wartości zapisujemy ślad (metoda, strona, fragment źródła), a GUI pokazuje PDF obok pól z podświetleniem miejsca, z którego pochodzi wynik, oraz uzasadnienie wyboru typu. Skany czytamy lokalnym OCR (RapidOCR) na CPU, bez GPU i bez dostępu do sieci; F1 na skanach: 0,992 (dev) i 0,967 (holdout). Wynik przerwanego przebiegu jest zachowany, bo `{}` zapisujemy dla każdego PDF przed przetwarzaniem. Uruchomienie: instrukcja dla jury w `RUN.md`, `start.bat` (Windows, Python 3.13/3.14) lub Docker Compose (`docker compose up --build`). Kod, dokumentacja i wyniki testów: https://github.com/TybBla/jsonix.

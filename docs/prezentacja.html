@@ -109,7 +109,7 @@
   <div class="kpis">
     <div class="kpi"><b>99,9%</b>dokumenty z tekstem, dev</div>
     <div class="kpi"><b>99,7%</b>dokumenty z tekstem, holdout (bez strojenia)</div>
-    <div class="kpi"><b>97,7%</b>skany z OCR, dev (holdout 91,2%; przelewy 88,2%)</div>
+    <div class="kpi"><b>99,2%</b>skany z OCR, dev (holdout 96,7%)</div>
   </div>
   <ul>
     <li>Klasyfikacja: <strong>0 błędów</strong> na dev i holdout, dokumenty spoza typów rozpoznane <strong>15/15 i 13/13</strong>.</li>
@@ -201,7 +201,7 @@ fields:
     <ul>
       <li>CI: testy, bramka F1 (dev i holdout), smoke na Windows i Linux, <code>docker build</code>.</li>
       <li>Smoke Docker: wynik w kontenerze = wynik CLI, także dla skanu z OCR.</li>
-      <li>Limit czasu UZP: dokument z tekstem <strong>0,01 s</strong>, skan <strong>~4 s</strong>; najpierw dokumenty z tekstem, <code>{}</code> zapisane przed przetwarzaniem.</li>
+      <li>Limit czasu UZP: dokument z tekstem <strong>0,04 s</strong>, skan <strong>3–8 s</strong> (zimny cache OCR); najpierw dokumenty z tekstem, <code>{}</code> zapisane przed przetwarzaniem.</li>
     </ul>
   </div>
   <footer><span>jsonix · README</span><span>9</span></footer>
