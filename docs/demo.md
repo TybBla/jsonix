@@ -49,8 +49,7 @@ Zrzuty ekranu do slajdów są w `docs/img/`: `gui-dodaj-pliki.jpg`, `gui-dlaczeg
 
 ## Plan slajdów (10 slajdów)
 
-Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otwórz w przeglądarce z repo; ← → slajdy, F pełny ekran, Ctrl+P zapis do PDF). Miejsca ⟨…⟩ są zaznaczone na czerwono.
-
+Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otwórz w przeglądarce z repo; ← → slajdy, F pełny ekran, Ctrl+P zapis do PDF).
 1. **jsonix:** dokumenty sprawy KIO → dane JSON. Jedno zdanie o problemie i zrzut GUI.
 2. **Problem:** ręczne przepisywanie danych z odwołań, pełnomocnictw i potwierdzeń przelewu; skany bez tekstu; różne układy dokumentów.
 3. **Jak działa:** diagram potoku z [architektura.md](architektura.md) (PDF → ingest/OCR → klasyfikacja → ekstrakcja → JSON + trace).
