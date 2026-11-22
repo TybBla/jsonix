@@ -158,7 +158,7 @@ liter (chyba że `case: true`); grupa nazwana `v` = wartość.
 
 | Ekstraktor | Zapis skrócony | Opcje | Działanie |
 |---|---|---|---|
-| `label` | `label: [etykiety]` | `max_chars` (120), `value`, `case`, `line_start`, `multiline`, `stop`, `max_lines` (8) | wartość po etykiecie (`:`/kropki pomijane). Gdy typ ma wzorzec (amount/date/iban/digits/email/int) albo podano `value` — pierwsze trafienie wzorca w oknie `max_chars` (także w kolejnych liniach). Inaczej reszta linii albo następna niepusta linia; `multiline` dokleja linie do pustej linii lub linii zaczynającej się frazą ze `stop` |
+| `label` | `label: [etykiety]` | `max_chars` (120), `value`, `case`, `line_start`, `multiline`, `stop`, `max_lines` (8), `blank_lines` (0) | wartość po etykiecie (`:`/kropki pomijane). Gdy typ ma wzorzec (amount/date/iban/digits/email/int) albo podano `value` — pierwsze trafienie wzorca w oknie `max_chars` (także w kolejnych liniach). Inaczej reszta linii albo następna niepusta linia; `multiline` dokleja linie do pustej linii lub linii zaczynającej się frazą ze `stop` ; `blank_lines: N` pozwala w `multiline` przeskoczyć do N pustych linii wewnątrz wartości (zawinięcie), o ile za nimi nie ma linii zaczynającej się frazą ze `stop` (patrz niżej) |
 | `regex` | `regex: 'wzorzec'` | `nth` (od 1), `case`, `fold` | trafienia regexu po kolei (albo tylko `nth`-te) |
 | `section_line` | `section_line: nagłówek` | `n` (1; 0 = linia nagłówka), `line_start` | `n`-ta niepusta linia po linii nagłówka |
 | `near` | `near: [frazy]` | `direction` (after/before/both), `max_chars` (200), `value`, `case` | wartość typu pola najbliżej frazy |
@@ -167,6 +167,17 @@ liter (chyba że `case: true`); grupa nazwana `v` = wartość.
 | `flag` | `flag: [frazy]` | `value` (1) | `value`, gdy w zakresie jest któraś z fraz (np. `przez-pelnomocnika`: `- flag: [reprezentowany przez]` + `- const: 0`) |
 | `phrase_lookup` | `phrase_lookup: słownik` | — | klasyfikacja fragmentu słownikiem `config/lookups/<słownik>.yaml` = lista `{id, phrases}`; **kolejność wpisów = priorytet** (np. `czynnosc_powod_frazy.yaml` → `czynnosc_powod_id`) |
 | `derived` | (klucz pola) | `lookup`, `from` | wartość z innego pola przez słownik `config/lookups/<lookup>.yaml` (bez `lookup` — kopia) |
+
+**`blank_lines` (etykieta, tylko z `multiline`)** — ile pustych linii wolno przeskoczyć wewnątrz wartości wieloliniowej (domyślnie `0` = pusta linia kończy wartość). Pusta linia jest pomijana tylko wtedy, gdy za nią jest dalszy tekst, który nie zaczyna się frazą ze `stop` (np. kolejną etykietą); limit `max_lines` nadal obowiązuje. Przykład (`config/doctypes/przelew.yaml`, tytuł zawinięty z pustą linią w środku):
+
+```yaml
+- label:
+    labels: [tytul przelewu, tytulem, tytul]
+    multiline: true
+    max_lines: 6
+    blank_lines: 1        # jedna pusta linia wewnątrz tytułu
+    stop: [kwota, data, nadawca, odbiorca]
+```
 
 `scope`: `after` (brak frazy = pole `null`), `before`, `max_chars`. Każdy ekstraktor przyjmuje też opcję
 **`within`** — okno w zakresie pola o tych samych kluczach albo lista okien zawężanych po kolei (brak frazy
