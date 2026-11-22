@@ -444,11 +444,36 @@ def nip_pl_prefix(t: str, gt: dict, typ: str) -> tuple[str, dict]:
 
 def keys_reorder(t: str, gt: dict, typ: str) -> tuple[str, dict]:
     """Linia „KRS: x, NIP: y, REGON: z” -> inna kolejność identyfikatorów (NIP, REGON, KRS)."""
-    return re.sub(
+    t = re.sub(
         r"(?m)^(\s*)KRS: (\d{10}), NIP: (\d{10}), REGON: (\d{9,14})\s*$",
         r"\1NIP: \3, REGON: \4, KRS: \2",
         t,
-    ), gt
+    )
+    # pełnomocnictwo: „KRS x, NIP y, REGON z” (bez dwukropków, także po „·”) -> NIP, REGON, KRS
+    t = re.sub(r"KRS (\d{10})(,| ·) NIP (\d{10})(,| ·) REGON (\d{9,14})", r"NIP \3\2 REGON \5\4 KRS \1", t)
+    return t, gt
+
+
+def signature_function_first(t: str, gt: dict, typ: str) -> tuple[str, dict]:
+    """Blok podpisu: funkcja nad nazwiskiem („Prezes Zarządu⏎Jan Nowak”) zamiast pod nim."""
+    if typ != "pelnomocnictwo":
+        return t, gt
+    fn = "Prezes Zarządu|Członek Zarządu|Wiceprezes Zarządu|Prokurent|Dyrektor"
+    name = rf"[{PL}][{pl}]+(?:-[{PL}][{pl}]+)? [{PL}][{pl}]+(?:-[{PL}][{pl}]+)?"
+    return re.sub(rf"(?m)^({name})\n({fn})[ \t]*$", r"\2\n\1", t), gt
+
+
+def typographic_quotes(t: str, gt: dict, typ: str) -> tuple[str, dict]:
+    """Cudzysłowy prostokątne w tytułach -> typograficzne („…”); w danych ingest je normalizuje."""
+    return re.sub(r'"([^"\n]{3,200})"', "„\\1”", t), gt
+
+
+def amount_without_currency(t: str, gt: dict, typ: str) -> tuple[str, dict]:
+    """Kwota bez waluty przy liczbie; waluta w osobnej linii „Waluta: PLN” po kwocie (przelew)."""
+    if typ != "przelew" or gt["przelew_bankowy"].get("kwota") is None:
+        return t, gt
+    k = f"{gt['przelew_bankowy']['kwota']:.2f}".replace(".", "[.,]")
+    return re.sub(rf"(?<![\d.,])({k})\s*(?:PLN|zł)", r"\1\nWaluta: PLN", t, count=1), gt
 
 
 def contact_swap(t: str, gt: dict, typ: str) -> tuple[str, dict]:
@@ -619,6 +644,16 @@ VARIANTS: dict[str, Variant] = {
     "c12 'Odwołujący: Nazwa' w 1 linii": party_inline,
     "c13 'W dniu D Zamawiający ...'": action_inverted,
     "c14 e-mail przed telefonem": contact_swap,
+    "c15 funkcja podpisującego nad nazwiskiem": signature_function_first,
+    "b20 kwota bez waluty (waluta w osobnej linii)": amount_without_currency,
+    "b21 cudzysłowy typograficzne": as_ingested(typographic_quotes),
+    "a29 Odwołujący:->Wnoszący odwołanie:": only(
+        "odwolanie", sub(r"(?m)^Odwołujący:", "Wnoszący odwołanie:")
+    ),
+    "a30 nr referencyjny sprawy->nr sprawy": only("odwolanie", sub(r"nr referencyjny sprawy:", "nr sprawy:")),
+    "a31 reprezentowana przez->Pełnomocnik": only(
+        "odwolanie", sub(r"(?m)^reprezentowan\w przez:", "Pełnomocnik:")
+    ),
 }
 
 
