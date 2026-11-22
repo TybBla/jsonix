@@ -454,3 +454,13 @@ def test_rejestr_zawiera_wszystkie_normalizatory() -> None:
 @pytest.mark.parametrize("nazwa", sorted(NORMALIZERS))
 def test_rejestr_pusty_wejscie_zwraca_none(nazwa: str) -> None:
     assert NORMALIZERS[nazwa]("") is None
+
+
+def test_date_with_spaces_from_ocr():
+    """OCR gubi kropki w dacie („20 04 2026”, skan Bank Karpacki) — ta sama data, nie liczba."""
+    from odw2json.extract import normalize as n
+
+    assert n.date("20 04 2026") == "2026-04-20"
+    assert n.date("5 4 2026") == "2026-04-05"
+    assert n.date("20 04.2026") is None, "mieszane separatory nie są datą"
+    assert n.date("32 04 2026") is None

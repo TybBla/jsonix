@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -55,6 +56,52 @@ def _dump(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    """Zapis przez plik tymczasowy w tym samym katalogu + `os.replace`.
+
+    Przerwanie procesu (np. limit czasu UZP, kryteria pkt 5a) nie zostawia pustego ani uciętego pliku:
+    w miejscu docelowym jest albo poprzednia, albo pełna nowa zawartość.
+    """
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _ocr_pages(pdf: Path, min_chars: int) -> int:
+    """Liczba stron bez warstwy tekstu (< `min_chars` znaków) — tanio, bez OCR. Nieczytelny PDF: 0."""
+    try:
+        import pypdfium2 as pdfium
+
+        doc = pdfium.PdfDocument(str(pdf))
+        try:
+            return sum(
+                len(doc[i].get_textpage().get_text_range().strip()) < min_chars for i in range(len(doc))
+            )
+        finally:
+            doc.close()
+    except Exception:
+        return 0
+
+
+def list_inputs(input_dir: Path, min_chars: int | None = None) -> list[Path]:
+    """PDF-y z `input_dir` (podfoldery = sprawy) w kolejności przetwarzania: najpierw z warstwą tekstu
+    (~0,01 s na dokument), na końcu skany do OCR (sekundy na stronę), wg liczby stron do OCR.
+
+    UZP ogranicza czas na rozwiązanie (kryteria pkt 5a): przy przerwaniu ocenionych zostaje jak najwięcej
+    dokumentów. Wyniki nie zależą od kolejności. `min_chars` jak `ingest.ocr.min_chars_per_page`.
+    """
+    if min_chars is None:
+        min_chars = int(
+            ((load_app_config().get("ingest") or {}).get("ocr") or {}).get("min_chars_per_page", 30)
+        )
+    pdfs = [p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf"]
+    return sorted(pdfs, key=lambda p: (_ocr_pages(p, min_chars), str(p)))
+
+
 def write_outputs(
     pdf: Path,
     input_dir: Path,
@@ -69,17 +116,18 @@ def write_outputs(
     target = output_dir / rel
     target.parent.mkdir(parents=True, exist_ok=True)
     if res is not None:
-        target.write_text(_dump(res.data), encoding="utf-8")
+        write_text_atomic(target, _dump(res.data))
     elif app_cfg.get("unknown_output", "empty_object") == "empty_object":
-        target.write_text("{}", encoding="utf-8")
+        write_text_atomic(target, "{}")
     elif app_cfg.get("unknown_output") == "empty_file":
-        target.write_text("", encoding="utf-8")
+        write_text_atomic(target, "")
     else:
         target = None
     if app_cfg.get("write_trace", True):
         tr = output_dir / ".trace" / rel.with_suffix(".trace.json")
         tr.parent.mkdir(parents=True, exist_ok=True)
-        tr.write_text(
+        write_text_atomic(
+            tr,
             _dump(
                 {
                     "run_id": run_id,
@@ -91,7 +139,6 @@ def write_outputs(
                     "trace": [asdict(f) for f in res.trace] if res else [],
                 }
             ),
-            encoding="utf-8",
         )
     return target
 
@@ -113,7 +160,8 @@ def run(
     report = RunReport(run_id=run_id)
     started = datetime.now(UTC)
     t_run = time.perf_counter()
-    pdfs = sorted(p for p in Path(input_dir).rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
+    min_chars = int(((effective.get("ocr") or {}).get("min_chars_per_page")) or 30)
+    pdfs = list_inputs(Path(input_dir), min_chars)
     for pdf in pdfs:
         t0 = time.perf_counter()
         rel = str(pdf.relative_to(input_dir))
