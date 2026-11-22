@@ -44,12 +44,13 @@ fields:
   przelew_bankowy.data_operacji:
     type: date
     extract:
-      - label: [data operacji, data transakcji, data realizacji, data wykonania, data ksiegowania, w dniu]
+      - label: [data operacji, data transakcji, data realizacji, data wykonania, data ksiegowania, data zaksiegowania,
+                data przelewu, data zlecenia, data platnosci, data waluty, w dniu]
         max_chars: 60
   przelew_bankowy.kwota:
     type: amount
     extract:
-      - label: [kwota przelewu, kwota operacji, kwota transakcji, kwota, w kwocie, wartosc]
+      - label: [kwota przelewu, kwota operacji, kwota transakcji, kwota platnosci, kwota, w kwocie, wartosc]
         max_chars: 60
     validate: {min: 0.01}
   przelew_bankowy.z_rachunku:
@@ -71,7 +72,8 @@ fields:
     type: str
     extract:
       # identyfikator: ciag liter/cyfr (>= 8 znakow, z cyfra) w oknie po etykiecie
-      - label: [numer transakcji, numer referencyjny, nr referencyjny, nr ref., nr ref, identyfikator operacji, identyfikator transakcji, numer operacji, id transakcji]
+      - label: [numer transakcji, numer referencyjny, nr referencyjny, nr ref., nr ref, identyfikator operacji, identyfikator transakcji, identyfikator platnosci, numer operacji, numer platnosci,
+                nr transakcji, nr operacji, nr platnosci, id transakcji, id operacji]
         value: '(?<![A-Za-z0-9])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{8,}(?![A-Za-z0-9])'
         max_chars: 60
   przelew_bankowy.tytul:
@@ -79,12 +81,13 @@ fields:
     extract:
       # tytul bywa zawiniety: doklejamy kolejne linie do pustej linii albo nastepnej etykiety
       - label:
-          labels: [tytul platnosci, tytul przelewu, tytul operacji, opis operacji, tytulem, tytul, opis]
+          labels: [tytul platnosci, tytul przelewu, tytul operacji, opis operacji, opis platnosci, tresc przelewu,
+                   tresc platnosci, cel platnosci, tytulem, tytul, opis]
           line_start: true
           multiline: true
           max_lines: 6
           blank_lines: 1   # jedna pusta linia wewnatrz tytulu (zawiniecie), o ile dalej nie ma etykiety
-          stop: [nr ref, nr klienta, numer, identyfikator, kwota, wartosc, data, status, waluta, kanal, typ operacji,
+          stop: [nr ref, nr klienta, nr transakcji, nr operacji, nr platnosci, numer, identyfikator, kwota, wartosc, data, status, waluta, kanal, typ operacji,
                  tryb, oplata, zrealizowano, wykonano, nadawca, odbiorca, platnik, zleceniodawca, adresat, beneficjent,
                  dane nadawcy, dane odbiorcy, rachunek, z rachunku, na rachunek, z powazaniem, bank, potwierdzenie,
                  typ, dokument, strona, niniejsze,
