@@ -4,8 +4,15 @@ Fakty organizatora (VM.md, 22.11.2026) są w [kryteria-uzp.md](kryteria-uzp.md),
 zbiór do `/opt/solution/input`, w `/opt/solution` uruchamia z `sudo` **komendę z `/opt/solution/RUN.md`** i zabiera
 `/opt/solution/output`. **Dostęp zespołów zostanie odcięty 22.11.2026 o 11:00** - obraz musi być zbudowany wcześniej.
 
-Co jest w repo: `RUN.md` (wzorzec pliku jury), `config/app.jury.yaml` (profil: w `output/` tylko wyniki),
+Co jest w repo: [RUN.md](../RUN.md) (wzorzec pliku jury), `config/app.jury.yaml` (profil: w `output/` tylko wyniki),
 `scripts/deploy-vm.sh` (wdrożenie i testy).
+
+## Stan wdrożenia (22.11.2026, v1.0.1)
+- Obraz `jsonix:latest` zbudowany na VM, `/opt/solution/RUN.md` skopiowany z repo (`/opt/solution/repo`).
+- Test jak u jury (krok 4) z `sudo`, także po restarcie VM (krok 5): kod wyjścia 0, w `output/` wyłącznie pliki JSON.
+- Pomiar: cały zbiór treningowy, 226 PDF (w tym 30 skanów), w 365 s; skan średnio ok. 12 s, dokument z tekstem
+  < 0,1 s. Limit jury: 60 minut na 150 plików.
+- Po teście `/opt/solution/input` i `/opt/solution/output` zostawione puste (krok 6).
 
 ## Profil jury: po co
 W kontenerze `/app/output` to zamontowane `/opt/solution/output`. Domyślnie do `output/` trafiają też trace
@@ -46,8 +53,8 @@ na `config/app.yaml`: `write_trace: false`, `log_dir` i `ingest.ocr.cache_dir` w
    własnych danych). Nie usuwaj `/opt/solution/repo` ani `/opt/solution/RUN.md` i nie kasuj obrazu (`docker rmi`/`docker system prune`).
 
 ## Ryzyka
-- **2 vCPU i brak GPU:** OCR skanów jest wolniejszy niż na laptopach (kilka sekund na stronę); limit czasu jury jest nieznany,
-  dlatego `{}` dla każdego PDF powstaje przed przetwarzaniem, a skany idą na końcu (patrz `RUN.md`).
+- **2 vCPU i brak GPU:** OCR skanów jest wolniejszy niż na laptopach (kilka sekund na stronę, skan średnio ok. 12 s); limit jury to 60 minut
+  na 150 plików, a nawet same skany zmieszczą się w ok. 30 min. Na wypadek przekroczenia `{}` dla każdego PDF powstaje przed przetwarzaniem, a skany idą na końcu (patrz `RUN.md`).
 - **Obraz zbudowany przed 11:00:** po odcięciu dostępu nie da się nic poprawić ani zbudować; `RUN.md` nie robi `docker build`
   ani `pull`. Ostatnią zmianę wdrażaj z `--self-test` i `--check-real`.
 - **Output tylko JSON-y:** każdy dodatkowy plik w `/opt/solution/output` to ryzyko złej oceny (patrz profil jury); self-test to sprawdza.

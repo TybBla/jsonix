@@ -66,21 +66,23 @@ Trace jest podstawą transparentności. CLI zapisuje go obok wyniku (`output/.tr
 | `schemas/<typ>.json` | szablon wyniku UZP: kolejność kluczy i `null` jako wartość domyślna |
 | `lookups/*.yaml` | słowniki, np. powód odwołania → opis czynności, frazy czynności, końcówki imion |
 | `classify.yaml` | ustawienia wspólne dla klasyfikacji (nagłówki dokumentów obcych) |
-| `app.yaml` | zachowanie aplikacji: plik dla nieznanego dokumentu, trace, backend PDF, czyszczenie, OCR, przełącznik LLM |
+| `app.yaml` | zachowanie aplikacji: plik dla nieznanego dokumentu, trace, backend PDF, czyszczenie, OCR, przełącznik LLM, katalog logów |
+| `app.jury.yaml` | profil jury scalany na `app.yaml` przez zmienną `JSONIX_APP_CONFIG`: bez trace, logi i cache OCR poza `output/`, 2 wątki OCR |
 | `llm.yaml`, `prompts/` | opcjonalna warstwa LLM (domyślnie wyłączona) |
 
-**Nowy typ dokumentu** to nowy plik `doctypes/<typ>.yaml` i szablon `schemas/<typ>.json`, bez zmian w kodzie. Instrukcja krok po kroku: [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md). W Dockerze katalog `config/` jest montowany z repo, więc zmiana konfiguracji nie wymaga przebudowy obrazu.
+**Nowy typ dokumentu** to nowy plik `doctypes/<typ>.yaml` i szablon `schemas/<typ>.json`, bez zmian w kodzie. Instrukcja krok po kroku: [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md), działający przykład 4. typu: [examples/nowy-typ/orzeczenie_kio](../examples/nowy-typ/orzeczenie_kio/README.md). W Dockerze katalog `config/` jest montowany z repo, więc zmiana konfiguracji nie wymaga przebudowy obrazu.
 
 ## LLM — decyzja: bez LLM
-jsonix działa **bez LLM** (`app.yaml: llm_enabled: false`): klasyfikacja i ekstrakcja opierają się na regułach z konfiguracji. Uzasadnienie: [decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md) — **bez LLM = 20/20 pkt** za moc modelu (model ≤ 8B też daje 20 pkt, więc decyzja wynika z F1 reguł i z czasu przetwarzania), reguły dają F1 0,999 / 0,997 na dokumentach z tekstem. Klient LLM (`odw2json/llm.py`) obsługuje dowolne API zgodne z OpenAI, z kluczem w `.env`, temperaturą 0 i kasetami odpowiedzi do testów bez sieci.
+jsonix działa **bez LLM** (`app.yaml: llm_enabled: false`): klasyfikacja i ekstrakcja opierają się na regułach z konfiguracji. Uzasadnienie: [decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md) — **bez LLM = 20/20 pkt** za moc modelu (model ≤ 8B też daje 20 pkt, więc decyzja wynika z F1 reguł i z czasu przetwarzania), reguły dają F1 0,999 / 0,997 (dev / holdout) na dokumentach z tekstem i 0,992 / 0,967 na skanach. **Wersja oddana do oceny nie używa żadnego modelu językowego** i nie potrzebuje kluczy API ani sieci. Klient LLM (`odw2json/llm.py`) obsługuje dowolne API zgodne z OpenAI, z kluczem w `.env`, temperaturą 0 i kasetami odpowiedzi do testów bez sieci.
 
 Zgodnie z ustaleniami UZP dopuszczamy wyłącznie model open source od firmy z serwerami w UE/EOG i polityką prywatności, która określa zakres i miejsce przetwarzania danych. Bierzemy pod uwagę tylko modele do 8B parametrów, bo tyle nie obniża punktacji za rozmiar modelu. Kryteria: [kryteria-uzp.md](kryteria-uzp.md).
 
 ## Ograniczony czas na rozwiązanie (UZP)
-UZP ogranicza czas działania każdego rozwiązania ([kryteria-uzp.md](kryteria-uzp.md), pkt 5a). Dlatego:
+UZP ogranicza czas działania każdego rozwiązania: na VM jury maksymalnie 60 minut na 150 plików ([kryteria-uzp.md](kryteria-uzp.md), pkt 5a i 5b). Dlatego:
 - **`{}` dla każdego PDF-a przed przetwarzaniem**, a zapis każdego wyniku jest **atomowy** (plik `.tmp` + `os.replace`) — przerwany przebieg zostawia pełne wyniki dla gotowych dokumentów i `{}` dla reszty, bez uciętych plików;
-- **najpierw dokumenty z warstwą tekstu (~0,01 s), na końcu skany** — kolejność z `pipeline.list_inputs` (strony z mniej niż `min_chars_per_page` znakami = OCR);
-- **99% czasu to OCR skanów** (~4 s na skan, ok. 2 s na stronę; klasyfikacja i ekstrakcja < 1%) — pomiar i decyzje: [decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md), narzędzie `scripts/bench_cases.py`.
+- **najpierw dokumenty z warstwą tekstu (ok. 0,04–0,1 s na dokument), na końcu skany** — kolejność z `pipeline.list_inputs` (strony z mniej niż `min_chars_per_page` znakami = OCR);
+- **prawie cały czas to OCR skanów** (3–8 s na skan przy zimnym cache na laptopie z 16 rdzeniami, ok. 2 s na stronę; klasyfikacja i ekstrakcja ok. 1%) — pomiar i decyzje: [decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md), [raport-jakosci.md](raport-jakosci.md), narzędzie `scripts/bench_cases.py`;
+- **na VM UZP (2 vCPU)** cały zbiór treningowy, 226 PDF (w tym 30 skanów), przetwarza się w 365 s, skan średnio ok. 12 s.
 
 ## Aplikacja: API i GUI
 - **API** (FastAPI, `python -m odw2json serve`, opis OpenAPI pod `/docs`):
@@ -90,18 +92,18 @@ UZP ogranicza czas działania każdego rozwiązania ([kryteria-uzp.md](kryteria-
   - pozostałe: `GET /api/doctypes`, `GET /api/health` oraz synchroniczne `POST /api/process` (zgodność wsteczna).
   - **Limity:** 50 plików i 200 MB na żądanie, 25 MB na plik; konfiguracja przez zmienne środowiskowe.
   - **Bezpieczeństwo nazw:** nazwy plików są sanityzowane (ochrona przed path traversal i nazwami zarezerwowanymi Windows).
-- **GUI** (`web/static/`): statyczny HTML, CSS i JS bez kroku budowania, serwowany przez FastAPI. PDF.js i fonty są dołączone lokalnie, więc GUI działa offline. Styl wg Design System Gov.pl, pełna obsługa klawiaturą, projekt zgodny z WCAG 2.1 AA (deklaracja dostępności w GUI). Pola wyniku są widoczne obok podglądu PDF z podświetleniem źródła (kliknięcie albo najechanie, w obie strony) i z ręczną edycją wartości. Szczegóły: [gui.md](gui.md).
+- **GUI** (`web/static/`): statyczny HTML, CSS i JS bez kroku budowania, serwowany przez FastAPI. PDF.js i fonty są dołączone lokalnie, więc GUI działa offline. Styl wg Design System Gov.pl, pełna obsługa klawiaturą, projekt zgodny z WCAG 2.1 AA (deklaracja dostępności w GUI). Pola wyniku są widoczne obok podglądu PDF z podświetleniem źródła (kliknięcie albo najechanie, w obie strony) i z ręczną edycją wartości; stronę i fragment źródła pokazuje dymek przy ikonce „i” obok wartości, a brak źródła — ikonka ostrzeżenia (trójkąt z „!”). Szczegóły: [gui.md](gui.md).
 
 ## Jakość
 - **F1 wg reguł UZP:** `eval/score.py`. Długie teksty porównujemy z progiem podobieństwa 80%, pozostałe pola dokładnie, listy po treści.
 - **Bramka regresji:** `python -m eval.gate --split dev|holdout [--source tekst|skan]`. Porównuje wynik z `eval/baseline.json` i kończy się kodem 1 przy spadku F1. Podział spraw na dev i holdout jest deterministyczny (`data/splits.yaml`); holdout sprawdzamy rzadko, żeby nie dopasować reguł do zbioru testowego.
-- **CI (GitHub Actions, Ubuntu i Windows, Python 3.13 i 3.14):** ruff, pytest, bramka F1 na dev i holdout, smoke CLI, `docker build`. Lokalnie dochodzą `scripts/smoke_gui.py` (API i GUI) oraz `scripts/smoke_docker.py` (Compose, healthcheck, wsad w kontenerze porównany z CLI).
+- **CI (GitHub Actions, Ubuntu i Windows, Python 3.13 i 3.14):** ruff, pytest (bez testów z prawdziwym LLM i OCR), bramka F1 na dev i holdout dla dokumentów z tekstem, smoke CLI, `docker build`. Bramkę skanów (`--source skan`, z OCR) uruchamiamy lokalnie. Lokalnie dochodzą `scripts/smoke_gui.py` (API i GUI) oraz `scripts/smoke_docker.py` (Compose, healthcheck, wsad w kontenerze porównany z CLI).
 
 ## Ocena na VM UZP
-Jury uruchamia obraz Dockera według `RUN.md`. Zmienna `JSONIX_APP_CONFIG=config/app.jury.yaml` wskazuje profil jury, który wyłącza trace i wynosi logi oraz cache OCR poza `output/`, dzięki czemu w `output/` są wyłącznie pliki JSON (`<sprawa>/<nazwa_jak_pdf>.json`). Wdrożenie i autotest na VM wykonuje `scripts/deploy-vm.sh`. Szczegóły: [vm-jury.md](vm-jury.md).
+Jury uruchamia obraz Dockera według `RUN.md`. Zmienna `JSONIX_APP_CONFIG=config/app.jury.yaml` wskazuje profil jury, który wyłącza trace i wynosi logi oraz cache OCR poza `output/`, dzięki czemu w `output/` są wyłącznie pliki JSON (`<sprawa>/<nazwa_jak_pdf>.json`). Wdrożenie i autotest na VM wykonuje `scripts/deploy-vm.sh`; rozwiązanie jest wdrożone, a test jak u jury (z `sudo`, także po restarcie VM) kończy się kodem 0. Szczegóły: [vm-jury.md](vm-jury.md), komenda: [RUN.md](../RUN.md).
 
 ## Uruchomienie
-- **CLI:** `pip install -r requirements.txt`, potem `start.bat` (Windows) albo `start.sh`, co odpowiada `python -m odw2json run input output`.
+- **CLI:** `start.bat` (Windows; przy pierwszym uruchomieniu sam tworzy `.venv` i instaluje `requirements.txt`) albo `start.sh` (Linux/macOS), co odpowiada `python -m odw2json run input output`.
 - **GUI:** `start-gui.bat` albo `python -m odw2json serve`, potem http://127.0.0.1:8000.
 - **Docker:** `docker compose up --build`; plik `.env` jest opcjonalny.
 
@@ -113,7 +115,9 @@ Jury uruchamia obraz Dockera według `RUN.md`. Zmienna `JSONIX_APP_CONFIG=config
 | `config/` | konfiguracja typów dokumentów i aplikacji (tabela wyżej) |
 | `web/static/` | GUI (HTML/CSS/JS, `vendor/` z PDF.js i fontami oraz ich licencjami) |
 | `eval/` | F1 wg UZP, bramka regresji, pokrycie tekstu |
-| `data/train/` | dane treningowe UZP (`przyklad_*`, `negatywne/`, `skany/`) i podział `splits.yaml` |
+| `data/` | dane treningowe UZP `train/` (`przyklad_*`, `negatywne/`, `skany/`), schematy `oczekiwane-json/`, podział `splits.yaml` |
+| `examples/nowy-typ/` | przykład 4. typu dokumentu dodanego samą konfiguracją |
+| `RUN.md`, `Dockerfile`, `docker-compose.yml` | komenda dla jury, obraz i Compose |
 | `tests/` | testy (pytest; logika JS przez Node, jeśli jest zainstalowany) |
 | `scripts/` | smoke testy, benchmarki, narzędzia |
-| `docs/` | kryteria UZP, ta architektura, GUI, nowy typ dokumentu, decyzje (`decyzje/`), plany etapów |
+| `docs/` | kryteria UZP, ta architektura, GUI, nowy typ dokumentu, raport jakości, VM jury, zgłoszenie, decyzje (`decyzje/`), plany etapów |

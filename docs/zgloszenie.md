@@ -1,6 +1,6 @@
 # Zgłoszenie — checklista zgodności z regulaminem i README UZP
 
-Źródło wymagań: [kryteria-uzp.md](kryteria-uzp.md) (regulamin, treść zadania, FAQ, README organizatora, ustalenia z Discorda). Stan na 22.11.2026 (po v0.4.0 i scaleniu PR #13–#23). Legenda: ✅ spełnione (z dowodem), 🟡 w toku, ⬜ do zrobienia przed zgłoszeniem.
+Źródło wymagań: [kryteria-uzp.md](kryteria-uzp.md) (regulamin, treść zadania, FAQ, README organizatora, ustalenia z Discorda). Stan na 22.11.2026: wydanie **v1.0.1** (tag `v1.0.1`), zgłoszenie wysłane, rozwiązanie wdrożone na VM jury. Legenda: ✅ spełnione (z dowodem), 🟡 w toku, ⬜ do zrobienia.
 
 ## Wymagania techniczne
 
@@ -13,7 +13,7 @@
 | Dokument nieznany → `<nazwa>.json` z `{}` | ✅ | `config/app.yaml: unknown_output: empty_object` |
 | JSON ściśle wg schematu (kolejność kluczy, `null` gdy brak) | ✅ | szablony `config/schemas/*.json`, test kształtu w bramce (`schema_errors = 0`) |
 | Skany bez warstwy tekstowej (OCR) | ✅ | RapidOCR w `requirements.txt` i w obrazie Dockera; F1 skanów: dev 0,992, holdout 0,967 (`docs/raport-jakosci.md`) |
-| **Ograniczony czas na rozwiązanie** (UZP, pkt 5a) | ✅ | dokument z tekstem 0,01 s, skan ~4 s ([decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md)); `{}` przed przetwarzaniem, zapis atomowy, najpierw dokumenty z tekstem — PR #13 (scalony) |
+| **Ograniczony czas na rozwiązanie** (UZP, pkt 5a) | ✅ | limit jury: 60 min na 150 plików. Na VM UZP (2 vCPU): 226 PDF w 365 s, skan śr. ok. 12 s, dokument z tekstem < 0,1 s ([kryteria-uzp.md](kryteria-uzp.md), pkt 5b); laptop 16 rdzeni, zimny cache OCR: tekst 0,04–0,1 s, skan 3–8 s ([raport-jakosci.md](raport-jakosci.md), [decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md)); `{}` przed przetwarzaniem, zapis atomowy, najpierw dokumenty z tekstem (PR #13) |
 | Wyłącznie open source; laptop i7 / 16 GB / bez GPU | ✅ | licencje niżej; OCR na CPU (onnxruntime) |
 | LLM opcjonalny: open source, firma z serwerami w UE/EOG i polityką prywatności (zakres i miejsce przetwarzania) | ✅ | **decyzja: bez LLM** (`llm_enabled: false`) — 20/20 pkt za moc modelu, F1 z reguł 0,999 / 0,997 ([decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md)); wymogi dostawcy nie dotyczą |
 
@@ -21,34 +21,37 @@
 
 | Element | Stan | Uwagi |
 |---|---|---|
+| Zgłoszenie wysłane | ✅ | formularz HackNation, tekst opisu na końcu tego pliku |
 | Tytuł projektu | ✅ | **jsonix** |
 | Link do repozytorium GitHub z działającym prototypem | ✅ | repozytorium publiczne: https://github.com/TybBla/jsonix |
-| Prototyp: wgranie dokumentów i odczyt wyników | ✅ | GUI (`start-gui.bat`, Docker) i CLI; [gui.md](gui.md) |
-| Dokumentacja techniczna, w tym opis użytego LLM | ✅ | [architektura.md](architektura.md) (sekcja „LLM — decyzja: bez LLM”) |
-| Wyniki testów jakości | ✅ | [raport-jakosci.md](raport-jakosci.md) (zimny cache OCR): tekst 0,999 / 0,997, skany 0,992 / 0,967 (dev / holdout), czas: tekst 0,04 s/dok., skan 3–8 s/dok.; `eval/baseline.json` |
+| Prototyp: wgranie dokumentów i odczyt wyników | ✅ | GUI (`start-gui.bat`, `docker compose up --build`) i CLI (`start.bat`); [gui.md](gui.md); test na czystym Windows: [test-jury.md](test-jury.md) |
+| Dokumentacja techniczna, w tym opis użytego LLM | ✅ | [architektura.md](architektura.md) (sekcja „LLM — decyzja: bez LLM”), uzasadnienie [decyzje/E6-bez-llm.md](decyzje/E6-bez-llm.md) |
+| Wyniki testów jakości | ✅ | [raport-jakosci.md](raport-jakosci.md) (zimny cache OCR): razem 0,998 / 0,994, tekst 0,999 / 0,997, skany 0,992 / 0,967 (dev / holdout), negatywy 15/15 i 13/13; czas: tekst 0,04–0,1 s/dok., skan 3–8 s/dok.; `eval/baseline.json` |
 
 ## Ocena na VM UZP (VM.md)
 
 | Element | Stan | Dowód |
 |---|---|---|
-| `RUN.md` w repo (komenda oceny, obraz `jsonix:latest`) | ✅ | [RUN.md](../RUN.md) |
+| `RUN.md` w katalogu głównym repo (komenda oceny, obraz `jsonix:latest`) | ✅ | [RUN.md](../RUN.md); test `tests/test_cli_jury.py` (jedna komenda `docker run` bez interakcji) |
 | Profil jury (w `output/` tylko pliki JSON, bez trace) | ✅ | `config/app.jury.yaml`, PR #23 |
-| Wdrożenie na VM | ⬜ | instrukcja [vm-jury.md](vm-jury.md), `scripts/deploy-vm.sh`; dostęp do VM odcięty 22.11 o 11:00 |
+| Wdrożenie na VM | ✅ | obraz `jsonix:latest` zbudowany na VM, `/opt/solution/RUN.md` skopiowany (`scripts/deploy-vm.sh`, [vm-jury.md](vm-jury.md)) |
+| Test jak u jury (z `sudo`, także po restarcie VM) | ✅ | exit 0, w `output/` wyłącznie pliki JSON; po teście `input/` i `output/` zostawione puste |
+| Limit czasu jury (60 min / 150 plików) | ✅ | pomiar na VM: 226 PDF (w tym 30 skanów) w 365 s, skan śr. ok. 12 s ([kryteria-uzp.md](kryteria-uzp.md), pkt 5b) |
 
 ## Warunek wypłaty nagrody (regulamin §3.5)
 
 | Element | Stan | Dowód |
 |---|---|---|
 | Kod źródłowy | ✅ | repozytorium |
-| Instrukcja uruchomienia | ✅ | [README](../README.md): szybki start, GUI, Docker |
+| Instrukcja uruchomienia | ✅ | [README](../README.md): szybki start (Windows, Docker, Linux), GUI; dla jury [RUN.md](../RUN.md) |
 | Docker Compose | ✅ | `docker-compose.yml` bez wymaganego `.env`, z healthcheckiem; test `scripts/smoke_docker.py` (wynik w kontenerze = CLI, także skan z OCR) |
 | Opis architektury | ✅ | [architektura.md](architektura.md) |
 | Konfiguracja ekstrakcji danej klasy dokumentów | ✅ | [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md) (sekcje `classify`, `fields`, `lists`), decyzje: [decyzje/E4-ekstrakcja.md](decyzje/E4-ekstrakcja.md) |
-| Dodawanie nowej klasy dokumentów | ✅ / 🟡 | [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md); przykład 4. typu wyłącznie konfiguracją (orzeczenie KIO) z testem „0 linii kodu” — PR E10 |
+| Dodawanie nowej klasy dokumentów | ✅ | [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md); przykład 4. typu wyłącznie konfiguracją: [examples/nowy-typ/orzeczenie_kio](../examples/nowy-typ/orzeczenie_kio/README.md), test „0 linii kodu” `tests/test_nowy_typ_konfiguracja.py` |
 
 ## Autorstwo i rozwiązania zewnętrzne (regulamin §4)
 - W commitach i PR nie umieszczamy atrybucji narzędzi AI (decyzja zespołu, `AGENTS.md`).
-- Rozwiązania zewnętrzne **wskazujemy w prezentacji**. Lista komponentów open source, z wersjami z obrazu Dockera z 21.11.2026:
+- Rozwiązania zewnętrzne **wskazujemy w prezentacji** (ostatni slajd [prezentacja.html](prezentacja.html)). Lista komponentów open source (zależności z `requirements.txt`, wersje przypięte w `requirements-lock.txt`):
 
 | Komponent | Do czego | Licencja |
 |---|---|---|
@@ -58,20 +61,24 @@
 | numpy, Pillow, shapely, pyclipper | zależności OCR | BSD-3-Clause i in., MIT-CMU, BSD-3-Clause, MIT |
 | PyYAML, pydantic, rapidfuzz | konfiguracja, modele danych, podobieństwo tekstu | MIT |
 | FastAPI, uvicorn, python-multipart | API i serwer | MIT, BSD-3-Clause, Apache-2.0 |
+| pytest, httpx | testy (w tym klient testowy API) | MIT, BSD-3-Clause |
 | openai (klient), python-dotenv | opcjonalny klient LLM (API zgodne z OpenAI), `.env` | Apache-2.0, BSD-3-Clause |
 | PDF.js (Mozilla) | podgląd PDF w GUI | Apache-2.0 (`web/static/vendor/pdfjs/LICENSE`) |
 | Open Sans | font GUI (Design System Gov.pl) | SIL OFL 1.1 (`web/static/vendor/fonts/LICENSE`) |
 | Design System Gov.pl | wzorce interfejsu (kolory, komunikaty) | wzorzec stylu, bez kodu w repo |
 
 ## Przed wysłaniem
-- [x] `main` zielony w CI (testy, bramka dev i holdout, smoke, `docker build`) — ostatnie przebiegi na `main` (55fcf98, 013819f, a06a422): success.
-- [ ] `python scripts/smoke_docker.py` i `python scripts/smoke_gui.py` zwracają 0 na czystym klonie.
-- [ ] Tag wydania (`v1.0.0`) i CHANGELOG.
-- [ ] `python -m odw2json doctypes` pokazuje **dokładnie 3 typy** (przykład 4. typu z `examples/` nie może zostać w `config/`) i bramka `python -m eval.gate --split dev` ma negatywy 15/15.
-- [ ] Pełny przebieg `start.bat` na wszystkich sprawach treningowych mieści się w rozsądnym czasie (plan v1.0, pkt 11).
-- [x] Raport jakości F1 w repo i w zgłoszeniu — `docs/raport-jakosci.md` (#27).
-- [x] Repo dostępne dla jury — `gh repo view`: PUBLIC, https://github.com/TybBla/jsonix (okno prywatne: do sprawdzenia przez człowieka).
-- [ ] Prezentacja: demo GUI, transparentność ekstrakcji (podświetlenie źródła), nowy typ bez kodu, uzasadnienie „bez LLM”, lista rozwiązań zewnętrznych.
+- [x] `main` zielony w CI (testy, bramka dev i holdout, smoke, `docker build`): przebiegi „Merge #29: wydanie v1.0.1” i „Merge #33” — success.
+- [x] `python scripts/smoke_docker.py` zwraca 0 na świeżym klonie ([test-jury.md](test-jury.md), sekcja „Docker”); GUI z `start-gui.bat` i z Dockera sprawdzone w tym samym teście.
+- [x] Tag wydania i CHANGELOG: `v1.0.0` i `v1.0.1` ([CHANGELOG.md](../CHANGELOG.md), [wydanie-v1.0.md](wydanie-v1.0.md)).
+- [x] `python -m odw2json doctypes` pokazuje **dokładnie 3 typy** (przykład 4. typu jest tylko w `examples/`, pilnuje tego `tests/test_nowy_typ_konfiguracja.py`), bramka dev ma negatywy 15/15.
+- [x] Pełny przebieg na wszystkich sprawach treningowych w rozsądnym czasie: 226 PDF w 213 s na laptopie ([decyzje/E11-wydajnosc.md](decyzje/E11-wydajnosc.md)) i w 365 s na VM jury.
+- [x] Raport jakości F1 w repo i w zgłoszeniu — [raport-jakosci.md](raport-jakosci.md) (#27).
+- [x] Repo dostępne dla jury — `gh repo view`: PUBLIC, https://github.com/TybBla/jsonix.
+- [x] Test instalacji na czystym Windows ze świeżego klonu (Python 3.13, 3.14 i 3.15) — [test-jury.md](test-jury.md).
+- [x] Wdrożenie na VM jury i test jak u jury (z `sudo`, po restarcie) — sekcja „Ocena na VM UZP” wyżej.
+- [x] Prezentacja: demo GUI, transparentność ekstrakcji (podświetlenie źródła), nowy typ bez kodu, uzasadnienie „bez LLM”, lista rozwiązań zewnętrznych — [prezentacja.html](prezentacja.html), scenariusz [demo.md](demo.md).
+- [x] Zgłoszenie wysłane (tytuł, link do repo, opis poniżej).
 
 ## Tekst opisu do formularza zgłoszenia
 

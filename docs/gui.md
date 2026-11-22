@@ -2,6 +2,8 @@
 
 GUI jsonix to statyczne pliki HTML/CSS/JS w `web/static/`, serwowane przez FastAPI. Nie wymaga Node ani kroku budowania i działa offline: PDF.js i font Open Sans są dołączone w `web/static/vendor/` (licencje i wersje: `web/static/vendor/README.md`).
 
+![jsonix — demo GUI](img/demo-gui.gif)
+
 ## Uruchomienie
 
 ```powershell
@@ -15,7 +17,7 @@ Otwórz http://127.0.0.1:8000. Opis API (OpenAPI): http://127.0.0.1:8000/docs.
 1. **Dodaj pliki** — przeciągnij pliki PDF na pole albo wybierz je przyciskiem „Dodaj plik”. Pliki są sprawdzane od razu (format PDF, pusty plik, limit 25 MB). Błędy są pokazywane przy pliku i w podsumowaniu na górze strony.
 2. **Analizuj** — pliki trafiają do `POST /api/jobs`, a każdy plik przechodzi przez `pipeline.process_file_ex`, czyli ten sam potok co CLI (identyczne dane w GUI i w `output/`). Pasek postępu pokazuje wysyłkę (%), a potem „Przeanalizowano N z M”. Stan joba jest odpytywany z `GET /api/jobs/{id}`.
 3. **Wyniki klasyfikacji** — tabela z typem dokumentu, pewnością (niska pewność ma ikonę i słowo „niska”), ostrzeżeniami i błędami. Dokument nierozpoznany ma oznaczenie „Nieznany dokument” (wynikowy JSON to `{}`). Rozwijane „Dlaczego ten typ?” („Dlaczego nie rozpoznano?” przy nieznanym dokumencie) tłumaczy uzasadnienie klasyfikacji (`classification.evidence`) na zdania po polsku (`web/static/js/evidence.js`): tytuł w nagłówku, słowa kluczowe i pomocnicze, liczba pasujących wzorców, cechy obniżające wynik oraz powód odrzucenia z nazwą najbliższego typu. Surowe cechy klasyfikatora są pod „Szczegóły techniczne”. Nieznany format cechy jest pokazywany bez zmian. Pobierzesz tu JSON każdego pliku albo wszystkie naraz (ZIP).
-4. **Sprawdź dane** — po lewej pola pogrupowane jak w JSON, po prawej dokument PDF. Najechanie kursorem albo przejście klawiszem Tab na pole lekko podświetla jego fragment w dokumencie (bez przewijania podglądu); gdy fragment jest na stronie poza widokiem, przy polu pojawia się znacznik „strona N”. Kliknięcie pola (albo Enter) przewija podgląd do fragmentu i zaznacza go (obramowanie + etykieta pola). Działa to też w drugą stronę: najechanie na podświetlony fragment w dokumencie wyróżnia odpowiadające mu pole (lista pól przewija się, jeśli pole jest poza widokiem), a kliknięcie fragmentu zaznacza pole. Zejście kursorem lub fokusem przywraca zaznaczenie z ostatniego kliknięcia. Na wąskim ekranie przełączasz widok przyciskami „Pola / Dokument”.
+4. **Sprawdź dane** — po lewej pola pogrupowane jak w JSON, po prawej dokument PDF. Najechanie kursorem albo przejście klawiszem Tab na pole lekko podświetla jego fragment w dokumencie (bez przewijania podglądu); gdy fragment jest na stronie poza widokiem, przy polu pojawia się znacznik „strona N”. Kliknięcie pola (albo Enter) przewija podgląd do fragmentu i zaznacza go (obramowanie + etykieta pola). Działa to też w drugą stronę: najechanie na podświetlony fragment w dokumencie wyróżnia odpowiadające mu pole (lista pól przewija się, jeśli pole jest poza widokiem), a kliknięcie fragmentu zaznacza pole. Zejście kursorem lub fokusem przywraca zaznaczenie z ostatniego kliknięcia. Na wąskim ekranie przełączasz widok przyciskami „Pola / Dokument”. Stronę i fragment źródła każdej wartości pokazuje dymek przy ikonce „i” obok wartości, a brak źródła — ikonka ostrzeżenia (trójkąt z „!”); szczegóły w sekcji „Źródło wartości (ikonka i dymek)”.
 5. **Popraw wartość (opcjonalnie)** — „Zmień” przy polu otwiera edycję (Enter zapisuje, Esc anuluje, puste pole = `null`). Zmienione pole ma oznaczenie „Zmieniono ręcznie” i przycisk „Przywróć wartość z dokumentu”. Liczby zostają liczbami („7 500,50” → `7500.5`).
 6. **Pobierz JSON** — wynik dokumentu jako plik `.json` o nazwie jak PDF, razem z Twoimi zmianami.
 
@@ -27,7 +29,11 @@ Dopasowania są liczone **raz** po wczytaniu dokumentu (`buildSourceMap`): każd
 
 ![Podgląd przy najechaniu na pole NIP](img/gui-hover-pole.jpg)
 
+![Dymek ze źródłem wartości przy ikonce „i”](img/gui-zrodlo-dymek.jpg)
+
 ![Podgląd przy najechaniu na fragment w dokumencie](img/gui-hover-dokument.jpg)
+
+Zrzuty pochodzą z v1.0.0: pod wartościami widać jeszcze stałą linię „Źródło: …”, którą w v1.0.1 zastąpiła ikonka z dymkiem (opis niżej). Podświetlanie źródła w PDF działa tak samo.
 
 ### Źródło wartości (ikonka i dymek)
 
@@ -55,7 +61,7 @@ Lista pól powstaje z `data`, a nie z `trace`, więc widać też pola bez warto�
 
 ## Dostępność
 
-Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), pełna obsługa klawiaturą, link „Przejdź do treści”, podsumowanie błędów z fokusem i prefiksem „Błąd:” w tytule strony, regiony `role="alert"` / `role="status"`, status nigdy tylko kolorem, przełącznik wysokiego kontrastu i rozmiaru tekstu. Deklaracja dostępności: `/static/deklaracja-dostepnosci.html`. Stopka: „jsonix v1.0.0 · projekt HackNation 2026 (zadanie UZP)” i linki do deklaracji dostępności, dokumentacji API (`/docs`) i kodu źródłowego (wersja wpisana na stałe; `/api/health` jej nie zwraca).
+Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), pełna obsługa klawiaturą, link „Przejdź do treści”, podsumowanie błędów z fokusem i prefiksem „Błąd:” w tytule strony, regiony `role="alert"` / `role="status"`, status nigdy tylko kolorem, przełącznik wysokiego kontrastu i rozmiaru tekstu. Deklaracja dostępności: `/static/deklaracja-dostepnosci.html`. Stopka: „jsonix v1.0.1 · projekt HackNation 2026 (zadanie UZP)” i linki do deklaracji dostępności, dokumentacji API (`/docs`) i kodu źródłowego (https://github.com/TybBla/jsonix). Wersja jest wpisana na stałe w `web/static/index.html` (`/api/health` jej nie zwraca); test pilnuje, żeby była równa najnowszej wersji z `CHANGELOG.md`.
 
 ## Testy
 
