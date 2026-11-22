@@ -5,7 +5,7 @@ Materiał dla zespołu na prezentację finałową. Ocena w finale to 50% F1 i 50
 - łatwość dodawania typów i pól bez przebudowy: 20 pkt;
 - inne funkcje, np. GUI: 10 pkt.
 
-Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1 pochodzą z pomiaru 21.11 na gałęzi E4 (Docker, OCR, `scripts/quality_report.py`); po scaleniu E4 potwierdź je tym samym skryptem. Do uzupełnienia zostaje skład zespołu (⟨…⟩).
+Źródło kryteriów: [kryteria-uzp.md](kryteria-uzp.md). Liczby F1: v0.4.0 (`eval/baseline.json`); pełny raport per pole i czas: `python scripts/quality_report.py`. Do uzupełnienia zostaje skład zespołu (⟨…⟩).
 
 ## Przygotowanie (15 minut przed)
 
@@ -32,7 +32,7 @@ Materiał dla zespołu na prezentację finałową. Ocena w finale to 50% F1 i 50
 | 6 | 0:30 | „Zmień” przy jednym polu, zapis, potem „Przywróć wartość z dokumentu” | „Urzędnik może poprawić wartość. Zmiana jest oznaczona, a oryginał da się przywrócić. Pobrany JSON zawiera poprawkę.” |
 | 7 | 0:30 | „Pobierz wszystkie wyniki (ZIP)”, otwierasz jeden JSON | „Wynik ściśle wg schematu UZP: kolejność kluczy, `null` tam, gdzie dokument nie podaje wartości. Niczego nie zmyślamy.” |
 | 8 | 1:00 | Terminal: `start.bat`, potem `output/` i `output/.trace/` | „To samo bez GUI, wsadowo, dla folderu `input/`. Trace zapisuje metodę i źródło każdej wartości: to transparentność ekstrakcji.” |
-| 9 | 0:30 | Pokazujesz `config/doctypes/*.yaml` i [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md) | „Nowy typ dokumentu to plik YAML i szablon JSON, bez zmian w kodzie. Na żywo: skopiuj 3 pliki z `examples/nowy-typ/orzeczenie_kio`, uruchom na postanowieniu KIO — wynik z 8 polami; potem usuń pliki.” |
+| 9 | 0:30 | Pokazujesz `config/doctypes/*.yaml` i [nowy-typ-dokumentu.md](nowy-typ-dokumentu.md) | „Nowy typ dokumentu to plik YAML i szablon JSON, bez zmian w kodzie. Na żywo **na kopii repozytorium (albo kopii `config/`)**: skopiuj 3 pliki z `examples/nowy-typ/orzeczenie_kio`, uruchom na postanowieniu KIO — wynik z 8 polami; w oddawanej wersji typ zostaje wyłączony (inaczej orzeczenia nie dadzą `{}`).” |
 
 Zrzuty ekranu do slajdów są w `docs/img/`: `gui-dodaj-pliki.jpg`, `gui-dlaczego-ten-typ.jpg`, `gui-hover-pole.jpg`, `gui-hover-dokument.jpg` i `gui-zaznaczenie-podpis.jpg`.
 
@@ -55,12 +55,14 @@ Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otw
 2. **Problem:** ręczne przepisywanie danych z odwołań, pełnomocnictw i potwierdzeń przelewu; skany bez tekstu; różne układy dokumentów.
 3. **Jak działa:** diagram potoku z [architektura.md](architektura.md) (PDF → ingest/OCR → klasyfikacja → ekstrakcja → JSON + trace).
 4. **Jakość (F1 wg reguł UZP):**
-   - dokumenty z tekstem: dev 99,9%, holdout 99,7%; skany: dev 97,5%, holdout 90,3%;
-   - klasyfikacja: 0 błędów na dev i holdout, dokumenty spoza typów 12/12 i 10/10;
+   - dokumenty z tekstem: dev 0,999, holdout 0,997;
+   - skany z OCR: dev 0,977, holdout 0,912 — odwołania 0,997 / 1,000, pełnomocnictwa 0,980 / 0,833 (3 dok.), przelewy 0,882 / 0,933;
+   - klasyfikacja: 0 błędów na dev i holdout, dokumenty spoza typów 15/15 i 13/13 (z OCR);
+   - czas: UZP ogranicza czas na rozwiązanie — dokument z tekstem 0,01 s, skan ~4 s; najpierw dokumenty z tekstem, `{}` zapisywane przed przetwarzaniem, więc nawet przerwany przebieg zostawia wyniki;
    - jak liczymy: `eval/score.py` wg reguł UZP, bramka regresji w CI.
 5. **Transparentność:** podświetlenie źródła w PDF, trace z metodą i fragmentem, „Dlaczego ten typ?”.
 6. **Bez LLM, z wyboru:**
-   - reguły z konfiguracji dają F1 99,9% / 99,7% bez kosztów i bez wysyłania danych poza komputer;
+   - reguły z konfiguracji dają F1 0,999 / 0,997 bez kosztów i bez wysyłania danych poza komputer;
    - 20/20 pkt za rozmiar modelu;
    - warstwa LLM jest gotowa jako opcja, tylko model ≤ 8B u dostawcy z UE.
 7. **Nowy typ bez kodu:** fragment YAML i szablonu; demo 4. typu z `examples/nowy-typ/orzeczenie_kio` (E10); dodanie pola = wpis w YAML.
@@ -75,8 +77,8 @@ Gotowa prezentacja według tego planu: [prezentacja.html](prezentacja.html) (otw
 
 ## Pytania jury: przygotowane odpowiedzi
 
-- **Dlaczego bez LLM?** Reguły z konfiguracji osiągają F1 99,9% (dev) i 99,7% (holdout) na dokumentach z tekstem. Decyzja: `docs/decyzje/E6-bez-llm.md`. LLM dodałby koszt, zależność od sieci i ryzyko zmyślania wartości, a punktów za rozmiar modelu nie zwiększy. Warstwa LLM jest gotowa jako opcja (`config/llm.yaml`, model ≤ 8B, dostawca z UE).
-- **Co z dokumentem w innym układzie?** Klasyfikacja opiera się na wielu cechach naraz (tytuł, słowa kluczowe, wzorce, cechy wykluczające), a nie na pozycji tekstu. Ekstrakcja szuka po etykietach i w oknach tekstu. Brak wartości daje `null`, a nie zgadywanie. ⟨Wyniki testu odporności z review E4.⟩
+- **Dlaczego bez LLM?** Reguły z konfiguracji osiągają F1 0,999 (dev) i 0,997 (holdout) na dokumentach z tekstem. Bez LLM i model ≤ 8B dają tyle samo punktów (20), więc decyduje F1 i czas: LLM dodałby sekundy na dokument (przy limicie czasu UZP), koszt, zależność od sieci i ryzyko zmyślania wartości. Decyzja: `docs/decyzje/E6-bez-llm.md`. Warstwa LLM jest gotowa jako opcja (`config/llm.yaml`, model ≤ 8B, dostawca z UE).
+- **Co z dokumentem w innym układzie?** Klasyfikacja opiera się na wielu cechach naraz (tytuł, słowa kluczowe, wzorce, cechy wykluczające), a nie na pozycji tekstu. Ekstrakcja szuka po etykietach i w oknach tekstu. Brak wartości daje `null`, a nie zgadywanie. Testy odporności (`docs/decyzje/E4-ekstrakcja.md`): zmienione etykiety stron („Wykonawca wnoszący odwołanie”, „Instytucja zamawiająca”), zamieniona kolejność bloków, zawinięte linie, inne formuły pełnomocnictwa i nazwiska wersalikami — F1 0,998–1,000 na dev, a holdout bez strojenia 0,996–0,997.
 - **Jak dodać nowe pole?** Wpis w `config/doctypes/<typ>.yaml` (ekstraktor, normalizator, walidator) i klucz w szablonie `config/schemas/<typ>.json`. Kod się nie zmienia.
 - **Skany?** OCR RapidOCR na CPU, modele w paczce, bez sieci. Wynik OCR jest cache'owany po hashu pliku.
 - **Bezpieczeństwo danych?** Wszystko działa lokalnie i offline. Serwer nasłuchuje na `127.0.0.1`. Pliki jobów są usuwane po 24 h. Nazwy plików są sanityzowane.

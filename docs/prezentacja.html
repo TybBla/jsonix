@@ -109,14 +109,14 @@
   <div class="kpis">
     <div class="kpi"><b>99,9%</b>dokumenty z tekstem, dev</div>
     <div class="kpi"><b>99,7%</b>dokumenty z tekstem, holdout (bez strojenia)</div>
-    <div class="kpi"><b>97,5%</b>skany z OCR, dev (holdout 90,3%)</div>
+    <div class="kpi"><b>97,7%</b>skany z OCR, dev (holdout 91,2%; przelewy 88,2%)</div>
   </div>
   <ul>
-    <li>Klasyfikacja: <strong>0 błędów</strong> na dev i holdout, dokumenty spoza typów rozpoznane <strong>12/12 i 10/10</strong>.</li>
+    <li>Klasyfikacja: <strong>0 błędów</strong> na dev i holdout, dokumenty spoza typów rozpoznane <strong>15/15 i 13/13</strong>.</li>
     <li>F1 liczone dokładnie wg reguł organizatora (<code>eval/score.py</code>): długie teksty z progiem 80%, reszta dokładnie, listy po treści.</li>
     <li>Bramka regresji w CI: każda zmiana, która obniża F1, jest zatrzymywana. Raport: <code>python scripts/quality_report.py</code>.</li>
   </ul>
-  <footer><span>jsonix · pomiar 21.11 (gałąź E4, Docker, OCR); potwierdź: scripts/quality_report.py</span><span>4</span></footer>
+  <footer><span>jsonix · v0.4.0 (eval/baseline.json); raport: scripts/quality_report.py</span><span>4</span></footer>
 </section>
 
 <section class="slide" aria-label="Slajd 5">
@@ -201,7 +201,7 @@ fields:
     <ul>
       <li>CI: testy, bramka F1 (dev i holdout), smoke na Windows i Linux, <code>docker build</code>.</li>
       <li>Smoke Docker: wynik w kontenerze = wynik CLI, także dla skanu z OCR.</li>
-      <li>Czas na CPU: dokument z tekstem <strong>0,01 s</strong>, skan z OCR średnio <strong>4 s</strong>.</li>
+      <li>Limit czasu UZP: dokument z tekstem <strong>0,01 s</strong>, skan <strong>~4 s</strong>; najpierw dokumenty z tekstem, <code>{}</code> zapisane przed przetwarzaniem.</li>
     </ul>
   </div>
   <footer><span>jsonix · README</span><span>9</span></footer>
