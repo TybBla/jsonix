@@ -7,7 +7,9 @@ Gałąź `etap/E12-raport-jakosci` → `main`. Zgłoszenie wymaga „wyników te
   - **Wynik:** `docs/raport-jakosci.md` oraz surowe metryki w `.json` obok.
   - **Tabele:** podsumowanie (F1, precyzja, pełność, dokumenty, negatywy, błędy klasyfikacji, czas na dokument), F1 per typ i F1 per pole. Pola z F1 < 0,85 są pogrubione (próg z roadmapy E7).
   - **Kontekst:** środowisko (commit, Python, CPU) i stan cache OCR.
-- Testy: renderowanie tabel i przebieg na prawdziwej bramce (dev/tekst).
+  - **Kod wyjścia:** skrypt zwraca kod ≠ 0 (największy kod bramek), gdy któraś sekcja dała ≠ 0, więc nadaje się do CI.
+  - **Uczciwość holdoutu:** raport nie twierdzi już, że holdout był nietknięty. Błędy pełnomocnictw na skanach (E7, PR #19) diagnozowano na holdoucie, więc holdout@skan dla pełnomocnictw nie jest niezależną oceną.
+- Testy: renderowanie tabel, przebieg na prawdziwej bramce (dev/tekst), kod wyjścia przy nieudanej bramce, odmiana „plik/pliki/plików”.
 - README: jedna linia w sekcji „Ewaluacja”.
 
 ### Podgląd na gałęzi E4 (jeszcze nie na `main`)

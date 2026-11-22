@@ -71,6 +71,15 @@ def _sec(v: float | None) -> str:
     return "—" if v is None else f"{v:.2f} s"
 
 
+def _pliki(n: int) -> str:
+    """„1 plik”, „3 pliki”, „5 plików”, „22 pliki”."""
+    if n == 1:
+        return "1 plik"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} pliki"
+    return f"{n} plików"
+
+
 def ocr_cache_state() -> str:
     from odw2json.config_loader import ROOT_DIR, load_app_config
 
@@ -79,7 +88,7 @@ def ocr_cache_state() -> str:
         return "brak cache OCR"
     path = Path(cache) if Path(cache).is_absolute() else ROOT_DIR / cache
     n = sum(1 for p in path.rglob("*") if p.is_file()) if path.is_dir() else 0
-    return f"ciepły ({n} plików w `{cache}`)" if n else f"zimny (pusty `{cache}`)"
+    return f"ciepły ({_pliki(n)} w `{cache}`)" if n else f"zimny (pusty `{cache}`)"
 
 
 def environment() -> dict[str, str]:
@@ -104,8 +113,10 @@ def render(runs: list[Run], env: dict[str, str], cache: str) -> str:
     out.append(
         "F1 liczone wg reguł UZP (`eval/score.py`: długie teksty z progiem podobieństwa 80%, reszta "
         "dokładnie, "
-        "listy po treści) na danych treningowych z podziałem `data/splits.yaml`. Holdout nie był używany do "
-        "strojenia reguł. Wygenerowano: `python scripts/quality_report.py`."
+        "listy po treści) na danych treningowych z podziałem `data/splits.yaml`. Holdout jest odłożony od "
+        "strojenia reguł z jednym wyjątkiem: błędy pełnomocnictw na skanach (E7) diagnozowano na holdoucie, "
+        "więc holdout@skan dla pełnomocnictw nie jest niezależną oceną. "
+        "Wygenerowano: `python scripts/quality_report.py`."
     )
     out += ["", "## Środowisko", ""]
     out += [f"- {k}: {v}" for k, v in env.items()]
@@ -217,7 +228,8 @@ def main(argv: list[str] | None = None) -> int:
         if r.exit_code != 0:
             print(f"[raport] UWAGA: bramka {r.split}/{r.source} zwróciła kod {r.exit_code}", file=sys.stderr)
     print(f"[raport] zapisano {out}")
-    return 0
+    # kod != 0, gdy którakolwiek bramka zwróciła != 0 (np. regresja albo błąd potoku)
+    return max((r.exit_code for r in runs if r.exit_code), default=0)
 
 
 if __name__ == "__main__":

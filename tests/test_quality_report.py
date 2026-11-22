@@ -68,3 +68,38 @@ def test_render_warns_when_gate_exit_code_is_not_zero():
     assert "⚠" in md and "holdout tekst: kod 1" in md
     ok = qr.render(runs[:1], {}, "brak cache OCR")
     assert "⚠" not in ok
+
+
+def test_main_returns_nonzero_when_any_gate_fails(tmp_path, monkeypatch):
+    codes = {("dev", "tekst"): 0, ("holdout", "tekst"): 1}
+
+    def fake_section(split, source, gate_dir):
+        return qr.Run(
+            split, source, _metrics(0.99, 0.9), docs=1, seconds=1.0, exit_code=codes[(split, source)]
+        )
+
+    monkeypatch.setattr(qr, "run_section", fake_section)
+    monkeypatch.setattr(qr, "ocr_cache_state", lambda: "brak cache OCR")
+    out = tmp_path / "r.md"
+    assert qr.main(["--source", "tekst", "--out", str(out)]) == 1
+    codes[("holdout", "tekst")] = 0
+    assert qr.main(["--source", "tekst", "--out", str(out)]) == 0
+
+
+def test_pliki_polish_plural():
+    assert [qr._pliki(n) for n in (1, 2, 5, 12, 22, 25, 104, 112)] == [
+        "1 plik",
+        "2 pliki",
+        "5 plików",
+        "12 plików",
+        "22 pliki",
+        "25 plików",
+        "104 pliki",
+        "112 plików",
+    ]
+
+
+def test_render_does_not_claim_holdout_untouched():
+    md = qr.render([], {}, "brak cache OCR")
+    assert "Holdout nie był używany" not in md
+    assert "nie jest niezależną oceną" in md
