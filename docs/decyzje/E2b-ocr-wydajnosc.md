@@ -140,6 +140,84 @@ porównawczą (bez diakrytyków) i słownik form prawnych.
   runnerach GitHub (do zmierzenia). Rozwiązanie to kasety z T4; test `slow` z silnikiem uruchamia jedną stronę (ok. 5 s).
 - Ryzyko: `intra_op_num_threads: 4` na maszynie z 2 rdzeniami bywa gorsze niż domyślne; wartość jest w konfiguracji.
 
+## Stabilność pod obciążeniem (E4, 2026-11-22)
+
+**Objaw.** Pierwszy, „zimny” przebieg `python -m eval.gate --split dev --source skan` uruchomiony równolegle z
+`pytest` dawał 3-9 błędów klasyfikacji na skanach (za każdym razem inne dokumenty). Kolejne przebiegi: 0 błędów.
+
+**Przyczyna (z dowodem): brak pamięci systemowej (limitu commit), nie niedeterminizm modelu i nie cache.**
+- Determinizm: ta sama strona 3x w jednym procesie bez cache (plus ponowny render) daje identyczny tekst
+  (sha1 równe) dla odwolania/0009, 0010, potwierdzenia/0001, pelnomocnictwa/0003. Hipoteza (d) odrzucona.
+- Pamięć: jeden proces OCR utrzymuje ok. 600 MB commit, szczyt ok. 990 MB (pomiar `GetProcessMemoryInfo`).
+  Na maszynie (15,3 GB RAM, plik stronicowania ok. 2 GB) przy pracy innych agentów wolny commit wynosił
+  0,6-2,7 GB (zmienny w czasie), więc 3 równoległe procesy OCR + pytest wyczerpują go w szczytach.
+- **Z tych 600 MB aż ok. 480 MB to bufory OpenBLAS** rezerwowane przy samym `import numpy` (16 wątków
+  logicznych): `import numpy` = +492 MB commit, z `OPENBLAS_NUM_THREADS=1` = +10 MB. Przy braku pamięci
+  OpenBLAS przerywa cały interpreter (`OpenBLAS error: Memory allocation still failed after 10 retries,
+  giving up`) bez wyjątku Pythona; tak padły bramka i skrypt w 3. przebiegu, a w 2. przebiegu
+  `pytest -m "not slow"` skończył się bez podsumowania (exit 1, ucięty na 67%). To ten sam objaw, który inny
+  agent zgłosił przy `test_engine_params_passed_to_rapidocr`: test używa podmienionego `RapidOCR`, ale
+  `_rapidocr_run` importuje numpy, więc to pierwszy import numpy w szybkich testach wywracał proces.
+- Reprodukcja przed poprawką (zimny cache, 4 równoległe procesy: bramka, 2x skrypt ingest+klasyfikacja na
+  30 skanach, z cache i bez, plus `pytest -m "not slow"`): bramka **17 błędów klasyfikacji (exit 1)**;
+  skrypty: 25/30 i 24/30 dokumentów źle (typ `None`), po 55 nieudanych stron. Komunikaty:
+  `onnxruntime ... Fail: [ONNXRuntimeError] : 1 : FAIL : bad allocation` (17 i 24 razy) oraz
+  `MemoryError: Unable to allocate 25.1 MiB for an array with shape (1760, 1248, 3)` (38 i 31 razy);
+  raz nawet pypdfium2/pypdf nie wczytały PDF-a (`MemoryError`). Hipoteza (a) potwierdzona.
+- Mechanizm: `_apply_ocr` łapał wyjątek i zostawiał stronę pustą z ostrzeżeniem, więc dokument bez tekstu
+  stawał się „nieznany”. Hipoteza (b) odrzucona: nieudany OCR nie trafiał do cache (wyjątek przed zapisem),
+  a pusty plik cache i tak był traktowany jak brak; stąd kolejne przebiegi były zielone (brakujące strony
+  liczone od nowa, gdy pamięci już nie brakowało). Hipoteza (c) odrzucona: zapis cache jest atomowy
+  (`os.replace`, plik tymczasowy z PID), a uszkodzonych wpisów nie zaobserwowano.
+
+**Poprawka:**
+- `odw2json/__init__.py`: `os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")` przed pierwszym importem numpy
+  (wartość użytkownika wygrywa). Proces OCR: commit stały 600 -> 120 MB, szczyt 990 -> 510 MB. Czas 7 stron
+  (odwolania/0006, bez cache): 36 s przy 16 wątkach BLAS, 32 s przy 1, 30 s przy 4, czyli w granicach szumu,
+  bo obliczenia liczy onnxruntime, a numpy tylko konwertuje obrazy.
+- `ingest.ocr.max_concurrent_processes: 1` (`config/app.yaml`): slot międzyprocesowy, czyli blokada pliku
+  `slot-K.lock` w `%TEMP%/odw2json-ocr-slots` (`msvcrt.locking` / `fcntl.flock`), trzymana na czas jednej
+  strony. Szczyty kilku procesów (bramka, pytest, GUI, inne worktree) już się nie nakładają. System zwalnia
+  blokadę także po awarii procesu. Po `slot_timeout_s: 900` czekania OCR rusza mimo wszystko (log). 0 albo
+  brak klucza = bez limitu (tak działają testy z podmienionym silnikiem). Na tej maszynie równoległość OCR i
+  tak nie przyspieszała (tabela wariantów wyżej), więc limit 1 nie kosztuje przepustowości.
+- Ponowienia (`odw2json/ingest/ocr.py`): render + silnik do `OCR_ATTEMPTS = 5` prób, z przerwą 2, 5, 10, 20 s
+  (plus `gc.collect()`), razem maksymalnie 37 s na stronę. Każda nieudana próba trafia do logu. Przy 4 próbach
+  (2/5/10 s) w 1. przebiegu po poprawce zostało po 1 stronie nieudanej na proces.
+- Po wyczerpaniu prób: `OcrError`, a w `Document.warnings` wyraźnie
+  `OCR nieudany – strona N (Typ: ostatni wiersz komunikatu)` (bez wielowierszowego tracebacku ORT).
+- Pusty lub nieudany wynik **nigdy** nie trafia do cache na dysku ani do pamięci procesu (LRU), więc kolejne
+  wywołanie znów próbuje silnika.
+- Blokada `_ENGINE_LOCK` wokół render + silnik: w jednym procesie (API z pulą wątków) naraz OCR-uje jedna
+  strona. Silnik sam wątkuje (`intra_op_num_threads: 4`), więc równoległe wywołania tylko mnożyły szczyt
+  pamięci; RapidOCR nie deklaruje bezpieczeństwa wątkowego.
+- **Bez** zmniejszania liczby wątków ORT przy ponowieniu: zmierzone, szczyt commit 990 MB przy 1 wątku i
+  992 MB przy 4, a osobna instancja silnika dla innych parametrów kosztowałaby kolejne ~500 MB.
+- Testy: szybki zestaw (`-m "not slow"`) nie importuje `onnxruntime` ani `rapidocr` (sprawdzone wtyczką
+  pytest na końcu sesji). Testy z prawdziwym silnikiem mają `slow` + `ocr_live`. Nowe testy: silnik rzucający
+  wyjątek co drugie wywołanie, brak cache dla pustych i nieudanych wyników, krótkie ostrzeżenie, blokada w
+  procesie (6 wątków, szczyt 1), slot międzyprocesowy (wyłączność, czekanie, limit czasu, 0 = wyłączony),
+  walidacja kluczy, `OPENBLAS_NUM_THREADS` w podprocesie.
+
+**Reprodukcje** (zimny cache, 4 procesy naraz: bramka `--source skan`, skrypt ingest+klasyfikacja 30 skanów
+z cache (A) i bez cache (B), `pytest -m "not slow"`):
+
+| Przebieg | Kod | Bramka (błędy klas.) | A: źle / nieudane strony | B: źle / nieudane strony | pytest |
+|---|---|---|---|---|---|
+| przed | stary | 17 (exit 1) | 25/30 / 55 | 24/30 / 55 | exit 0 |
+| po 1 | ponowienia 4x, cache, blokada | 0 (exit 0) | 0/30 / 1 | 0/30 / 1 | exit 0 |
+| po 2 | ponowienia 5x | 1 (exit 1, potwierdzenia/0007) | 1/30 / 1 | 0/30 / 1 | exit 1 (crash OpenBLAS) |
+| po 3 | + slot międzyprocesowy | crash OpenBLAS przy imporcie | 0/30 / 0 | crash OpenBLAS | exit 0 |
+| po 4 (częściowy) | pełna poprawka (+ OpenBLAS 1 wątek) | przerwany (limit czasu) | 0/5 / 0 | 0/10 / 0 | exit 0 |
+
+Przebieg „po 4” przerwano po ok. 6 min z powodu limitu czasu zadania: do tego momentu zero nieudanych prób
+OCR (ani jednej linii „próba N/5 nieudana” w żadnym procesie). Z limitem 1 slotu trzy procesy OCR-ują
+strony po kolei, więc pełny przebieg 3 x 72 stron trwa ok. 3x dłużej niż pojedynczy. **Do zrobienia:** pełny
+przebieg po 4 i drugi przebieg (zimny cache + równoległe procesy) na pełnej poprawce, oba z wynikiem 0 błędów.
+
+Wolny commit przed przebiegami „po 2” i „po 3”: 1,5-1,6 GB, w trakcie spadł do 0,64 GB (inne procesy na
+maszynie), stąd awarie OpenBLAS przy imporcie, zanim jakikolwiek kod OCR ruszył.
+
 ## Ryzyka
 
 - `Global.use_cls: false` (klasyfikator kąta wyłączony) przyspiesza OCR, ale strony obrócone o 90/180° w skanach
