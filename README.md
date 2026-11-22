@@ -6,36 +6,19 @@ jsonix czyta dokumenty PDF ze sprawy odwoławczej KIO i zamienia je na dane JSON
 
 Wersja **v1.0.1** · F1 wg reguł UZP: **0,998** (dev) / **0,994** (holdout) · [raport jakości](docs/raport-jakosci.md) · projekt HackNation 2026 (zadanie UZP)
 
-## Uruchomienie na VM jury (tak, jak sprawdza jury)
+## Instrukcja uruchomienia na VM
 
-Ocena odbywa się na VM UZP: Ubuntu 24.04, 2 vCPU, 16 GB RAM, Docker. Jury wrzuca dokumenty do `/opt/solution/input`, w katalogu `/opt/solution` uruchamia z `sudo` komendę z pliku `/opt/solution/RUN.md` i zabiera wyniki z `/opt/solution/output`. Limit czasu to 60 minut na 150 plików.
-
-**1. Przygotowanie VM** (jednorazowo, robi to zespół):
+1. Wgraj dokumenty do `/opt/solution/input` — jeden podfolder na sprawę: `/opt/solution/input/<sprawa>/<plik>.pdf` (PDF-y luzem w `input/` też zadziałają).
+2. Uruchom:
 
 ```bash
 cd /opt/solution
-git clone https://github.com/TybBla/jsonix.git repo
-docker build -t jsonix:latest repo      # kilka minut; potem nic nie jest pobierane
-cp repo/RUN.md /opt/solution/RUN.md
+sudo docker run --rm -e JSONIX_APP_CONFIG=config/app.jury.yaml -v /opt/solution/input:/app/input -v /opt/solution/output:/app/output jsonix:latest python -m odw2json run input output
 ```
 
-**2. Ocena** (to robi jury):
+3. Wyniki są w `/opt/solution/output/<sprawa>/<nazwa_pdf>.json` — jeden plik JSON na każdy PDF; dokument spoza trzech typów ma `{}`.
 
-```bash
-# dokumenty: /opt/solution/input/<sprawa>/<plik>.pdf (albo PDF-y luzem w input/)
-cd /opt/solution
-sudo docker run --rm -e JSONIX_APP_CONFIG=config/app.jury.yaml \
-  -v /opt/solution/input:/app/input -v /opt/solution/output:/app/output \
-  jsonix:latest python -m odw2json run input output
-```
-
-To ta sama komenda co w [RUN.md](RUN.md). Kończy się sama, nie zadaje pytań, nie potrzebuje usług w tle ani kluczy API.
-
-**3. Wynik:** `/opt/solution/output/<sprawa>/<nazwa_pdf>.json`, jeden plik na każdy PDF, w tym `{}` dla dokumentów spoza trzech typów. W `output/` nie ma nic poza tymi plikami.
-
-**Czas na tej VM:** 226 PDF-ów ze zbioru treningowego, w tym 30 skanów, przetwarza się w 6 minut. Dokument z tekstem zajmuje ułamek sekundy, skan średnio około 12 s. Nawet 150 samych skanów to około 30 minut. Plik `{}` powstaje dla każdego PDF-a od razu na starcie, a wyniki zapisują się na bieżąco. Dzięki temu po ewentualnym przerwaniu w `output/` są wszystkie gotowe wyniki.
-
-Wdrożenie jest gotowe i przetestowane: komenda działa z `sudo` i po restarcie VM. Szczegóły i skrypt z autotestem: [docs/vm-jury.md](docs/vm-jury.md), `scripts/deploy-vm.sh`.
+Ta sama komenda jest w [RUN.md](RUN.md). Kończy się sama, bez pytań i bez dostępu do sieci. Czas na VM (2 vCPU): dokument z tekstem ułamek sekundy, skan średnio ok. 12 s; 226 PDF-ów (w tym 30 skanów) — 6 minut.
 
 ## Uruchomienie u siebie
 
