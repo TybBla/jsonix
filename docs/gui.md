@@ -29,7 +29,17 @@ Dopasowania są liczone **raz** po wczytaniu dokumentu (`buildSourceMap`): każd
 
 ![Podgląd przy najechaniu na fragment w dokumencie](img/gui-hover-dokument.jpg)
 
-Przy każdym polu czytnik ekranu odczyta „Źródło: strona N, „…fragment…””.
+### Źródło wartości (ikonka i dymek)
+
+Przy wartości pola nie ma stałej linii „Źródło: …”, tylko mała ikonka (przycisk 24 × 24 px): „i” w kółku, gdy źródło znaleziono, albo „!” w żółtym trójkącie, gdy go brak (ostrzeżenie: nie znaleziono fragmentu, strona jest skanem bez warstwy tekstowej, wartość wyliczona). Szczegóły (strona, fragment, ostrzeżenia) są w dymku (`web/static/js/source-pop.js`):
+
+- **Mysz:** najechanie na ikonkę pokazuje dymek po ok. 0,35 s, zjechanie go chowa (dymek można najechać, żeby zaznaczyć tekst). Kliknięcie ikonki utrwala dymek i zaznacza pole (podświetlenie w PDF, bez przełączania widoku na wąskim ekranie); drugie kliknięcie zamyka.
+- **Klawiatura:** Tab przechodzi do ikonki (widoczna obwódka fokusu), Enter lub spacja otwiera dymek, Esc zamyka. Tab i fokus same dymka nie otwierają.
+- **Zamknięcie:** Esc, kliknięcie poza dymkiem i przewinięcie listy; przewijanie podglądu PDF (np. po zaznaczeniu pola) go nie zamyka. Otwarty jest naraz jeden dymek. Położenie jest korygowane, żeby nie wychodził poza okno (przesunięcie w bok, a bez miejsca pod ikonką pokazuje się nad nią).
+- **Czytnik ekranu:** ikonka ma `aria-label` („Źródło wartości „NIP”: strona 2”; w wariancie ostrzegawczym „…: ostrzeżenie, nie znaleziono fragmentu w dokumencie”), `aria-expanded`, `aria-controls` i `aria-describedby` wskazujące dymek (`role="tooltip"`). Samo pole nadal ma `aria-describedby` do ukrytego opisu „Źródło: strona N, „…fragment…””, więc informacja jest dostępna bez otwierania dymka.
+- Ostrzeżenia nie znikają z widoku: ikonka ostrzegawcza jest widoczna zawsze i różni się kształtem (trójkąt z „!”), nie tylko kolorem.
+
+Wygląd: tekst drugorzędny (`--muted`) ma kolor `#4a4a4a` (kontrast 8,9:1 na bieli i 7,8:1 na `#f1f1f1`); nagłówek jest przy lewej krawędzi okna, bez logo, z tytułem „jsonix” 1,75–2 rem.
 
 Lista pól powstaje z `data`, a nie z `trace`, więc widać też pola bez wartości („Nie podano”). Etykiety pól są w `web/static/js/fields.js`; pole nowego typu dokumentu bez etykiety w słowniku dostaje ją automatycznie z nazwy klucza (`numer_umowy` → „Numer umowy”), więc nowy typ działa w GUI bez zmian kodu.
 
@@ -45,10 +55,10 @@ Lista pól powstaje z `data`, a nie z `trace`, więc widać też pola bez warto�
 
 ## Dostępność
 
-Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), pełna obsługa klawiaturą, link „Przejdź do treści”, podsumowanie błędów z fokusem i prefiksem „Błąd:” w tytule strony, regiony `role="alert"` / `role="status"`, status nigdy tylko kolorem, przełącznik wysokiego kontrastu i rozmiaru tekstu. Deklaracja dostępności: `/static/deklaracja-dostepnosci.html`.
+Styl wg Design System Gov.pl (kolory, Open Sans, komunikaty z piktogramem), pełna obsługa klawiaturą, link „Przejdź do treści”, podsumowanie błędów z fokusem i prefiksem „Błąd:” w tytule strony, regiony `role="alert"` / `role="status"`, status nigdy tylko kolorem, przełącznik wysokiego kontrastu i rozmiaru tekstu. Deklaracja dostępności: `/static/deklaracja-dostepnosci.html`. Stopka: „jsonix v1.0.0 · projekt HackNation 2026 (zadanie UZP)” i linki do deklaracji dostępności, dokumentacji API (`/docs`) i kodu źródłowego (wersja wpisana na stałe; `/api/health` jej nie zwraca).
 
 ## Testy
 
 - `tests/test_api.py` — API jobów (upload, walidacja, path traversal, nazwy zarezerwowane Windows, pobieranie PDF/JSON/ZIP, limity żądania, kolejka jobów, zgodność danych z CLI).
-- `tests/test_gui_static.py` — struktura strony (landmarki, ARIA, teksty Gov.pl, lokalne zasoby), a z Node.js także logika JS: dopasowanie fragmentów na prawdziwym tekście PDF z `przyklad_01` (każde pole z `page` w `tests/fixtures/gui/*.result.json` musi zostać znalezione na właściwej stronie), mapa pól liczona raz (także czas dla długiego dokumentu) i stany podglądu przy najechaniu.
+- `tests/test_gui_static.py` — struktura strony (landmarki, ARIA, teksty Gov.pl, lokalne zasoby), a z Node.js także logika JS: dopasowanie fragmentów na prawdziwym tekście PDF z `przyklad_01` (każde pole z `page` w `tests/fixtures/gui/*.result.json` musi zostać znalezione na właściwej stronie), mapa pól liczona raz (także czas dla długiego dokumentu) i stany podglądu przy najechaniu, a także ikonka źródła i dymek (opis źródła, stany, położenie, zdarzenia na atrapie DOM), kontrast szarego tekstu (wzór WCAG), nagłówek i stopka.
 - `scripts/smoke_gui.py` — test dymny na uruchomionym serwerze.
