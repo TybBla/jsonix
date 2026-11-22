@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from odw2json import pipeline
-from odw2json.config_loader import ROOT_DIR, load_registry
+from odw2json.config_loader import ROOT_DIR, load_app_config, load_registry
 from odw2json.logging_setup import new_run_id, setup_logging
 
 
@@ -17,6 +17,23 @@ def _force_utf8() -> None:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+
+
+def write_placeholders(pdfs: list[Path], input_dir: Path, output_dir: Path, app_cfg: dict) -> None:
+    """Wynik „dokument nieznany” dla każdego wejścia PRZED przetwarzaniem.
+
+    UZP ogranicza czas na rozwiązanie (docs/kryteria-uzp.md, pkt 5a). Gdy przebieg zostanie przerwany,
+    każdy PDF ma już plik wynikowy (zgodnie z `unknown_output`: `{}` albo pusty plik) zamiast jego braku;
+    `pipeline.run` nadpisuje go pełnym wynikiem zaraz po przetworzeniu pliku.
+    """
+    mode = app_cfg.get("unknown_output", "empty_object")
+    if mode not in ("empty_object", "empty_file"):
+        return
+    content = "{}" if mode == "empty_object" else ""
+    for pdf in pdfs:
+        target = output_dir / pdf.relative_to(input_dir).with_suffix(".json")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pipeline.write_text_atomic(target, content)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,7 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     run_id = new_run_id()
     log_file = Path(a.log_file) if a.log_file else out / ".logs" / f"{run_id}.jsonl"
     setup_logging(a.verbose, log_file, run_id=run_id)
-    rep = pipeline.run(Path(a.input), out, run_id=run_id)
+    inp = Path(a.input)
+    write_placeholders(pipeline.list_inputs(inp), inp, out, load_app_config())
+    rep = pipeline.run(inp, out, run_id=run_id)
     print(f"Przebieg: {run_id}")
     print(
         f"Przetworzono: {rep.processed}, typy: {rep.by_type}, błędy: {len(rep.errors)}, "

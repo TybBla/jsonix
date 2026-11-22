@@ -51,7 +51,8 @@ def _tylko_cyfry(tekst: str) -> str:
 # --- date -----------------------------------------------------------------
 
 # DD.MM.RRRR, DD-MM-RRRR, DD/MM/RRRR; ten sam separator w obu miejscach (\2).
-_DATA_DMY = re.compile(r"^(\d{1,2})([./-])(\d{1,2})\2(\d{4})$")
+# separator spacja: OCR gubi kropki („20 04 2026”); ten sam separator w obu miejscach
+_DATA_DMY = re.compile(r"^(\d{1,2})([./\- ])(\d{1,2})\2(\d{4})$")
 _DATA_ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 _DATA_SLOWNIE = re.compile(r"^(\d{1,2})\s+([^\W\d_]+)\s+(\d{4})$")
 _SUFIKS_R = re.compile(r"\s*(r\.|r|roku)$", re.IGNORECASE)

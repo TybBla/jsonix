@@ -222,3 +222,63 @@ Testy: `tests/test_extract_robustness_pelnomocnictwo.py` (warianty prawdziwych t
 
 **Ograniczenia.** Imię i nazwisko z członem jednoliterowym wersalikiem („J. KOWALSKI”) nie jest wzorcem
 imienia; warianty „Mocodawca”/„MOCODAWCA” jako goły nagłówek nad nazwą rozpoznaje tylko forma wersalikowa.
+
+## Sonda odporności (E7-13, stan po v0.4.0)
+
+`scripts/robustness_probe.py` — narzędzie diagnostyczne (nie bramka, zawsze kod wyjścia 0). Buduje korpus z
+`data/train` + `data/splits.yaml` (tylko PDF-y z warstwą tekstu, bez OCR i bez skanów; typ z kluczy GT jak w
+`eval`), przerabia teksty w pamięci 72 wariantami (synonimy etykiet, formaty dat/kwot/IBAN/BZP/NIP, szyk zdań,
+zawinięcia, wersaliki, puste linie, brak pól — GT zmienia się razem z tekstem tylko tam, gdzie powinno) i liczy
+F1 wg `eval.score`. Raport: F1 bazowe per typ, F1 per wariant (`<<<` = spadek o > 0,005) i lista pęknięć
+(wariant, typ, pole, liczba dokumentów, przykładowe sprawy).
+
+```powershell
+python scripts/robustness_probe.py --split dev                     # strojenie (tylko dev!)
+python scripts/robustness_probe.py --split dev --variant c --examples 3   # warianty z prefiksem „c”, PRED vs GT
+python scripts/robustness_probe.py --split holdout --out output/odpornosc-holdout.txt   # raz, na końcu
+```
+
+Warianty to słownik `VARIANTS` w skrypcie (funkcja `(tekst, gt, typ) -> (tekst, gt)`); nowy wariant = jeden wpis.
+Warianty białych znaków (NBSP, podwójne spacje, CRLF) przechodzą przez `ingest.clean` z `config/app.yaml`, bo
+w prawdziwym potoku to czyszczenie je usuwa. Numery rachunków i BZP w GT wariantów są „jak w dokumencie”
+(ustalenie UZP 21.11: z prefiksem `PL` tylko, gdy jest w dokumencie; BZP z przyrostkiem `/NN`, gdy jest w tekście).
+
+**Wynik (v0.4.0 + poprawki E7-13), F1 bazowe:** dev odwołanie 0,998 / pełnomocnictwo 1,000 / przelew 1,000;
+holdout 0,997 / 1,000 / 0,994. Po poprawkach na dev jedyne pęknięcie to znana luka poniżej; holdout (jeden
+przebieg, bez strojenia) — brak pęknięć.
+
+| Wariant (dev) | typ | n | F1 przed | F1 po |
+|---|---|---|---|---|
+| `Data operacji` → `Data przelewu` / `Data zlecenia` | przelew | 42 | 0,909 | 1,000 |
+| `Numer transakcji` → `Nr transakcji` / `Identyfikator płatności` | przelew | 46 | 0,905–0,909 | 1,000 |
+| `Tytuł` → `Opis płatności` | przelew | 46 | 0,976 | 1,000 |
+| `Tytuł` → `Treść przelewu` | przelew | 46 | 0,909 | 1,000 |
+| `Kwota` → `Kwota płatności` | przelew | 42 | 0,998 | 1,000 |
+| `adres do korespondencji` → `adres do doręczeń` | odwołanie | 46 | 0,973 | 0,998 |
+| `Zamawiający w dniu D` → `Zamawiający dnia D` | odwołanie | 46 | 0,935 | 0,998 |
+| `Zamawiający w dniu D …` → `W dniu D Zamawiający …` | odwołanie | 46 | 0,946 | 0,998 |
+| `Odwołujący:` → `Wnoszący odwołanie:` | odwołanie | 46 | 0,726 | 0,998 |
+| `nr referencyjny sprawy` → `nr sprawy` | odwołanie | 23 | 0,973 | 0,999 |
+
+Poprawki są wyłącznie w `config/doctypes/przelew.yaml` i `odwolanie.yaml` (silnik bez zmian); testy:
+`tests/test_extract_robustness_warianty.py` (warianty naprawione: n ≥ 10 i F1 ≥ 0,97; wszystkie warianty sondy:
+brak spadku > 0,005) oraz smoke test sondy `tests/test_robustness_probe.py`.
+- **przelew:** synonimy etykiet (data przelewu/zlecenia/płatności/waluty/zaksięgowania; nr transakcji/operacji/
+  płatności, identyfikator płatności; opis płatności, treść przelewu/płatności, cel płatności; kwota płatności);
+  nowe etykiety numeru są też słowami stopu tytułu (inaczej zawinięty tytuł wchłaniał „Nr transakcji … CEN…”).
+- **odwołanie:** `adres do doręczeń` / `adres kancelarii` (nazwa i e-mail pełnomocnika); czynność: „Zamawiający dnia
+  D”, szyk odwrócony „W dniu D Zamawiający …” (data i okno klasyfikacji powodu; szyk odwrócony szukany tylko przed
+  pierwszym zarzutem, żeby nie złapać zdania z uzasadnienia); linia „Miejscowość, data” nie bierze zdania
+  „Zamawiający dnia D …” za miejscowość; etykieta strony `Wnoszący odwołanie:` (z „Wykonawca” albo bez);
+  `nr sprawy` / `numer sprawy` / `sygnatura sprawy` jako numer postępowania.
+
+**Warianty z poprzedniej recenzji (stary skrypt, wynik sprzed poprawek E4):** `a4`, `a5`, `a8`, `b4`–`b6`, `c2`,
+`c4`, `c6`, `c7` naprawione już w E4; `a2`/`odwołanie`, `b12`, `d1`, `d3` były błędami samego wariantu (etykiety
+przelewu w odwołaniu, GT bez przyrostka `/01`, niepełne usunięcie TED zapisanego `2026/S086-999073`, usuwanie
+niewłaściwej linii z datą) — poprawione w sondzie.
+
+**Znana luka (nienaprawiana):** `c2 puste linie` / przelew (1 dokument dev, `przyklad_05`) — numer rachunku zawinięty
+w środku grupy cyfr (`… 4853⏎4519`) i rozdzielony **pustą** linią. Wzorce IBAN dopuszczają tylko pojedynczy biały
+znak między grupami, a etykietowy ekstraktor `type: iban` jest w silniku. W danych puste linie nie występują
+w środku numeru (zawinięcie daje pojedynczy `\n`), więc wariant uznajemy za nierealistyczny i nie rozszerzamy
+wzorców ani silnika.
