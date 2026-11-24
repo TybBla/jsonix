@@ -1,94 +1,107 @@
 # jsonix
 
-jsonix czyta dokumenty PDF ze sprawy odwoławczej KIO i zamienia je na dane JSON w formacie UZP. Sam rozpoznaje, czy dokument to odwołanie, pełnomocnictwo czy potwierdzenie przelewu, i wyciąga z niego pola. Przy każdej wartości zapisuje, z której strony i z którego fragmentu ją wziął. Dokument innego rodzaju dostaje plik z `{}`. Skany bez tekstu czyta lokalny OCR, bez GPU i bez wysyłania danych na zewnątrz. Nie używamy LLM.
+> **Built at HackNation 2026 in Bydgoszcz** — a hackathon project for the UZP (Public Procurement Office) task.
 
-![jsonix — demo GUI](docs/img/demo-gui.gif)
+jsonix reads PDF documents from a KIO appeal case (Poland's National Appeals Chamber for public procurement) and turns them into JSON in the UZP format. It recognises on its own whether a document is an appeal, a power of attorney or a payment confirmation, and extracts the fields from it. For every value it records the page and the text fragment it came from. A document of any other kind gets an empty `{}`. Scanned PDFs without a text layer are read by a local OCR engine — no GPU, and no data leaves the machine. **No LLM is used.**
 
-Wersja **v1.0.1** · F1 wg reguł UZP: **0,998** (dev) / **0,994** (holdout) · [raport jakości](docs/raport-jakosci.md) · projekt HackNation 2026 (zadanie UZP)
+![jsonix — GUI demo](docs/img/demo-gui.gif)
 
-## Instrukcja uruchomienia na VM
+Version **v1.0.1** · F1 by UZP rules: **0.998** (dev) / **0.994** (holdout) · [quality report](docs/raport-jakosci.md)
 
-1. Wgraj dokumenty do `/opt/solution/input` — jeden podfolder na sprawę: `/opt/solution/input/<sprawa>/<plik>.pdf` (PDF-y luzem w `input/` też zadziałają).
-2. Uruchom:
+## Features
 
-```bash
-cd /opt/solution
-sudo docker run --rm -e JSONIX_APP_CONFIG=config/app.jury.yaml -v /opt/solution/input:/app/input -v /opt/solution/output:/app/output jsonix:latest python -m odw2json run input output
+- **Document classification** — appeal, power of attorney, payment confirmation; anything else maps to `{}` (28/28 out-of-scope documents handled correctly on dev and holdout).
+- **Field extraction** — rule-based, driven by YAML config, output validated against the UZP JSON schema.
+- **Source traceability** — each value carries its page and source text fragment; the GUI shows it in a tooltip and highlights it in the PDF.
+- **Local OCR for scans** — RapidOCR (PP-OCRv6 models bundled in the wheel), CPU only, fully offline at runtime.
+- **Web GUI** — upload PDFs, check the detected type with a "Why this type?" explanation, review and correct values next to the document preview, download JSON or ZIP.
+- **Batch mode** — one command processes a whole `input/<case>/*.pdf` tree into `output/<case>/*.json`.
+- **Config instead of code** — a new document type is a single `config/doctypes/<type>.yaml` file.
+
+## Results
+
+F1 computed by UZP rules on the training data (dev / holdout split):
+
+| Split | Overall | Text documents | Scans (OCR) |
+|---|---|---|---|
+| dev | 0.998 | 0.999 | 0.992 |
+| holdout | 0.994 | 0.997 | 0.967 |
+
+Classification makes no errors. Per-type and per-field results and timings are in the [quality report](docs/raport-jakosci.md); regenerate it with `python scripts/quality_report.py`.
+
+Timing (2 vCPU): a text document takes a fraction of a second, a scan about 12 s on average; 226 PDFs (30 of them scans) take 6 minutes.
+
+## How it works
+
+```
+PDF → text layer or OCR → document type recognition → field extraction → UZP JSON (+ source of every value)
 ```
 
-3. Wyniki są w `/opt/solution/output/<sprawa>/<nazwa_pdf>.json` — jeden plik JSON na każdy PDF; dokument spoza trzech typów ma `{}`.
+- **Config over code.** Each document type lives in `config/doctypes/<type>.yaml`: how to recognise it and where its fields come from. Adding a type needs configuration only ([guide](docs/nowy-typ-dokumentu.md), [example: KIO ruling](examples/nowy-typ/orzeczenie_kio/README.md)).
+- **Transparency.** Every value stores its page and the text it was taken from.
+- **Why no LLM.** Rules reach F1 0.999 on text documents, cost nothing, run locally and are reproducible. Rationale: [decision E6](docs/decyzje/E6-bez-llm.md). An optional LLM layer can be enabled in `config/app.yaml`, restricted to models up to 8B from an EU provider.
 
-Ta sama komenda jest w [RUN.md](RUN.md). Kończy się sama, bez pytań i bez dostępu do sieci. Czas na VM (2 vCPU): dokument z tekstem ułamek sekundy, skan średnio ok. 12 s; 226 PDF-ów (w tym 30 skanów) — 6 minut.
+Full description: [docs/architektura.md](docs/architektura.md).
 
-## Uruchomienie u siebie
+## Quick start
 
-**Windows** (Python 3.13 lub 3.14 z [python.org](https://www.python.org/downloads/), z zaznaczonym „Add python.exe to PATH”):
+### Windows
+
+Requires Python 3.13 or 3.14 from [python.org](https://www.python.org/downloads/) with "Add python.exe to PATH" ticked.
 
 ```powershell
-.\start-gui.bat     # aplikacja w przeglądarce: http://127.0.0.1:8000
-.\start.bat         # wsad: PDF-y z input\<sprawa>\ → wyniki w output\<sprawa>\
+.\start-gui.bat     # web app: http://127.0.0.1:8000
+.\start.bat         # batch: PDFs from input\<case>\ → results in output\<case>\
 ```
 
-Za pierwszym razem skrypt sam tworzy środowisko i instaluje zależności. Trwa to kilka minut i wymaga internetu. Potem aplikacja działa offline.
+The first run creates a virtual environment and installs dependencies (a few minutes, internet required). After that everything works offline.
 
-**Docker** (dowolny system):
+### Docker (any OS)
 
 ```bash
-docker compose up --build                            # aplikacja: http://127.0.0.1:8000
-docker compose run --rm app python -m odw2json run   # wsad: input/ → output/
+docker compose up --build                            # web app: http://127.0.0.1:8000
+docker compose run --rm app python -m odw2json run   # batch: input/ → output/
 ```
 
-**Linux/macOS:** `pip install -r requirements.txt`, potem `sh start.sh` (wsad) albo `python -m odw2json serve` (aplikacja).
+### Linux / macOS
 
-W aplikacji wgrywasz PDF-y sprawy i klikasz „Analizuj”. Potem sprawdzasz rozpoznany typ (wraz z uzasadnieniem „Dlaczego ten typ?”) i przeglądasz dane obok podglądu dokumentu. Ikonka „i” przy wartości pokazuje stronę i fragment źródła, a najechanie na pole podświetla je w PDF. Wartości można poprawić i pobrać jako JSON albo ZIP. Więcej: [docs/gui.md](docs/gui.md).
-
-## Wyniki
-
-F1 liczone wg reguł UZP na danych treningowych (podział dev/holdout):
-
-| Zbiór | Razem | Dokumenty z tekstem | Skany (OCR) |
-|---|---|---|---|
-| dev | 0,998 | 0,999 | 0,992 |
-| holdout | 0,994 | 0,997 | 0,967 |
-
-Klasyfikacja nie popełnia błędów, a wszystkie dokumenty spoza typów dostają `{}` (15/15 i 13/13). Wyniki per typ i pole oraz czasy są w [raporcie jakości](docs/raport-jakosci.md). Skrypt `python scripts/quality_report.py` generuje go od nowa.
-
-## Jak to działa
-
-```
-PDF → tekst z PDF albo OCR → rozpoznanie typu → wyodrębnienie pól → JSON wg schematu UZP (+ źródło każdej wartości)
+```bash
+pip install -r requirements.txt
+sh start.sh                  # batch
+python -m odw2json serve     # web app
 ```
 
-- **Konfiguracja zamiast kodu.** Każdy typ dokumentu to plik `config/doctypes/<typ>.yaml`: jak go rozpoznać i skąd brać pola. Nowy typ dodaje się samą konfiguracją ([instrukcja](docs/nowy-typ-dokumentu.md), [przykład: orzeczenie KIO](examples/nowy-typ/orzeczenie_kio/README.md)).
-- **Przejrzystość.** Każda wartość ma zapisaną stronę i fragment tekstu, z którego pochodzi. GUI pokazuje je w dokumencie.
-- **Bez LLM.** Reguły dają F1 0,999 na dokumentach z tekstem, nic nie kosztują, działają lokalnie i dają powtarzalny wynik, a za moc modelu jest wtedy maksimum punktów. Uzasadnienie: [decyzja E6](docs/decyzje/E6-bez-llm.md). Opcjonalną warstwę LLM można włączyć w `config/app.yaml`, wyłącznie z modelem do 8B od dostawcy z UE.
+### Using the web app
 
-Pełny opis: [docs/architektura.md](docs/architektura.md).
+Upload the case PDFs and click "Analizuj" (Analyze). Check the detected type, browse the extracted data next to the document preview, hover a field to highlight it in the PDF, click the "i" icon to see its source page and fragment, correct values if needed, and download the result as JSON or ZIP. More: [docs/gui.md](docs/gui.md).
 
-## Dokumentacja
+## Documentation
 
-| Dokument | Co zawiera |
+| Document | Contents |
 |---|---|
-| [RUN.md](RUN.md) | komenda dla jury na VM |
-| [docs/vm-jury.md](docs/vm-jury.md) | wdrożenie i test na VM krok po kroku |
-| [docs/architektura.md](docs/architektura.md) | architektura: etapy, kontrakty danych, konfiguracja, API i GUI |
-| [docs/nowy-typ-dokumentu.md](docs/nowy-typ-dokumentu.md) | konfiguracja ekstrakcji i dodawanie nowej klasy dokumentów |
-| [docs/gui.md](docs/gui.md) | aplikacja w przeglądarce |
-| [docs/raport-jakosci.md](docs/raport-jakosci.md) | wyniki testów jakości |
-| [docs/test-jury.md](docs/test-jury.md) | test instalacji ze świeżego klonu (Windows, Docker) |
-| [docs/decyzje/E6-bez-llm.md](docs/decyzje/E6-bez-llm.md) | dlaczego bez LLM |
-| [docs/zgloszenie.md](docs/zgloszenie.md) | zgodność z regulaminem, użyte komponenty open source i licencje |
-| [docs/kryteria-uzp.md](docs/kryteria-uzp.md) | kryteria oceny i ustalenia organizatora |
-| [CHANGELOG.md](CHANGELOG.md) | historia wersji |
+| [docs/architektura.md](docs/architektura.md) | architecture: stages, data contracts, configuration, API and GUI |
+| [docs/nowy-typ-dokumentu.md](docs/nowy-typ-dokumentu.md) | extraction config and adding a new document class |
+| [docs/gui.md](docs/gui.md) | the browser application |
+| [docs/raport-jakosci.md](docs/raport-jakosci.md) | quality test results |
+| [docs/decyzje/E6-bez-llm.md](docs/decyzje/E6-bez-llm.md) | why no LLM |
+| [docs/zgloszenie.md](docs/zgloszenie.md) | compliance with the rules, open-source components and licences |
+| [docs/kryteria-uzp.md](docs/kryteria-uzp.md) | judging criteria and organiser clarifications |
+| [CHANGELOG.md](CHANGELOG.md) | version history |
 
-## Dla programistów
+> Most of the documentation is written in Polish.
+
+## For developers
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q -m "not slow"                  # szybkie testy
-python -m eval.gate --split dev --source tekst     # bramka jakości F1 (jak w CI)
+python -m pytest -q -m "not slow"                  # fast tests
+python -m eval.gate --split dev --source tekst     # F1 quality gate (as in CI)
 ```
 
-CI na GitHub Actions uruchamia lint, testy, bramkę F1, testy dymne na Windows i Ubuntu oraz `docker build`. Jak liczymy F1: [eval/README.md](eval/README.md). Zasady pracy w repo: [AGENTS.md](AGENTS.md).
+CI on GitHub Actions runs lint, tests, the F1 gate, smoke tests on Windows and Ubuntu, and `docker build`. How F1 is computed: [eval/README.md](eval/README.md). Repository working rules: [AGENTS.md](AGENTS.md).
 
-Dane treningowe pochodzą z [repozytorium UZP](https://github.com/Urzad-Zamowien-Publicznych/hacknation-2026).
+**Stack:** Python 3.13+, FastAPI + Uvicorn, pdfplumber / pypdf / pypdfium2, RapidOCR + ONNX Runtime, Pydantic, RapidFuzz, PyYAML.
+
+## Acknowledgements
+
+Training data comes from the [UZP repository](https://github.com/Urzad-Zamowien-Publicznych/hacknation-2026).
